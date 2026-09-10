@@ -20,6 +20,22 @@ export function addDaysIso(iso: string, days: number) {
   return format(addDays(parseISO(iso), days), "yyyy-MM-dd");
 }
 
+export function stayDates(guests: GuestEntry[], g: GuestEntry) {
+  const nights = guests.filter((x) => stayKey(x) === stayKey(g));
+  const checkIn =
+    g.checkIn ||
+    nights.reduce((m, x) => (m && m < x.date ? m : x.date), g.date);
+  const out = nights.find((x) => x.stay === "out" || Boolean(x.checkOut));
+  return {
+    checkIn,
+    checkOut:
+      g.checkOut ||
+      out?.checkOut ||
+      (out?.stay === "out" ? out.date : null) ||
+      null,
+  };
+}
+
 export function applyStay(
   guests: GuestEntry[],
   id: string,

@@ -20,7 +20,11 @@ export function expenseBucket(particular: string): ExpBucket {
 
 export function sumByMode(rows: NamedAmount[]) {
   const out: Record<PayMode, number> = {
-    CASH: 0, QRS: 0, QRPK: 0, ONLINE: 0, BALANCE: 0,
+    CASH: 0,
+    QRS: 0,
+    QRPK: 0,
+    ONLINE: 0,
+    BALANCE: 0,
   };
   for (const r of rows) out[r.mode] += r.amount;
   return out;
@@ -44,7 +48,11 @@ export function sumByDay(rows: NamedAmount[]) {
 
 export function sumByBucket(rows: NamedAmount[]) {
   const out: Record<ExpBucket, number> = {
-    flysky: 0, ws: 0, kitchen: 0, salary: 0, ops: 0,
+    flysky: 0,
+    ws: 0,
+    kitchen: 0,
+    salary: 0,
+    ops: 0,
   };
   for (const r of rows) out[expenseBucket(r.particular)] += r.amount;
   return out;

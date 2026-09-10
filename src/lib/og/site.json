@@ -1,4 +1,6 @@
 {
-  "name": "Status Ledger",
-  "description": "Daily cash book for Hotel Status Residency, Mahape."
+  "title": "Status Ledger",
+  "description": "Daily cash-book for Hotel Status Residency, Mahape.",
+  "type": "website",
+  "card": "custom"
 }

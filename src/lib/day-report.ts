@@ -20,7 +20,10 @@ export interface DayTake {
   balanceRooms: string[];
 }
 
-function addMode(rows: { mode: PayMode; amount: number }[], mode: PayMode) {
+function addMode(
+  rows: { mode: PayMode; amount: number }[],
+  mode: PayMode,
+) {
   return rows.filter((r) => r.mode === mode).reduce((s, r) => s + r.amount, 0);
 }
 
