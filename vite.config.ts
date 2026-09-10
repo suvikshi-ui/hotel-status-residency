@@ -134,7 +134,9 @@ export default defineConfig(async ({ command, isPreview }) => {
 
   const grokPwa: Plugin[] = [];
   if (!isGithubPages) {
-    const { grokPwaPlugin } = await import("./scripts/grok-pwa-plugin.mjs");
+    // Non-literal specifier so the Pages config bundle does not resolve this file.
+    const spec = [".", "scripts", "grok-pwa-plugin.mjs"].join("/");
+    const { grokPwaPlugin } = await import(/* @vite-ignore */ spec);
     grokPwa.push(grokPwaPlugin());
   }
 
