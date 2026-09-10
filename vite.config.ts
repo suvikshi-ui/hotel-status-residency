@@ -130,6 +130,9 @@ function authPopupPlugin(): Plugin {
 }
 
 export default defineConfig(async ({ command, isPreview }) => {
+  if (isGithubPages) {
+    process.env.VITE_GITHUB_PAGES = "true";
+  }
   const base = publicBase();
   const routerBasepath = base === "/" ? "/" : base.replace(/\/$/, "");
 

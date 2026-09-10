@@ -3,15 +3,18 @@
  * Belt-and-suspenders for `npm run build:pages`.
  * Ensures GitHub Pages gets index.html, 404.html (SPA fallback) and .nojekyll
  * even if the Vite plugin did not run.
+ *
+ * Do not copy hashed assets to the workspace root — a root `assets/*.css`
+ * folder makes the default Vercel/Nitro build fail.
  */
 import {
   copyFileSync,
   existsSync,
   mkdirSync,
-  readFileSync,
   readdirSync,
   statSync,
   writeFileSync,
+  readFileSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -80,8 +83,13 @@ if (!htmlPath) {
 }
 
 const indexHtml = readFileSync(htmlPath, "utf8");
-if (!indexHtml.includes("<html") || !indexHtml.includes("script")) {
-  console.error("pages-finalize: index.html is not a usable document");
+if (
+  !indexHtml.includes("<html") ||
+  !indexHtml.includes("script") ||
+  !indexHtml.includes('id="root"') ||
+  !indexHtml.includes("Hotel Status Residency")
+) {
+  console.error("pages-finalize: index.html is not a usable SPA document");
   process.exit(1);
 }
 

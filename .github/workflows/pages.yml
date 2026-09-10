@@ -34,6 +34,7 @@ jobs:
         run: npm run build:pages
         env:
           GITHUB_PAGES: "true"
+          VITE_GITHUB_PAGES: "true"
           GITHUB_REPOSITORY: ${{ github.repository }}
 
       - name: Verify Pages artifact
@@ -44,6 +45,8 @@ jobs:
           test -f .output/public/.nojekyll
           grep -E 'type="module"' .output/public/index.html
           grep -F "/${GITHUB_REPOSITORY#*/}/" .output/public/index.html
+          grep -F 'id="root"' .output/public/index.html
+          grep -F "Hotel Status Residency" .output/public/index.html
           ! grep -qi jekyll .output/public/index.html
 
       - name: Upload Pages artifact

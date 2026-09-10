@@ -44,8 +44,8 @@ Data lives in the browser (`localStorage` key `status-ledger-v5`). Rooms and sta
 
 Live app: [https://suvikshi-ui.github.io/hotel-status-residency/](https://suvikshi-ui.github.io/hotel-status-residency/)
 
-The site is a static SPA. Base path is `/hotel-status-residency/` (from the repo name).
-
-**Settings → Pages → Source = GitHub Actions** — not “Deploy from a branch”. Branch deploy runs Jekyll on the README and hides the app.
+Static SPA. Base path is `/hotel-status-residency/` (from the repo name). Client routes fall back through `404.html`.
 
 Every push to `main` runs `.github/workflows/pages.yml` (`npm ci` + `npm run build:pages`).
+
+If GitHub Settings still say “Deploy from a branch”, leave **Source = `/` on `main`**. The repo root also ships `index.html`, `404.html`, `.nojekyll` and hashed assets so the ledger still opens. Prefer **Settings → Pages → Source = GitHub Actions** when you can change it.

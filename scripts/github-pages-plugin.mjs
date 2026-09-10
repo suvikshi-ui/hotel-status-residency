@@ -6,8 +6,9 @@
  * writes the SPA shell after the client bundle so Pages can serve the app
  * from `/<repo>/` with a 404.html fallback for client routes.
  *
- * TanStack Start's client calls `hydrate(router)`, which reads `window.$_TSR`.
- * A minimal stub lets the client rematch routes without a prerendered payload.
+ * The shell mounts into `#root` with `createRoot` (see `src/client.tsx`).
+ * `window.$_TSR` is still required: StartClient hydrates the router, not the
+ * DOM.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -55,6 +56,15 @@ export function renderPagesHtml({ base, entryFile, cssFiles }) {
 ${cssLinks}
   </head>
   <body>
+    <div id="root">
+      <div style="min-height:100dvh;display:grid;place-items:center;background:#f3eee4;color:#1f5c54;font-family:Figtree,system-ui,sans-serif;padding:24px;text-align:center">
+        <div>
+          <p style="margin:0 0 8px;letter-spacing:.18em;text-transform:uppercase;font-size:11px;color:#6f675c">Night audit</p>
+          <h1 style="margin:0;font-size:clamp(1.6rem,4vw,2.4rem);line-height:1.15">Hotel Status Residency</h1>
+          <p style="margin:10px 0 0;color:#6f675c">Status Ledger · Mahape</p>
+        </div>
+      </div>
+    </div>
     <script>
       window.$_TSR = {
         router: { manifest: undefined, matches: [] },

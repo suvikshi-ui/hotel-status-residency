@@ -9,6 +9,7 @@ import { publicUrl } from "@/lib/public-url";
 import appCss from "../styles.css?url";
 
 const APP_NAME = "Status Ledger";
+const isGithubPages = import.meta.env.VITE_GITHUB_PAGES === "true";
 
 export const Route = createRootRoute({
   head: () => ({
@@ -31,25 +32,40 @@ export const Route = createRootRoute({
       { rel: "apple-touch-icon", href: publicUrl("__grok/icon-180.png") },
     ],
   }),
-  component: () => (
+  component: RootComponent,
+});
+
+function AppTree() {
+  return (
+    <>
+      <PreviewHostBridge />
+      <AuthProvider>
+        <HydrateLedger>
+          <SecurityProvider>
+            <AppShell>
+              <Outlet />
+            </AppShell>
+            <Toaster />
+          </SecurityProvider>
+        </HydrateLedger>
+      </AuthProvider>
+    </>
+  );
+}
+
+function RootComponent() {
+  if (isGithubPages) {
+    return <AppTree />;
+  }
+  return (
     <html lang="en" suppressHydrationWarning className="antialiased">
       <head>
         <HeadContent />
       </head>
       <body>
-        <PreviewHostBridge />
-        <AuthProvider>
-          <HydrateLedger>
-            <SecurityProvider>
-            <AppShell>
-              <Outlet />
-            </AppShell>
-            <Toaster />
-            </SecurityProvider>
-          </HydrateLedger>
-        </AuthProvider>
+        <AppTree />
         <Scripts />
       </body>
     </html>
-  ),
-});
+  );
+}
