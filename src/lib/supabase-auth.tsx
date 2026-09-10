@@ -11,6 +11,7 @@ import type { Session, User } from "@supabase/supabase-js";
 import { isSupabaseConfigured } from "./supabase-config";
 import { getSupabase } from "./supabase";
 import { setLedgerOwner } from "./store";
+import { stopCloudSync } from "./supabase-sync";
 
 export type StaffUser = {
   id: string;
@@ -124,6 +125,7 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
     if (isSupabaseConfigured()) {
       await getSupabase().auth.signOut();
     }
+    stopCloudSync();
     setUser(null);
     await setLedgerOwner(null);
   }, []);

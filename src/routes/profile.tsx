@@ -10,6 +10,9 @@ import { formatDay, money } from "@/lib/format";
 import { codeOk, hashCode } from "@/lib/pin";
 import { useLedger } from "@/lib/store";
 import { HotelLogo } from "@/components/hotel-logo";
+import { CloudSchemaSetup } from "@/components/cloud-schema-setup";
+import { useStaffSession } from "@/lib/supabase-auth";
+import { useCloudSync } from "@/lib/supabase-sync";
 
 export const Route = createFileRoute("/profile")({ component: ProfilePage });
 
@@ -21,6 +24,8 @@ function ProfilePage() {
   const setOpening = useLedger((s) => s.setOpening);
   const setSecurityCode = useLedger((s) => s.setSecurityCode);
   const { gate, hasCode } = useGate();
+  const { user } = useStaffSession();
+  const cloud = useCloudSync();
 
   const [date, setDate] = useState(openingDate);
   const [cash, setCash] = useState(String(opening.cash));
@@ -49,6 +54,35 @@ function ProfilePage() {
           </p>
         </div>
       </div>
+
+      {user ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Cloud books</CardTitle>
+            <p className="text-sm text-muted">
+              {cloud.phase === "missing-schema"
+                ? "Rooms, staff, expenses and balance tables are not in your Supabase project yet. Books stay on this device until those tables exist."
+                : cloud.phase === "error"
+                  ? cloud.message || "Could not reach your account's books."
+                  : cloud.phase === "migrated"
+                    ? "This device's older books were copied into your account."
+                    : cloud.phase === "saving"
+                      ? "Saving the latest entries to your account…"
+                      : "Rooms, staff, expenses and balance are saved to your account, per sign-in."}
+            </p>
+          </CardHeader>
+          <CardContent>
+            {cloud.phase === "missing-schema" ? (
+              <CloudSchemaSetup userId={user.id} />
+            ) : (
+              <p className="text-xs text-muted">
+                Each staff login only sees its own rooms, expenses, staff and
+                balance rows.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card>
         <CardHeader>

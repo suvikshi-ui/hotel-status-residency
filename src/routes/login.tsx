@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -6,8 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { HotelLogo } from "@/components/hotel-logo";
+import { CloudSchemaSetup } from "@/components/cloud-schema-setup";
 import { SUPABASE_URL } from "@/lib/supabase-config";
 import { useStaffSession } from "@/lib/supabase-auth";
+import { getSupabase } from "@/lib/supabase";
+import { isMissingSchema } from "@/lib/supabase-db";
 
 export const Route = createFileRoute("/login")({
   ssr: false,
@@ -23,6 +26,23 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [schemaMissing, setSchemaMissing] = useState(false);
+
+  useEffect(() => {
+    if (!configured) return;
+    let alive = true;
+    void getSupabase()
+      .from("rooms")
+      .select("no")
+      .limit(1)
+      .then(({ error }) => {
+        if (!alive) return;
+        if (error && isMissingSchema(error)) setSchemaMissing(true);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [configured]);
 
   async function onSignIn(e: FormEvent) {
     e.preventDefault();
@@ -117,8 +137,8 @@ function LoginPage() {
             {tab === "signup" ? "Create account" : "Sign in"}
           </h2>
           <p className="mt-1 text-sm text-muted">
-            Email and password. Each account keeps its own ledger on this
-            device.
+            Email and password. Each account keeps its own rooms, staff,
+            expenses and balance.
           </p>
 
           {!configured ? (
@@ -128,6 +148,19 @@ function LoginPage() {
               Send the publishable (anon) key from Supabase → Settings → API
               to finish sign-in.
             </p>
+          ) : null}
+
+          {configured && schemaMissing ? (
+            <div className="mt-5 rounded-lg bg-bg-warm px-3 py-3">
+              <p className="text-sm text-fg">
+                Rooms, staff, expenses and balance tables still need to be
+                created once in your project. After that, sign-in will copy this
+                device's old books into your account.
+              </p>
+              <div className="mt-3">
+                <CloudSchemaSetup />
+              </div>
+            </div>
           ) : null}
 
           <Tabs value={tab} onValueChange={setTab} className="mt-6">

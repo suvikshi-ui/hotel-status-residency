@@ -19,6 +19,7 @@ import { DateNav } from "@/components/date-nav";
 import { HotelLogo } from "@/components/hotel-logo";
 import { useLedger } from "@/lib/store";
 import { useStaffSession } from "@/lib/supabase-auth";
+import { useCloudSync } from "@/lib/supabase-sync";
 
 const NAV = [
   { to: "/", label: "Overview", icon: LayoutDashboard },
@@ -95,6 +96,7 @@ function NavLinks({
 export function AppShell({ children }: { children: ReactNode }) {
   const hotel = useLedger((s) => s.hotel);
   const { user, signOut } = useStaffSession();
+  const cloud = useCloudSync();
   const [menu, setMenu] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [leaving, setLeaving] = useState(false);
@@ -138,6 +140,17 @@ export function AppShell({ children }: { children: ReactNode }) {
                   {user.email}
                 </div>
               ) : null}
+              <div className="mt-1 text-[10px] uppercase tracking-[0.12em] text-sidebar-muted">
+                {cloud.phase === "saving"
+                  ? "Saving to account…"
+                  : cloud.phase === "missing-schema"
+                    ? "On this device"
+                    : cloud.phase === "error"
+                      ? "Cloud unreachable"
+                      : cloud.phase === "loading"
+                        ? "Loading books…"
+                        : "Saved to account"}
+              </div>
               <button
                 type="button"
                 onClick={onSignOut}

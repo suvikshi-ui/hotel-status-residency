@@ -71,6 +71,7 @@ export interface LedgerState {
   restoreSeed: () => void;
   setStaff: (staff: StaffRow[]) => void;
   setAdvances: (advances: AdvanceRow[]) => void;
+  applySnapshot: (p: Partial<LedgerState>) => void;
 }
 
 function seedState(): Omit<
@@ -93,6 +94,7 @@ function seedState(): Omit<
   | "restoreSeed"
   | "setStaff"
   | "setAdvances"
+  | "applySnapshot"
 > {
   return {
     hotel: seed.hotel,
@@ -104,15 +106,8 @@ function seedState(): Omit<
     expenses: seed.expenses as NamedAmount[],
     balReceived: seed.balReceived as NamedAmount[],
     days: seed.days as DayBooks[],
-    staff: (seed.staff as StaffRow[]).map((r, i) => ({
-      ...r,
-      id: r.id || `st-${i}`,
-      extra: r.extra ?? 0,
-    })),
-    advances: (seed.advances as AdvanceRow[]).map((r, i) => ({
-      ...r,
-      id: r.id || `adv-${i}`,
-    })),
+    staff: normalizeStaff(seed.staff as StaffRow[]),
+    advances: normalizeAdvances(seed.advances as AdvanceRow[]),
     ota: seed.ota,
     janSales: seed.janSales,
     janFood: seed.janFood,
@@ -122,6 +117,31 @@ function seedState(): Omit<
     openingDate: BASE_OPENING_DATE,
     securityCode: "",
   };
+}
+
+function normalizeStaff(rows: StaffRow[]): StaffRow[] {
+  return rows.map((r, i) => ({
+    ...r,
+    id: r.id || `st-${i}`,
+    extra: r.extra ?? 0,
+  }));
+}
+
+function normalizeAdvances(rows: AdvanceRow[]): AdvanceRow[] {
+  return rows.map((r, i) => ({
+    ...r,
+    id: r.id || `adv-${i}`,
+  }));
+}
+
+function mergeSnapshot(
+  persisted: Partial<LedgerState>,
+  current: LedgerState,
+): LedgerState {
+  const staff = normalizeStaff(persisted.staff ?? current.staff);
+  const advances = normalizeAdvances(persisted.advances ?? current.advances);
+  const rooms = (persisted.rooms?.length ? persisted.rooms : current.rooms) as RoomDef[];
+  return { ...current, ...persisted, staff, advances, rooms };
 }
 
 function rebuildFrom(
@@ -282,8 +302,15 @@ export const useLedger = create<LedgerState>()(
         const s = seedState();
         set(s);
       },
-      setStaff: (staff) => set({ staff }),
-      setAdvances: (advances) => set({ advances }),
+      setStaff: (staff) => set({ staff: normalizeStaff(staff) }),
+      setAdvances: (advances) => set({ advances: normalizeAdvances(advances) }),
+      applySnapshot: (p) => {
+        const merged = mergeSnapshot(p, get());
+        set({
+          ...merged,
+          ...rebuildFrom(merged, merged.openingDate || BASE_OPENING_DATE),
+        });
+      },
     }),
     {
       name: LEDGER_STORAGE_KEY,
@@ -299,23 +326,13 @@ export const useLedger = create<LedgerState>()(
         dirty: s.dirty,
         advances: s.advances,
         staff: s.staff,
+        rooms: s.rooms,
         opening: s.opening,
         openingDate: s.openingDate,
         securityCode: s.securityCode,
       }),
-      merge: (persisted, current) => {
-        const p = (persisted ?? {}) as Partial<LedgerState>;
-        const staff = (p.staff ?? current.staff).map((r, i) => ({
-          ...r,
-          id: r.id || `st-${i}`,
-          extra: r.extra ?? 0,
-        }));
-        const advances = (p.advances ?? current.advances).map((r, i) => ({
-          ...r,
-          id: r.id || `adv-${i}`,
-        }));
-        return { ...current, ...p, staff, advances };
-      },
+      merge: (persisted, current) =>
+        mergeSnapshot((persisted ?? {}) as Partial<LedgerState>, current),
     },
   ),
 );
@@ -324,8 +341,8 @@ export async function setLedgerOwner(userId: string | null) {
   const name = userId
     ? `${LEDGER_STORAGE_KEY}:${userId}`
     : LEDGER_STORAGE_KEY;
-  useLedger.setState(seedState());
   useLedger.persist.setOptions({ name });
+  useLedger.setState(seedState());
   try {
     await useLedger.persist.rehydrate();
   } catch {

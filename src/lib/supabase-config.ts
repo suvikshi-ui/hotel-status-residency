@@ -28,3 +28,8 @@ export const SUPABASE_URL =
 export function isSupabaseConfigured() {
   return Boolean(SUPABASE_URL && SUPABASE_PUBLISHABLE_KEY);
 }
+
+export const SUPABASE_SQL_EDITOR =
+  SUPABASE_PROJECT_ID
+    ? `https://supabase.com/dashboard/project/${SUPABASE_PROJECT_ID}/sql/new`
+    : "https://supabase.com/dashboard";
