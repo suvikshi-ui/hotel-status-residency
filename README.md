@@ -44,6 +44,8 @@ Data lives in the browser (`localStorage` key `status-ledger-v5`). Rooms and sta
 
 Live app: [https://suvikshi-ui.github.io/hotel-status-residency/](https://suvikshi-ui.github.io/hotel-status-residency/)
 
-Every push to `main` runs `.github/workflows/pages.yml`: it builds a static SPA with `base` set from the repo name (`/hotel-status-residency/`) and deploys to GitHub Pages.
+The site is a static SPA. Base path is `/hotel-status-residency/` (from the repo name).
 
-In the repo: **Settings → Pages → Source = GitHub Actions**.
+**Settings → Pages → Source = GitHub Actions** — not “Deploy from a branch”. Branch deploy runs Jekyll on the README and hides the app.
+
+Every push to `main` runs `.github/workflows/pages.yml` (`npm ci` + `npm run build:pages`).
