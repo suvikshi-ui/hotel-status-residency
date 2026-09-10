@@ -29,12 +29,15 @@ let message: string | undefined;
 const listeners = new Set<(s: CloudState) => void>();
 let unsubStore: (() => void) | null = null;
 let timer: ReturnType<typeof setTimeout> | null = null;
+let retryTimer: ReturnType<typeof setInterval> | null = null;
 let hydrating = false;
 let lastHash = "";
 let lastUserId: string | null = null;
 let warnedMissing = false;
 let hideFlush: (() => void) | null = null;
 let hideVis: (() => void) | null = null;
+let inFlight: Promise<void> | null = null;
+let queued = false;
 
 function emit() {
   const snap = { phase, message };
@@ -86,11 +89,25 @@ function hashOf(s: LedgerSnapshot) {
   return JSON.stringify(s);
 }
 
-async function flush(userId: string) {
-  if (hydrating || phase === "missing-schema" || phase === "off") return;
+function disarmRetry() {
+  if (retryTimer) {
+    clearInterval(retryTimer);
+    retryTimer = null;
+  }
+}
+
+function armRetry(userId: string) {
+  if (retryTimer) return;
+  retryTimer = setInterval(() => {
+    lastHash = "";
+    void flush(userId);
+  }, 8000);
+}
+
+async function doFlush(userId: string) {
   const snap = snapshotFromStore();
   const hash = hashOf(snap);
-  if (hash === lastHash) return;
+  if (hash === lastHash && (phase === "synced" || phase === "migrated")) return;
   setPhase("saving");
   const result = await pushLedger(userId, snap);
   if (!result.ok) {
@@ -98,15 +115,50 @@ async function flush(userId: string) {
       setPhase("missing-schema", result.message);
       if (!warnedMissing) {
         warnedMissing = true;
-        toast.error("Cloud tables are missing. Books stay on this device.");
+        toast.error("Could not save to your account yet. Entries stay on this phone until cloud tables exist.");
       }
+      armRetry(userId);
       return;
     }
     setPhase("error", result.message);
+    armRetry(userId);
     return;
   }
-  lastHash = hash;
+  disarmRetry();
+  lastHash = hashOf(snapshotFromStore());
   setPhase("synced");
+}
+
+async function flush(userId: string) {
+  if (hydrating || !lastUserId || lastUserId !== userId) return;
+  if (inFlight) {
+    queued = true;
+    return inFlight;
+  }
+  inFlight = doFlush(userId)
+    .catch((err) => {
+      setPhase("error", err instanceof Error ? err.message : "Save failed");
+      armRetry(userId);
+    })
+    .finally(() => {
+      inFlight = null;
+      if (queued && lastUserId === userId) {
+        queued = false;
+        void flush(userId);
+      }
+    });
+  return inFlight;
+}
+
+/** Call from every ledger mutation. Coalesces in-flight writes. */
+export function requestCloudSave() {
+  const userId = lastUserId;
+  if (!userId || hydrating) return;
+  if (timer) clearTimeout(timer);
+  timer = setTimeout(() => {
+    timer = null;
+    void flush(userId);
+  }, 0);
 }
 
 export function stopCloudSync() {
@@ -114,11 +166,13 @@ export function stopCloudSync() {
     clearTimeout(timer);
     timer = null;
   }
+  disarmRetry();
   unsubStore?.();
   unsubStore = null;
   lastUserId = null;
   lastHash = "";
   hydrating = false;
+  queued = false;
   if (typeof window !== "undefined" && hideFlush) {
     window.removeEventListener("pagehide", hideFlush);
     hideFlush = null;
@@ -127,18 +181,14 @@ export function stopCloudSync() {
     document.removeEventListener("visibilitychange", hideVis);
     hideVis = null;
   }
-  if (phase !== "off" && phase !== "missing-schema") setPhase("off");
+  if (phase !== "off") setPhase("off");
 }
 
 export function startCloudSync(userId: string) {
   lastUserId = userId;
   unsubStore?.();
   unsubStore = useLedger.subscribe(() => {
-    if (hydrating || lastUserId !== userId) return;
-    if (timer) clearTimeout(timer);
-    timer = setTimeout(() => {
-      void flush(userId);
-    }, 900);
+    requestCloudSave();
   });
   if (typeof window !== "undefined") {
     if (hideFlush) window.removeEventListener("pagehide", hideFlush);
@@ -152,10 +202,12 @@ export function startCloudSync(userId: string) {
     };
     hideVis = () => {
       if (document.visibilityState === "hidden") hideFlush?.();
+      if (document.visibilityState === "visible") requestCloudSave();
     };
     window.addEventListener("pagehide", hideFlush);
     document.addEventListener("visibilitychange", hideVis);
   }
+  requestCloudSave();
 }
 
 export async function hydrateFromCloud(userId: string): Promise<CloudPhase> {
@@ -266,9 +318,8 @@ export function useCloudSync() {
 
 export async function retryCloudHydrate(userId: string) {
   warnedMissing = false;
+  lastHash = "";
   const phaseNow = await hydrateFromCloud(userId);
-  if (phaseNow !== "missing-schema" && phaseNow !== "error") {
-    startCloudSync(userId);
-  }
+  startCloudSync(userId);
   return phaseNow;
 }

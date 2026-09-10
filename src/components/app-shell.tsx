@@ -144,9 +144,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                 {cloud.phase === "saving"
                   ? "Saving to account…"
                   : cloud.phase === "missing-schema"
-                    ? "On this device"
+                    ? "Not in account yet"
                     : cloud.phase === "error"
-                      ? "Cloud unreachable"
+                      ? "Account save failed"
                       : cloud.phase === "loading"
                         ? "Loading books…"
                         : "Saved to account"}

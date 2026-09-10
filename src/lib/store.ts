@@ -21,6 +21,10 @@ import { uid } from "./format";
 import { applyStay } from "./stay";
 import { closeAsPrev, computeBooks, openingAsPrev } from "./ledger";
 
+function afterSave() {
+  void import("./supabase-sync").then((m) => m.requestCloudSave());
+}
+
 const seed = seedJson as SeedData;
 const BASE_OPENING = seed.opening;
 const BASE_OPENING_DATE = seed.days[0]?.date ?? "2026-09-01";
@@ -187,19 +191,24 @@ function rebuildFrom(
 
 export const useLedger = create<LedgerState>()(
   persist(
-    (set, get) => ({
+    (set, get) => {
+      const save: typeof set = ((...args: Parameters<typeof set>) => {
+        set(...args);
+        afterSave();
+      }) as typeof set;
+      return {
       ...seedState(),
-      setDate: (date) => set({ selectedDate: date }),
+      setDate: (date) => save({ selectedDate: date }),
       setOpening: (date, opening) => {
         const next = { ...get(), opening, openingDate: date, selectedDate: date };
-        set({
+        save({
           opening,
           openingDate: date,
           selectedDate: date,
           ...rebuildFrom(next, date),
         });
       },
-      setSecurityCode: (hash) => set({ securityCode: hash }),
+      setSecurityCode: (hash) => save({ securityCode: hash }),
       addGuest: (g) => {
         const date = g.date ?? get().selectedDate;
         const existing = get().guests.filter((x) => x.date === date);
@@ -216,7 +225,7 @@ export const useLedger = create<LedgerState>()(
           } as GuestEntry,
         ];
         const next = { ...get(), guests };
-        set({ guests, ...rebuildFrom(next, date) });
+        save({ guests, ...rebuildFrom(next, date) });
       },
       updateGuest: (id, patch) => {
         const guests = get().guests.map((g) =>
@@ -224,43 +233,43 @@ export const useLedger = create<LedgerState>()(
         );
         const row = guests.find((g) => g.id === id);
         const next = { ...get(), guests };
-        set({ guests, ...rebuildFrom(next, row?.date ?? get().selectedDate) });
+        save({ guests, ...rebuildFrom(next, row?.date ?? get().selectedDate) });
       },
       setStay: (id, stay) => {
         const row = get().guests.find((g) => g.id === id);
         const guests = applyStay(get().guests, id, stay);
         const next = { ...get(), guests };
-        set({ guests, ...rebuildFrom(next, row?.date ?? get().selectedDate) });
+        save({ guests, ...rebuildFrom(next, row?.date ?? get().selectedDate) });
       },
       removeGuest: (id) => {
         const row = get().guests.find((g) => g.id === id);
         const guests = get().guests.filter((g) => g.id !== id);
         const next = { ...get(), guests };
-        set({ guests, ...rebuildFrom(next, row?.date ?? get().selectedDate) });
+        save({ guests, ...rebuildFrom(next, row?.date ?? get().selectedDate) });
       },
       addFood: (row) => {
         const date = row.date ?? get().selectedDate;
         const food = [...get().food, { ...row, id: uid("f"), date }];
         const next = { ...get(), food };
-        set({ food, ...rebuildFrom(next, date) });
+        save({ food, ...rebuildFrom(next, date) });
       },
       removeFood: (id) => {
         const row = get().food.find((x) => x.id === id);
         const food = get().food.filter((x) => x.id !== id);
         const next = { ...get(), food };
-        set({ food, ...rebuildFrom(next, row?.date ?? get().selectedDate) });
+        save({ food, ...rebuildFrom(next, row?.date ?? get().selectedDate) });
       },
       addWholesale: (row) => {
         const date = row.date ?? get().selectedDate;
         const wholesale = [...get().wholesale, { ...row, id: uid("w"), date }];
         const next = { ...get(), wholesale };
-        set({ wholesale, ...rebuildFrom(next, date) });
+        save({ wholesale, ...rebuildFrom(next, date) });
       },
       removeWholesale: (id) => {
         const row = get().wholesale.find((x) => x.id === id);
         const wholesale = get().wholesale.filter((x) => x.id !== id);
         const next = { ...get(), wholesale };
-        set({
+        save({
           wholesale,
           ...rebuildFrom(next, row?.date ?? get().selectedDate),
         });
@@ -269,13 +278,13 @@ export const useLedger = create<LedgerState>()(
         const date = row.date ?? get().selectedDate;
         const expenses = [...get().expenses, { ...row, id: uid("e"), date }];
         const next = { ...get(), expenses };
-        set({ expenses, ...rebuildFrom(next, date) });
+        save({ expenses, ...rebuildFrom(next, date) });
       },
       removeExpense: (id) => {
         const row = get().expenses.find((x) => x.id === id);
         const expenses = get().expenses.filter((x) => x.id !== id);
         const next = { ...get(), expenses };
-        set({
+        save({
           expenses,
           ...rebuildFrom(next, row?.date ?? get().selectedDate),
         });
@@ -287,31 +296,32 @@ export const useLedger = create<LedgerState>()(
           { ...row, id: uid("b"), date },
         ];
         const next = { ...get(), balReceived };
-        set({ balReceived, ...rebuildFrom(next, date) });
+        save({ balReceived, ...rebuildFrom(next, date) });
       },
       removeBalReceived: (id) => {
         const row = get().balReceived.find((x) => x.id === id);
         const balReceived = get().balReceived.filter((x) => x.id !== id);
         const next = { ...get(), balReceived };
-        set({
+        save({
           balReceived,
           ...rebuildFrom(next, row?.date ?? get().selectedDate),
         });
       },
       restoreSeed: () => {
         const s = seedState();
-        set(s);
+        save(s);
       },
-      setStaff: (staff) => set({ staff: normalizeStaff(staff) }),
-      setAdvances: (advances) => set({ advances: normalizeAdvances(advances) }),
+      setStaff: (staff) => save({ staff: normalizeStaff(staff) }),
+      setAdvances: (advances) => save({ advances: normalizeAdvances(advances) }),
       applySnapshot: (p) => {
         const merged = mergeSnapshot(p, get());
-        set({
+        save({
           ...merged,
           ...rebuildFrom(merged, merged.openingDate || BASE_OPENING_DATE),
         });
       },
-    }),
+    };
+    },
     {
       name: LEDGER_STORAGE_KEY,
       skipHydration: true,

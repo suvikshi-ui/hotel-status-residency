@@ -33,10 +33,8 @@ export function HydrateLedger({ children }: { children: ReactNode }) {
     void (async () => {
       await setLedgerOwner(user?.id ?? null);
       if (user?.id) {
-        const phase = await hydrateFromCloud(user.id);
-        if (phase !== "missing-schema" && phase !== "error" && phase !== "off") {
-          startCloudSync(user.id);
-        }
+        await hydrateFromCloud(user.id);
+        startCloudSync(user.id);
       }
       if (!cancelled) setReady(true);
     })();
