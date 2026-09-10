@@ -39,3 +39,11 @@ npm run build
 | Profile | Opening balances + security code |
 
 Data lives in the browser (`localStorage` key `status-ledger-v5`). Rooms and staff names are seeded; books start at zero.
+
+## GitHub Pages
+
+Live app: [https://suvikshi-ui.github.io/hotel-status-residency/](https://suvikshi-ui.github.io/hotel-status-residency/)
+
+Every push to `main` runs `.github/workflows/pages.yml`: it builds a static SPA with `base` set from the repo name (`/hotel-status-residency/`) and deploys to GitHub Pages.
+
+In the repo: **Settings → Pages → Source = GitHub Actions**.
