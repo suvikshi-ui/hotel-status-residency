@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { publicUrl } from "@/lib/public-url";
 
 export function HotelLogo({
   className,
@@ -11,7 +12,7 @@ export function HotelLogo({
 }) {
   return (
     <img
-      src={mark ? "/logo-mark.png?v=2" : "/logo.png?v=2"}
+      src={publicUrl(mark ? "logo-mark.png?v=2" : "logo.png?v=2")}
       alt={alt}
       className={cn("h-10 w-auto object-contain", className)}
     />
