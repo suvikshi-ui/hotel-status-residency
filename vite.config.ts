@@ -1,5 +1,6 @@
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import type { Plugin } from "vite";
 import { defineConfig } from "vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
@@ -134,8 +135,10 @@ export default defineConfig(async ({ command, isPreview }) => {
 
   const grokPwa: Plugin[] = [];
   if (!isGithubPages) {
-    // Non-literal specifier so the Pages config bundle does not resolve this file.
-    const spec = [".", "scripts", "grok-pwa-plugin.mjs"].join("/");
+    // Absolute file URL: Vite 8.3 loads this config from node_modules/.vite-temp.
+    const spec = pathToFileURL(
+      join(process.cwd(), "scripts", "grok-pwa-plugin.mjs"),
+    ).href;
     const { grokPwaPlugin } = await import(/* @vite-ignore */ spec);
     grokPwa.push(grokPwaPlugin());
   }
