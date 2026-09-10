@@ -1,0 +1,160 @@
+@import url("https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Cinzel:wght@600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Figtree:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap");
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@theme {
+  --color-bg: #f3eee4;
+  --color-bg-warm: #ebe4d4;
+  --color-fg: #1c1915;
+  --color-card: #faf6ee;
+  --color-muted: #6f675c;
+  --color-muted-fg: #6f675c;
+  --color-border: #ddd4c2;
+  --color-primary: #1f5c54;
+  --color-primary-fg: #f4efe4;
+  --color-accent: #1f5c54;
+  --color-accent-fg: #f4efe4;
+  --color-ring: #1f5c54;
+  --color-sidebar: #152724;
+  --color-sidebar-fg: #e7e1d4;
+  --color-sidebar-muted: #9aa8a4;
+  --color-sidebar-line: #2a3f3b;
+  --color-danger: #9b3d32;
+  --color-warn: #8a5a22;
+  --color-ok: #2f6b4f;
+  --color-due: #8a5a22;
+  --color-ota: #3d5a80;
+
+  --font-sans: "Figtree", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Fraunces", "Times New Roman", serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius: 12px;
+
+  --shadow-border:
+    0 0 0 1px rgba(28, 25, 21, 0.06),
+    0 1px 2px -1px rgba(28, 25, 21, 0.06),
+    0 2px 8px 0 rgba(28, 25, 21, 0.04);
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    min-height: 100dvh;
+    background-image:
+      radial-gradient(rgba(28, 25, 21, 0.035) 0.6px, transparent 0.6px);
+    background-size: 7px 7px;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    text-wrap: balance;
+    letter-spacing: -0.03em;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  * {
+    border-color: var(--color-border);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.paper-card {
+  background: var(--color-card);
+  box-shadow: var(--shadow-border);
+}
+
+.daily-a4 {
+  width: 100%;
+  max-width: 210mm;
+  margin-inline: auto;
+  box-shadow: 0 18px 48px rgba(28, 25, 21, 0.14);
+  overflow: hidden;
+  border-radius: 16px;
+}
+
+.daily-a4-head {
+  background: #14352c !important;
+  color: #f4efe4 !important;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 8mm;
+    background: #fff;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    background-image: none !important;
+    color: #1c1915 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .paper-card {
+    box-shadow: none;
+    border: 1px solid #ddd4c2;
+    break-inside: avoid;
+  }
+
+  input {
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    padding-inline: 0 !important;
+  }
+
+  .daily-a4 {
+    box-shadow: none !important;
+    width: 100% !important;
+    max-width: none !important;
+    background: #fff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .daily-a4-head {
+    background: #14352c !important;
+  }
+}
