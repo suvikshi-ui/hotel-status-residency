@@ -1,11 +1,14 @@
 import { useEffect, type ReactNode } from "react";
-import { useLedger } from "@/lib/store";
+import { setLedgerOwner } from "@/lib/store";
+import { useStaffSession } from "@/lib/supabase-auth";
 
 export function HydrateLedger({ children }: { children: ReactNode }) {
+  const { user, isPending } = useStaffSession();
+
   useEffect(() => {
-    void Promise.resolve(useLedger.persist.rehydrate()).catch(() => {
-      /* keep seed if saved ledger cannot restore */
-    });
-  }, []);
+    if (isPending) return;
+    void setLedgerOwner(user?.id ?? null);
+  }, [user?.id, isPending]);
+
   return <>{children}</>;
 }

@@ -37,8 +37,17 @@ npm run build
 | Staff | Salary + advance sheets |
 | Reports | A4 daily sheet (print + JPEG) |
 | Profile | Opening balances + security code |
+| Sign in | Email / password (Supabase Auth) |
 
-Data lives in the browser (`localStorage` key `status-ledger-v5`). Rooms and staff names are seeded; books start at zero.
+Data lives in the browser. After sign-in the key is `status-ledger-v5:<user-id>` so each account has its own books. Rooms and staff names are seeded; books start at zero.
+
+## Sign in
+
+Staff email + password via **Supabase Auth**. URL is `https://<project-id>.supabase.co`.
+
+Set `VITE_SUPABASE_PROJECT_ID` and `VITE_SUPABASE_ANON_KEY` (publishable key), or put them in `src/lib/supabase-config.ts`. Until those are set, the ledger stays open without a login wall.
+
+In the Supabase dashboard enable **Email** under Authentication → Providers, and turn off “Confirm email” if you want instant access after Create account.
 
 ## GitHub Pages
 

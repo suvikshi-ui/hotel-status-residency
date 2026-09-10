@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as BalanceRouteImport } from './routes/balance'
 import { Route as DaySheetRouteImport } from './routes/day-sheet'
 import { Route as ExpensesRouteImport } from './routes/expenses'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as ReportsRouteImport } from './routes/reports'
@@ -37,6 +38,11 @@ const DaySheetRoute = DaySheetRouteImport.update({
 const ExpensesRoute = ExpensesRouteImport.update({
   id: '/expenses',
   path: '/expenses',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProfileRoute = ProfileRouteImport.update({
@@ -70,6 +76,7 @@ export interface FileRoutesByFullPath {
   '/balance': typeof BalanceRoute
   '/day-sheet': typeof DaySheetRoute
   '/expenses': typeof ExpensesRoute
+  '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
   '/reports': typeof ReportsRoute
@@ -81,6 +88,7 @@ export interface FileRoutesByTo {
   '/balance': typeof BalanceRoute
   '/day-sheet': typeof DaySheetRoute
   '/expenses': typeof ExpensesRoute
+  '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
   '/reports': typeof ReportsRoute
@@ -93,6 +101,7 @@ export interface FileRoutesById {
   '/balance': typeof BalanceRoute
   '/day-sheet': typeof DaySheetRoute
   '/expenses': typeof ExpensesRoute
+  '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
   '/reports': typeof ReportsRoute
@@ -106,6 +115,7 @@ export interface FileRouteTypes {
     | '/balance'
     | '/day-sheet'
     | '/expenses'
+    | '/login'
     | '/profile'
     | '/register'
     | '/reports'
@@ -117,6 +127,7 @@ export interface FileRouteTypes {
     | '/balance'
     | '/day-sheet'
     | '/expenses'
+    | '/login'
     | '/profile'
     | '/register'
     | '/reports'
@@ -128,6 +139,7 @@ export interface FileRouteTypes {
     | '/balance'
     | '/day-sheet'
     | '/expenses'
+    | '/login'
     | '/profile'
     | '/register'
     | '/reports'
@@ -140,6 +152,7 @@ export interface RootRouteChildren {
   BalanceRoute: typeof BalanceRoute
   DaySheetRoute: typeof DaySheetRoute
   ExpensesRoute: typeof ExpensesRoute
+  LoginRoute: typeof LoginRoute
   ProfileRoute: typeof ProfileRoute
   RegisterRoute: typeof RegisterRoute
   ReportsRoute: typeof ReportsRoute
@@ -175,6 +188,13 @@ declare module '@tanstack/react-router' {
       path: '/expenses'
       fullPath: '/expenses'
       preLoaderRoute: typeof ExpensesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/profile': {
@@ -220,6 +240,7 @@ const rootRouteChildren: RootRouteChildren = {
   BalanceRoute: BalanceRoute,
   DaySheetRoute: DaySheetRoute,
   ExpensesRoute: ExpensesRoute,
+  LoginRoute: LoginRoute,
   ProfileRoute: ProfileRoute,
   RegisterRoute: RegisterRoute,
   ReportsRoute: ReportsRoute,

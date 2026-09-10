@@ -27,6 +27,7 @@ const BASE_OPENING_DATE = seed.days[0]?.date ?? "2026-09-01";
 
 export const LAST_SEEDED = "2026-09-01";
 export const DEFAULT_DATE = LAST_SEEDED;
+export const LEDGER_STORAGE_KEY = "status-ledger-v5";
 
 function byDate<T extends { date: string }>(rows: T[], date: string) {
   return rows.filter((r) => r.date === date);
@@ -285,7 +286,7 @@ export const useLedger = create<LedgerState>()(
       setAdvances: (advances) => set({ advances }),
     }),
     {
-      name: "status-ledger-v5",
+      name: LEDGER_STORAGE_KEY,
       skipHydration: true,
       partialize: (s) => ({
         guests: s.guests,
@@ -318,6 +319,19 @@ export const useLedger = create<LedgerState>()(
     },
   ),
 );
+
+export async function setLedgerOwner(userId: string | null) {
+  const name = userId
+    ? `${LEDGER_STORAGE_KEY}:${userId}`
+    : LEDGER_STORAGE_KEY;
+  useLedger.setState(seedState());
+  useLedger.persist.setOptions({ name });
+  try {
+    await useLedger.persist.rehydrate();
+  } catch {
+    /* keep seed if saved ledger cannot restore */
+  }
+}
 
 export function useDayBooks(date: string): DayBooks | undefined {
   const days = useLedger((s) => s.days);

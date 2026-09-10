@@ -3,13 +3,14 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import {
   BookOpen,
   Building2,
+  CircleUser,
   LayoutDashboard,
+  LogOut,
   Menu,
   Receipt,
   Scale,
   Users,
   BarChart3,
-  CircleUser,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { DateNav } from "@/components/date-nav";
 import { HotelLogo } from "@/components/hotel-logo";
 import { useLedger } from "@/lib/store";
+import { useStaffSession } from "@/lib/supabase-auth";
 
 const NAV = [
   { to: "/", label: "Overview", icon: LayoutDashboard },
@@ -92,12 +94,21 @@ function NavLinks({
 
 export function AppShell({ children }: { children: ReactNode }) {
   const hotel = useLedger((s) => s.hotel);
+  const { user, signOut } = useStaffSession();
   const [menu, setMenu] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const [leaving, setLeaving] = useState(false);
 
   useEffect(() => {
     setMenu(false);
   }, [pathname]);
+
+  function onSignOut() {
+    setLeaving(true);
+    void signOut().catch(() => setLeaving(false));
+  }
+
+  const accountLabel = user?.name || user?.email || "Staff";
 
   return (
     <div className="min-h-dvh md:grid md:grid-cols-[16.5rem_1fr]">
@@ -116,8 +127,32 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="min-h-0 flex-1 overflow-y-auto">
           <NavLinks variant="side" />
         </div>
-        <div className="border-t border-sidebar-line px-5 py-3 text-[10px] leading-snug text-sidebar-muted">
-          {hotel.blessing}
+        <div className="border-t border-sidebar-line px-5 py-4">
+          {user ? (
+            <>
+              <div className="truncate text-xs font-medium text-sidebar-fg">
+                {accountLabel}
+              </div>
+              {user.email && user.name ? (
+                <div className="truncate text-[11px] text-sidebar-muted">
+                  {user.email}
+                </div>
+              ) : null}
+              <button
+                type="button"
+                onClick={onSignOut}
+                disabled={leaving}
+                className="mt-3 flex min-h-10 w-full items-center gap-2 rounded-lg px-2 text-sm text-sidebar-muted hover:bg-sidebar-line/60 hover:text-sidebar-fg disabled:cursor-wait"
+              >
+                <LogOut className="size-4" />
+                {leaving ? "Signing out…" : "Sign out"}
+              </button>
+            </>
+          ) : (
+            <p className="text-[10px] leading-snug text-sidebar-muted">
+              {hotel.blessing}
+            </p>
+          )}
         </div>
       </aside>
 
@@ -147,6 +182,17 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </div>
               </div>
               <NavLinks variant="side" onNavigate={() => setMenu(false)} />
+              {user ? (
+                <button
+                  type="button"
+                  onClick={onSignOut}
+                  disabled={leaving}
+                  className="mt-6 flex min-h-11 w-full items-center gap-2 rounded-lg px-5 text-sm text-muted hover:bg-bg-warm"
+                >
+                  <LogOut className="size-4" />
+                  {leaving ? "Signing out…" : "Sign out"}
+                </button>
+              ) : null}
             </SheetContent>
           </Sheet>
           <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -156,6 +202,18 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
           </div>
           <DateNav />
+          {user ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="shrink-0"
+              aria-label={leaving ? "Signing out" : "Sign out"}
+              onClick={onSignOut}
+              disabled={leaving}
+            >
+              <LogOut className="size-4" />
+            </Button>
+          ) : null}
         </header>
         <main className="mx-auto w-full max-w-6xl flex-1 px-3 py-5 print:max-w-none print:px-0 print:py-0 md:px-8 md:py-8">
           {children}
@@ -187,6 +245,17 @@ export function AppShell({ children }: { children: ReactNode }) {
               </div>
             </div>
             <NavLinks variant="side" />
+            {user ? (
+              <button
+                type="button"
+                onClick={onSignOut}
+                disabled={leaving}
+                className="mt-6 flex min-h-11 w-full items-center gap-2 rounded-lg px-5 text-sm text-muted hover:bg-bg-warm"
+              >
+                <LogOut className="size-4" />
+                {leaving ? "Signing out…" : "Sign out"}
+              </button>
+            ) : null}
           </SheetContent>
         </Sheet>
       </nav>

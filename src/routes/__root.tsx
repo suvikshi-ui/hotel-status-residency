@@ -2,10 +2,11 @@ import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-r
 import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import { HydrateLedger } from "@/components/hydrate";
-import { AppShell } from "@/components/app-shell";
+import { AuthShell } from "@/components/auth-shell";
 import { SecurityProvider } from "@/components/security-gate";
 import { Toaster } from "@/components/ui/sonner";
 import { publicUrl } from "@/lib/public-url";
+import { SupabaseAuthProvider } from "@/lib/supabase-auth";
 import appCss from "../styles.css?url";
 
 const APP_NAME = "Status Ledger";
@@ -40,14 +41,16 @@ function AppTree() {
     <>
       <PreviewHostBridge />
       <AuthProvider>
-        <HydrateLedger>
-          <SecurityProvider>
-            <AppShell>
-              <Outlet />
-            </AppShell>
-            <Toaster />
-          </SecurityProvider>
-        </HydrateLedger>
+        <SupabaseAuthProvider>
+          <HydrateLedger>
+            <SecurityProvider>
+              <AuthShell>
+                <Outlet />
+              </AuthShell>
+              <Toaster />
+            </SecurityProvider>
+          </HydrateLedger>
+        </SupabaseAuthProvider>
       </AuthProvider>
     </>
   );
