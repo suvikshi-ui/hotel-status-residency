@@ -3,19 +3,15 @@ export interface InventoryItem {
   name: string;
   lastMonth: number;
   thisMonth: number;
-  expected: number;
+  notes: string;
 }
-
-export type InventoryCheck =
-  | { kind: "even" }
-  | { kind: "take-out"; qty: number }
-  | { kind: "replace"; qty: number };
 
 type RawInventory = {
   id?: string;
   name?: string;
   lastMonth?: unknown;
   thisMonth?: unknown;
+  notes?: unknown;
   expected?: unknown;
   opening?: unknown;
   received?: unknown;
@@ -38,11 +34,16 @@ function qty(n: unknown): number {
   return Math.round(v);
 }
 
+function notesOf(row: RawInventory | undefined): string {
+  const n = row?.notes;
+  return typeof n === "string" ? n.trim() : "";
+}
+
 function fieldsFrom(row: RawInventory | undefined): Pick<
   InventoryItem,
-  "lastMonth" | "thisMonth" | "expected"
+  "lastMonth" | "thisMonth" | "notes"
 > {
-  if (!row) return { lastMonth: 0, thisMonth: 0, expected: 0 };
+  if (!row) return { lastMonth: 0, thisMonth: 0, notes: "" };
   const lastMonth = row.lastMonth ?? row.opening;
   const thisMonth =
     row.thisMonth ??
@@ -52,7 +53,7 @@ function fieldsFrom(row: RawInventory | undefined): Pick<
   return {
     lastMonth: qty(lastMonth),
     thisMonth: qty(thisMonth),
-    expected: qty(row.expected),
+    notes: notesOf(row),
   };
 }
 
@@ -60,7 +61,7 @@ export function emptyInventoryItem(
   id: string,
   name: string,
 ): InventoryItem {
-  return { id, name, lastMonth: 0, thisMonth: 0, expected: 0 };
+  return { id, name, lastMonth: 0, thisMonth: 0, notes: "" };
 }
 
 export function inventoryDifference(
@@ -73,21 +74,6 @@ export function signedCount(n: number): string {
   if (n > 0) return `+${n}`;
   if (n < 0) return `−${Math.abs(n)}`;
   return "0";
-}
-
-export function inventoryCheck(
-  item: Pick<InventoryItem, "thisMonth" | "expected">,
-): InventoryCheck {
-  const gap = item.thisMonth - item.expected;
-  if (gap === 0) return { kind: "even" };
-  if (gap > 0) return { kind: "take-out", qty: gap };
-  return { kind: "replace", qty: -gap };
-}
-
-export function inventoryCheckLabel(check: InventoryCheck): string {
-  if (check.kind === "even") return "बराबर है";
-  if (check.kind === "take-out") return `${check.qty} बाहर निकालना पड़ेगा`;
-  return `${check.qty} रिप्लेस करना पड़ेगा`;
 }
 
 export function seedInventory(): InventoryItem[] {

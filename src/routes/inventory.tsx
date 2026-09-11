@@ -11,8 +11,6 @@ import { useGate } from "@/components/security-gate";
 import { uid } from "@/lib/format";
 import {
   emptyInventoryItem,
-  inventoryCheck,
-  inventoryCheckLabel,
   inventoryDifference,
   LINEN_CATALOG,
   normalizeInventory,
@@ -50,15 +48,13 @@ function InventoryPage() {
   const dirty = JSON.stringify(rows) !== JSON.stringify(inventory);
   const lastTotal = rows.reduce((s, r) => s + r.lastMonth, 0);
   const thisTotal = rows.reduce((s, r) => s + r.thisMonth, 0);
-  const expectedTotal = rows.reduce((s, r) => s + r.expected, 0);
   const diffTotal = thisTotal - lastTotal;
-  const mismatch = rows.filter((r) => inventoryCheck(r).kind !== "even");
 
   function patch(id: string, field: keyof InventoryItem, value: string) {
     setDraft((prev) =>
       prev.map((r) => {
         if (r.id !== id) return r;
-        if (field === "name") return { ...r, name: value };
+        if (field === "name" || field === "notes") return { ...r, [field]: value };
         const n = Number(value);
         return { ...r, [field]: Number.isFinite(n) && n >= 0 ? Math.round(n) : 0 };
       }),
@@ -105,22 +101,19 @@ function InventoryPage() {
         <th class="num">Last month</th>
         <th class="num">This month</th>
         <th class="num">Difference</th>
-        <th class="num">Expected</th>
-        <th>Check</th>
+        <th>Notes</th>
       </tr></thead>
       <tbody>
         ${rows
-          .map((r) => {
-            const check = inventoryCheck(r);
-            return `<tr>
+          .map(
+            (r) => `<tr>
           <td>${escapeHtml(r.name)}</td>
           <td class="num">${r.lastMonth}</td>
           <td class="num">${r.thisMonth}</td>
           <td class="num">${signedCount(inventoryDifference(r))}</td>
-          <td class="num">${r.expected}</td>
-          <td>${escapeHtml(inventoryCheckLabel(check))}</td>
-        </tr>`;
-          })
+          <td>${escapeHtml(r.notes)}</td>
+        </tr>`,
+          )
           .join("")}
       </tbody>
       <tfoot><tr>
@@ -128,8 +121,7 @@ function InventoryPage() {
         <td class="num">${lastTotal}</td>
         <td class="num">${thisTotal}</td>
         <td class="num">${signedCount(diffTotal)}</td>
-        <td class="num">${expectedTotal}</td>
-        <td>${mismatch.length ? `${mismatch.length} not even` : "बराबर है"}</td>
+        <td></td>
       </tr></tfoot>
     </table>`;
     toast.message("Opening print…");
@@ -152,9 +144,8 @@ function InventoryPage() {
             Inventory
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Monthly check — last month vs this month, then expected. If the
-            count is not even: take out the extra, or replace the short. Not a
-            laundry sheet.
+            Monthly check — last month, this month, difference. Notes for
+            anything that needs a remark.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 print:hidden">
@@ -168,7 +159,7 @@ function InventoryPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-3 gap-3">
         <Card className="p-4">
           <div className="text-xs font-medium text-muted">Last month</div>
           <div className="mt-1 font-display text-2xl font-semibold tabular">
@@ -192,37 +183,24 @@ function InventoryPage() {
             {signedCount(diffTotal)}
           </div>
         </Card>
-        <Card className="p-4">
-          <div className="text-xs font-medium text-muted">Not even</div>
-          <div
-            className={cn(
-              "mt-1 font-display text-2xl font-semibold tabular",
-              mismatch.length > 0 && "text-danger",
-            )}
-          >
-            {mismatch.length}
-          </div>
-        </Card>
       </div>
 
       <Card>
         <CardContent className="overflow-x-auto p-0">
-          <table className="w-full min-w-[56rem] text-left text-sm">
+          <table className="w-full min-w-[48rem] text-left text-sm">
             <thead className="text-xs uppercase tracking-wide text-muted">
               <tr className="border-y border-border">
                 <th className="px-5 py-2 font-medium">Item</th>
                 <th className="px-3 py-2 text-right font-medium">Last month</th>
                 <th className="px-3 py-2 text-right font-medium">This month</th>
                 <th className="px-3 py-2 text-right font-medium">Difference</th>
-                <th className="px-3 py-2 text-right font-medium">Expected</th>
-                <th className="px-3 py-2 font-medium">Check</th>
+                <th className="px-3 py-2 font-medium">Notes</th>
                 <th className="px-3 py-2" />
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => {
                 const diff = inventoryDifference(r);
-                const check = inventoryCheck(r);
                 return (
                   <tr key={r.id} className="border-b border-border/70">
                     <td className="px-5 py-2.5 font-medium">{r.name}</td>
@@ -252,24 +230,15 @@ function InventoryPage() {
                     >
                       {signedCount(diff)}
                     </td>
-                    <td className="px-3 py-1.5">
+                    <td className="min-w-[14rem] px-3 py-1.5">
                       <Input
-                        className="h-11 min-h-11 text-right tabular"
-                        type="number"
-                        inputMode="numeric"
-                        min={0}
-                        value={r.expected}
-                        onChange={(e) => patch(r.id, "expected", e.target.value)}
-                        aria-label={`${r.name} expected`}
+                        className="h-11 min-h-11"
+                        value={r.notes}
+                        onChange={(e) => patch(r.id, "notes", e.target.value)}
+                        placeholder="Remark…"
+                        aria-label={`${r.name} notes`}
+                        autoComplete="off"
                       />
-                    </td>
-                    <td
-                      className={cn(
-                        "max-w-[14rem] px-3 py-2.5 text-sm leading-snug",
-                        check.kind === "even" ? "text-muted" : "font-medium text-danger",
-                      )}
-                    >
-                      {inventoryCheckLabel(check)}
                     </td>
                     <td className="px-3 py-2.5 text-right">
                       {CATALOG_IDS.has(r.id) ? null : (
@@ -301,17 +270,7 @@ function InventoryPage() {
                 >
                   {signedCount(diffTotal)}
                 </td>
-                <td className="px-3 py-2.5 text-right tabular">{expectedTotal}</td>
-                <td
-                  className={cn(
-                    "px-3 py-2.5",
-                    mismatch.length > 0 ? "text-danger" : "text-muted",
-                  )}
-                >
-                  {mismatch.length
-                    ? `${mismatch.length} not even`
-                    : "बराबर है"}
-                </td>
+                <td />
                 <td />
               </tr>
             </tfoot>

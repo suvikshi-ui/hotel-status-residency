@@ -1,8 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
-  inventoryCheck,
-  inventoryCheckLabel,
   inventoryDifference,
   normalizeInventory,
   seedInventory,
@@ -35,24 +33,6 @@ describe("inventory sheet", () => {
     assert.equal(signedCount(3), "+3");
   });
 
-  it("says take out when this month is above expected", () => {
-    const check = inventoryCheck({ thisMonth: 42, expected: 40 });
-    assert.deepEqual(check, { kind: "take-out", qty: 2 });
-    assert.equal(inventoryCheckLabel(check), "2 बाहर निकालना पड़ेगा");
-  });
-
-  it("says replace when this month is below expected", () => {
-    const check = inventoryCheck({ thisMonth: 18, expected: 24 });
-    assert.deepEqual(check, { kind: "replace", qty: 6 });
-    assert.equal(inventoryCheckLabel(check), "6 रिप्लेस करना पड़ेगा");
-  });
-
-  it("says even when this month matches expected", () => {
-    const check = inventoryCheck({ thisMonth: 20, expected: 20 });
-    assert.equal(check.kind, "even");
-    assert.equal(inventoryCheckLabel(check), "बराबर है");
-  });
-
   it("fills pillow cover onto an old save and keeps last month counts", () => {
     const rows = normalizeInventory([
       {
@@ -67,11 +47,12 @@ describe("inventory sheet", () => {
     const towel = rows.find((r) => r.id === "inv-towel");
     assert.equal(towel?.lastMonth, 20);
     assert.equal(towel?.thisMonth, 16);
+    assert.equal(towel?.notes, "");
     assert.ok(rows.some((r) => r.id === "inv-pillow-cover"));
     assert.ok(rows.some((r) => r.id === "inv-single-sheet"));
   });
 
-  it("keeps extra items added later", () => {
+  it("keeps extra items and notes", () => {
     const rows = normalizeInventory([
       ...seedInventory(),
       {
@@ -79,12 +60,13 @@ describe("inventory sheet", () => {
         name: "Blanket",
         lastMonth: 8,
         thisMonth: 6,
-        expected: 8,
+        notes: "  2 torn, replace  ",
       },
     ]);
     const extra = rows.find((r) => r.id === "inv-blanket");
     assert.equal(extra?.lastMonth, 8);
     assert.equal(extra?.thisMonth, 6);
+    assert.equal(extra?.notes, "2 torn, replace");
     assert.equal(rows[0]?.id, "inv-single-sheet");
   });
 });
