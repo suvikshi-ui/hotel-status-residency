@@ -1,6 +1,12 @@
 import type { PostgrestError } from "@supabase/supabase-js";
 import { MODES } from "./format";
 import { getSupabase } from "./supabase";
+import {
+  hotelForCloud,
+  hotelFromCloud,
+  locksFromHotel,
+  parseLockedDates,
+} from "./register-lock";
 import type {
   AdvanceRow,
   CreditGuest,
@@ -49,6 +55,7 @@ export type LedgerSnapshot = {
   selectedDate: string;
   openingDate: string;
   securityCode: string;
+  lockedDates?: Record<string, true>;
 };
 
 export type CloudPull =
@@ -138,9 +145,14 @@ export function snapshotFromUnknown(
   raw: unknown,
   fallback: LedgerSnapshot,
 ): LedgerSnapshot {
-  const p = (raw ?? {}) as Partial<LedgerSnapshot>;
+  const p = (raw ?? {}) as Partial<LedgerSnapshot> & { hotel?: unknown };
+  const hotel = hotelFromCloud(p.hotel, fallback.hotel);
+  const lockedDates =
+    p.lockedDates !== undefined
+      ? parseLockedDates(p.lockedDates)
+      : locksFromHotel(p.hotel);
   return {
-    hotel: (p.hotel ?? fallback.hotel) as HotelInfo,
+    hotel,
     opening: {
       cash: num(p.opening?.cash ?? fallback.opening.cash),
       santosh: num(p.opening?.santosh ?? fallback.opening.santosh),
@@ -166,6 +178,7 @@ export function snapshotFromUnknown(
     selectedDate: dateStr(p.selectedDate, fallback.selectedDate),
     openingDate: dateStr(p.openingDate, fallback.openingDate),
     securityCode: str(p.securityCode ?? fallback.securityCode),
+    lockedDates,
   };
 }
 
@@ -296,8 +309,9 @@ export async function pullLedger(userId: string): Promise<CloudPull> {
   if (firstErr) return asError(firstErr);
 
   const row = meta.data as Record<string, unknown>;
+  const hotelRaw = row.hotel;
   const snapshot: LedgerSnapshot = {
-    hotel: (row.hotel ?? {}) as HotelInfo,
+    hotel: hotelFromCloud(hotelRaw, {} as HotelInfo),
     opening: (row.opening ?? {}) as OpeningBalances,
     rooms: (rooms.data ?? []).map((r) => ({
       no: str((r as { no: unknown }).no),
@@ -369,6 +383,7 @@ export async function pullLedger(userId: string): Promise<CloudPull> {
     selectedDate: dateStr(row.selected_date),
     openingDate: dateStr(row.opening_date),
     securityCode: str(row.security_code),
+    lockedDates: locksFromHotel(hotelRaw),
   };
 
   return { ok: true, kind: "data", snapshot };
@@ -527,7 +542,7 @@ export async function pushLedger(
   const { error: metaErr } = await sb.from("ledger_meta").upsert(
     {
       user_id: userId,
-      hotel: snap.hotel,
+      hotel: hotelForCloud(snap.hotel, snap.lockedDates ?? {}),
       opening: snap.opening,
       opening_date: snap.openingDate,
       selected_date: snap.selectedDate,

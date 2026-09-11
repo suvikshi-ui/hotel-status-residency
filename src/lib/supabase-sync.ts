@@ -11,6 +11,7 @@ import {
 } from "./supabase-db";
 import { LEDGER_STORAGE_KEY, useLedger } from "./store";
 import { isSupabaseConfigured } from "./supabase-config";
+import { hotelForCloud } from "./register-lock";
 
 export type CloudPhase =
   | "off"
@@ -64,7 +65,7 @@ export function subscribeCloud(fn: (s: CloudState) => void) {
 function snapshotFromStore(): LedgerSnapshot {
   const s = useLedger.getState();
   return {
-    hotel: s.hotel,
+    hotel: hotelForCloud(s.hotel, s.lockedDates ?? {}),
     opening: s.opening,
     rooms: s.rooms,
     guests: s.guests,
@@ -81,6 +82,7 @@ function snapshotFromStore(): LedgerSnapshot {
     selectedDate: s.selectedDate,
     openingDate: s.openingDate,
     securityCode: s.securityCode,
+    lockedDates: s.lockedDates ?? {},
   };
 }
 
