@@ -65,6 +65,7 @@ export interface LedgerState {
   securityCode: string;
   appRole: AppRole;
   lockedDates: Record<string, true>;
+  savedAt: number;
   setDate: (date: string) => void;
   setOpening: (date: string, opening: OpeningBalances) => void;
   setSecurityCode: (hash: string) => void;
@@ -144,6 +145,7 @@ function seedState(): Omit<
     securityCode: "",
     appRole: "admin",
     lockedDates: {},
+    savedAt: 0,
   };
 }
 
@@ -165,6 +167,7 @@ function normalizeAdvances(rows: AdvanceRow[]): AdvanceRow[] {
 function mergeSnapshot(
   persisted: Partial<LedgerState>,
   current: LedgerState,
+  opts?: { skipSeedFill?: boolean },
 ): LedgerState {
   const staff = normalizeStaff(persisted.staff ?? current.staff);
   const advances = normalizeAdvances(persisted.advances ?? current.advances);
@@ -179,22 +182,30 @@ function mergeSnapshot(
       : undefined,
     current.lockedDates,
   );
-  const guests = fillAllSeedDates(
-    persisted.guests,
-    (seed.guests as GuestEntry[]) ?? current.guests,
-  );
-  const food = fillAllSeedDates(
-    persisted.food,
-    (seed.food as ModeAmount[]) ?? current.food,
-  );
-  const wholesale = fillAllSeedDates(
-    persisted.wholesale,
-    (seed.wholesale as ModeAmount[]) ?? current.wholesale,
-  );
-  const expenses = fillAllSeedDates(
-    persisted.expenses,
-    (seed.expenses as NamedAmount[]) ?? current.expenses,
-  );
+  const guests = opts?.skipSeedFill
+    ? (persisted.guests ?? current.guests)
+    : fillAllSeedDates(
+        persisted.guests,
+        (seed.guests as GuestEntry[]) ?? current.guests,
+      );
+  const food = opts?.skipSeedFill
+    ? (persisted.food ?? current.food)
+    : fillAllSeedDates(
+        persisted.food,
+        (seed.food as ModeAmount[]) ?? current.food,
+      );
+  const wholesale = opts?.skipSeedFill
+    ? (persisted.wholesale ?? current.wholesale)
+    : fillAllSeedDates(
+        persisted.wholesale,
+        (seed.wholesale as ModeAmount[]) ?? current.wholesale,
+      );
+  const expenses = opts?.skipSeedFill
+    ? (persisted.expenses ?? current.expenses)
+    : fillAllSeedDates(
+        persisted.expenses,
+        (seed.expenses as NamedAmount[]) ?? current.expenses,
+      );
   let selectedDate = persisted.selectedDate ?? current.selectedDate ?? DEFAULT_DATE;
   return {
     ...current,
@@ -249,6 +260,7 @@ export const useLedger = create<LedgerState>()(
     (set, get) => {
       const save: typeof set = ((...args: Parameters<typeof set>) => {
         set(...args);
+        set({ savedAt: Date.now() });
         afterSave();
       }) as typeof set;
       return {
@@ -404,11 +416,12 @@ export const useLedger = create<LedgerState>()(
       setComplaints: (complaints) =>
         save({ complaints: normalizeComplaints(complaints) }),
       applySnapshot: (p) => {
-        const merged = mergeSnapshot(p, get());
+        const merged = mergeSnapshot(p, get(), { skipSeedFill: true });
         writeStoredLocks(ledgerOwnerKey(), merged.lockedDates ?? {});
-        save({
+        set({
           ...merged,
           ...rebuildFrom(merged, merged.openingDate || BASE_OPENING_DATE),
+          savedAt: p.savedAt ?? merged.savedAt ?? Date.now(),
         });
       },
     };
@@ -435,6 +448,7 @@ export const useLedger = create<LedgerState>()(
         complaints: s.complaints,
         appRole: s.appRole,
         lockedDates: s.lockedDates,
+        savedAt: s.savedAt,
       }),
       merge: (persisted, current) =>
         withBooks(mergeSnapshot((persisted ?? {}) as Partial<LedgerState>, current)),

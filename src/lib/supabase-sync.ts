@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { preferLocalOverCloud } from "./cloud-save";
 import {
   anonymousLedgerUnclaimed,
   claimAnonymousLedger,
@@ -83,6 +84,9 @@ function snapshotFromStore(): LedgerSnapshot {
     openingDate: s.openingDate,
     securityCode: s.securityCode,
     lockedDates: s.lockedDates ?? {},
+    inventory: s.inventory,
+    complaints: s.complaints,
+    savedAt: s.savedAt,
   };
 }
 
@@ -110,7 +114,7 @@ async function doFlush(userId: string) {
   const hash = hashOf(snap);
   if (hash === lastHash && (phase === "synced" || phase === "migrated")) return;
   setPhase("saving");
-  const result = await pushLedger(userId, snap);
+  const result = await pushLedger(userId, snap, undefined, useLedger.getState().appRole);
   if (!result.ok) {
     if (result.missingSchema) {
       setPhase("missing-schema", result.message);
@@ -159,7 +163,7 @@ export function requestCloudSave() {
   timer = setTimeout(() => {
     timer = null;
     void flush(userId);
-  }, 0);
+  }, 300);
 }
 
 export function stopCloudSync() {
@@ -243,9 +247,19 @@ export async function hydrateFromCloud(userId: string): Promise<CloudPhase> {
     if (pulled.kind === "data") {
       const cloud = pulled.snapshot;
       const local = localRicher();
-      if (ledgerActivityScore(local) > ledgerActivityScore(cloud)) {
-        useLedger.getState().applySnapshot(local);
-        const pushed = await pushLedger(userId, local, "localStorage");
+      if (preferLocalOverCloud({
+        localSavedAt: local.savedAt ?? 0,
+        cloudUpdatedAt: cloud.savedAt ?? 0,
+        localScore: ledgerActivityScore(local),
+        cloudScore: ledgerActivityScore(cloud),
+      })) {
+        useLedger.getState().applySnapshot({ ...local, savedAt: local.savedAt ?? Date.now() });
+        const pushed = await pushLedger(
+          userId,
+          local,
+          "localStorage",
+          useLedger.getState().appRole,
+        );
         if (!pushed.ok) {
           if (pushed.missingSchema) {
             setPhase("missing-schema", pushed.message);
@@ -267,7 +281,12 @@ export async function hydrateFromCloud(userId: string): Promise<CloudPhase> {
       if (!cloud.rooms.length) cloud.rooms = current.rooms;
       if (!cloud.staff.length) cloud.staff = current.staff;
       if (!cloud.hotel?.name) cloud.hotel = current.hotel;
-      useLedger.getState().applySnapshot(cloud);
+      if (!cloud.inventory?.length) cloud.inventory = current.inventory;
+      if (!cloud.complaints?.length) cloud.complaints = current.complaints;
+      useLedger.getState().applySnapshot({
+        ...cloud,
+        savedAt: cloud.savedAt ?? Date.now(),
+      });
       lastHash = hashOf(snapshotFromStore());
       claimAnonymousLedger(userId);
       setPhase("synced");
@@ -278,7 +297,12 @@ export async function hydrateFromCloud(userId: string): Promise<CloudPhase> {
     const migratedFrom = "localStorage";
 
     useLedger.getState().applySnapshot(source);
-    const pushed = await pushLedger(userId, source, migratedFrom);
+    const pushed = await pushLedger(
+      userId,
+      source,
+      migratedFrom,
+      useLedger.getState().appRole,
+    );
     if (!pushed.ok) {
       if (pushed.missingSchema) {
         setPhase("missing-schema", pushed.message);

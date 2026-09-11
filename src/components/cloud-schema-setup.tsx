@@ -6,6 +6,7 @@ import { retryCloudHydrate } from "@/lib/supabase-sync";
 import ledgerSql from "../../supabase/migrations/0001_ledger.sql?raw";
 import usersSql from "../../supabase/migrations/0002_hotel_users.sql?raw";
 import appUsersSql from "../../supabase/migrations/0003_public_users.sql?raw";
+import rlsSql from "../../supabase/migrations/0005_rls_strong.sql?raw";
 
 export function CloudSchemaSetup({ userId }: { userId?: string | null }) {
   const [retrying, setRetrying] = useState(false);
@@ -16,7 +17,7 @@ export function CloudSchemaSetup({ userId }: { userId?: string | null }) {
         type="button"
         onClick={() => {
           void navigator.clipboard.writeText(
-            `${ledgerSql}\n\n${usersSql}\n\n${appUsersSql}`,
+            `${ledgerSql}\n\n${usersSql}\n\n${appUsersSql}\n\n${rlsSql}`,
           ).then(
             () =>
               toast.success(

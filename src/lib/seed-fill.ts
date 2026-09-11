@@ -41,18 +41,20 @@ export function fillSeedDate<T extends Seedish>(
   if (!haveOn.length) return [...others, ...seedOn];
 
   const seedById = new Map(seedOn.map((r) => [r.id, r]));
+  const extras = haveOn.filter((row) => !row.id || !seedById.has(row.id));
+  const overlap = haveOn.some((row) => Boolean(row.id && seedById.has(row.id)));
   const touched = haveOn.some((row) => {
     if (!row.id || !seedById.has(row.id)) return false;
     return userEditedSeedRow(row, seedById.get(row.id)!);
   });
   if (touched) return have;
-
+  if (!overlap && haveOn.length) return [...others, ...seedOn];
   if (!force) {
     const seedAmt = seedOn.reduce((s, r) => s + (Number(r.amount) || 0), 0);
     const haveAmt = haveOn.reduce((s, r) => s + (Number(r.amount) || 0), 0);
     if (haveOn.length === seedOn.length && haveAmt === seedAmt) return have;
   }
-  return [...others, ...seedOn];
+  return [...others, ...seedOn, ...extras];
 }
 
 export function fillAllSeedDates<T extends Seedish>(

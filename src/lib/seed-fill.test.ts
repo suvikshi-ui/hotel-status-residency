@@ -81,4 +81,20 @@ describe("fillSeedDate", () => {
     assert.equal(next.filter((g) => g.date === "2026-09-08").length, 38);
     assert.equal(next.filter((g) => g.date === "2026-09-09").length, 33);
   });
+
+  it("keeps a guest added on a seeded date", () => {
+    const DATE = "2026-09-09";
+    const seedOn = seedJson.guests.filter((g) => g.date === DATE);
+    const extra = {
+      id: "g-new-walkin",
+      date: DATE,
+      name: "WALK IN",
+      roomNo: "110",
+      mode: "CASH",
+      amount: 2000,
+    };
+    const next = fillAllSeedDates([...seedOn, extra], seedJson.guests);
+    assert.equal(next.filter((g) => g.date === DATE).length, 34);
+    assert.ok(next.some((g) => g.id === "g-new-walkin"));
+  });
 });

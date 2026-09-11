@@ -1,4 +1,6 @@
 import type { PostgrestError } from "@supabase/supabase-js";
+import { normalizeComplaints, type RoomComplaint } from "./complaints";
+import { normalizeInventory, type InventoryItem } from "./inventory";
 import { MODES } from "./format";
 import { getSupabase } from "./supabase";
 import {
@@ -33,6 +35,8 @@ export const LEDGER_TABLES = [
   "food",
   "wholesale",
   "advances",
+  "complaints",
+  "inventory",
 ] as const;
 
 export const ANON_LEDGER_CLAIM_KEY = "status-ledger-v5:migrated";
@@ -56,6 +60,9 @@ export type LedgerSnapshot = {
   openingDate: string;
   securityCode: string;
   lockedDates?: Record<string, true>;
+  inventory?: InventoryItem[];
+  complaints?: RoomComplaint[];
+  savedAt?: number;
 };
 
 export type CloudPull =
@@ -179,6 +186,13 @@ export function snapshotFromUnknown(
     openingDate: dateStr(p.openingDate, fallback.openingDate),
     securityCode: str(p.securityCode ?? fallback.securityCode),
     lockedDates,
+    inventory: normalizeInventory(
+      (p as { inventory?: InventoryItem[] }).inventory ?? fallback.inventory,
+    ),
+    complaints: normalizeComplaints(
+      (p as { complaints?: RoomComplaint[] }).complaints ?? fallback.complaints,
+    ),
+    savedAt: num((p as { savedAt?: unknown }).savedAt) || fallback.savedAt,
   };
 }
 
@@ -269,7 +283,7 @@ export async function pullLedger(userId: string): Promise<CloudPull> {
   const meta = await sb
     .from("ledger_meta")
     .select(
-      "hotel, opening, opening_date, selected_date, security_code, ota, jan_sales, jan_food, credit_guests, migrated_from",
+      "hotel, opening, opening_date, selected_date, security_code, ota, jan_sales, jan_food, credit_guests, migrated_from, updated_at",
     )
     .eq("user_id", userId)
     .maybeSingle();
@@ -286,6 +300,8 @@ export async function pullLedger(userId: string): Promise<CloudPull> {
     food,
     wholesale,
     advances,
+    complaints,
+    inventory,
   ] = await Promise.all([
     sb.from("rooms").select("no, floor, sort_index").eq("user_id", userId).order("sort_index"),
     sb.from("staff").select("*").eq("user_id", userId),
@@ -295,6 +311,8 @@ export async function pullLedger(userId: string): Promise<CloudPull> {
     sb.from("food").select("*").eq("user_id", userId),
     sb.from("wholesale").select("*").eq("user_id", userId),
     sb.from("advances").select("*").eq("user_id", userId),
+    sb.from("complaints").select("*").eq("user_id", userId),
+    sb.from("inventory").select("*").eq("user_id", userId),
   ]);
 
   const firstErr =
@@ -306,6 +324,12 @@ export async function pullLedger(userId: string): Promise<CloudPull> {
     food.error ||
     wholesale.error ||
     advances.error;
+  if (complaints.error && !isMissingSchema(complaints.error)) {
+    return asError(complaints.error);
+  }
+  if (inventory.error && !isMissingSchema(inventory.error)) {
+    return asError(inventory.error);
+  }
   if (firstErr) return asError(firstErr);
 
   const row = meta.data as Record<string, unknown>;
@@ -384,6 +408,35 @@ export async function pullLedger(userId: string): Promise<CloudPull> {
     openingDate: dateStr(row.opening_date),
     securityCode: str(row.security_code),
     lockedDates: locksFromHotel(hotelRaw),
+    complaints: isMissingSchema(complaints.error)
+      ? []
+      : normalizeComplaints(
+          (complaints.data ?? []).map((r) => {
+            const row = r as Record<string, unknown>;
+            return {
+              id: str(row.id),
+              roomNo: str(row.room_no),
+              note: str(row.note),
+              level: str(row.level) as RoomComplaint["level"],
+              createdAt: str(row.created_at),
+            };
+          }),
+        ),
+    inventory: isMissingSchema(inventory.error)
+      ? []
+      : normalizeInventory(
+          (inventory.data ?? []).map((r) => {
+            const row = r as Record<string, unknown>;
+            return {
+              id: str(row.id),
+              name: str(row.name),
+              lastMonth: num(row.last_month),
+              thisMonth: num(row.this_month),
+              notes: str(row.notes),
+            };
+          }),
+        ),
+    savedAt: Date.parse(str(row.updated_at)) || 0,
   };
 
   return { ok: true, kind: "data", snapshot };
@@ -439,6 +492,7 @@ export async function pushLedger(
   userId: string,
   snap: LedgerSnapshot,
   migratedFrom?: string,
+  role?: string,
 ): Promise<{ ok: true } | { ok: false; missingSchema: boolean; message: string }> {
   const rooms = snap.rooms.map((r, i) => ({
     no: r.no,
@@ -513,19 +567,41 @@ export async function pushLedger(
     qrs: num(r.qrs),
     month: r.month,
   }));
+  const complaints = (snap.complaints ?? []).map((r) => ({
+    id: r.id,
+    room_no: r.roomNo,
+    note: r.note,
+    level: r.level,
+    created_at: r.createdAt,
+  }));
+  const inventory = (snap.inventory ?? []).map((r) => ({
+    id: r.id,
+    name: r.name,
+    last_month: num(r.lastMonth),
+    this_month: num(r.thisMonth),
+    notes: r.notes,
+  }));
 
-  const writes: Array<Promise<PostgrestError | null>> = [
-    replaceRows("rooms", userId, "no", rooms),
-    replaceRows("staff", userId, "id", staff),
-    replaceRows("expenses", userId, "id", expenses),
-    replaceRows("balance_received", userId, "id", balance),
-    replaceRows("guests", userId, "id", guests),
-    replaceRows("food", userId, "id", food),
-    replaceRows("wholesale", userId, "id", wholesale),
-    replaceRows("advances", userId, "id", advances),
-  ];
+  const hkOnly = role === "housekeeping";
+  const writes: Array<Promise<PostgrestError | null>> = hkOnly
+    ? [
+        replaceRows("complaints", userId, "id", complaints),
+        replaceRows("inventory", userId, "id", inventory),
+      ]
+    : [
+        replaceRows("rooms", userId, "no", rooms),
+        replaceRows("staff", userId, "id", staff),
+        replaceRows("expenses", userId, "id", expenses),
+        replaceRows("balance_received", userId, "id", balance),
+        replaceRows("guests", userId, "id", guests),
+        replaceRows("food", userId, "id", food),
+        replaceRows("wholesale", userId, "id", wholesale),
+        replaceRows("advances", userId, "id", advances),
+        replaceRows("complaints", userId, "id", complaints),
+        replaceRows("inventory", userId, "id", inventory),
+      ];
   const results = await Promise.all(writes);
-  const err = results.find(Boolean);
+  const err = results.find((e) => e && !isMissingSchema(e));
   if (err) {
     const mapped = asError(err);
     if (mapped.ok) {
@@ -537,6 +613,8 @@ export async function pushLedger(
       message: mapped.message,
     };
   }
+
+  if (hkOnly) return { ok: true };
 
   const sb = getSupabase();
   const { error: metaErr } = await sb.from("ledger_meta").upsert(

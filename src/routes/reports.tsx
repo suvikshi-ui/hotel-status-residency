@@ -26,7 +26,7 @@ import {
 } from "@/lib/inventory";
 import { printHtmlDocument } from "@/lib/print-sheet";
 import { REPORT_TAB, parseReportView } from "@/lib/report-views";
-import { printDailyPdf, saveDailyJpeg } from "@/lib/daily-pdf";
+import { printDailyPdf } from "@/lib/daily-pdf";
 import { staffPay } from "@/lib/staff-pay";
 import { useLedger, useDayBooks } from "@/lib/store";
 import { useGate } from "@/components/security-gate";
@@ -708,28 +708,16 @@ function DailyReportPanel() {
   const receipts = allRecv.filter((r) => r.date === date);
   const books = useDayBooks(date);
   const take = buildDayTake(guests, food, ws);
-
-  async function saveJpeg() {
-    toast.message("Saving JPEG from the PDF…");
-    try {
-      await saveDailyJpeg(
-        {
-          hotel: hotel.name,
-          blessing: hotel.blessing,
-          date,
-          books,
-          take,
-          expenses,
-          receipts,
-          guests,
-        },
-        `HSR-daily-${date}.jpg`,
-      );
-      toast.success("JPEG saved");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not save JPEG");
-    }
-  }
+  const pdfInput = {
+    hotel: hotel.name,
+    blessing: hotel.blessing,
+    date,
+    books,
+    take,
+    expenses,
+    receipts,
+    guests,
+  };
 
   return (
     <div className="flex flex-col gap-4">
@@ -738,27 +726,13 @@ function DailyReportPanel() {
           {formatDay(date)} · A4 daily report
         </p>
         <div className="flex flex-wrap items-center gap-4">
-          <button
-            type="button"
-            className="text-sm font-medium text-primary underline underline-offset-4"
-            onClick={() => void saveJpeg()}
-          >
-            Save as JPEG
-          </button>
           <Button
             type="button"
             onClick={() => {
               toast.message("Opening PDF…");
-              void printDailyPdf({
-                hotel: hotel.name,
-                blessing: hotel.blessing,
-                date,
-                books,
-                take,
-                expenses,
-                receipts,
-                guests,
-              }).catch(() => toast.error("Could not print PDF"));
+              void printDailyPdf(pdfInput).catch(() =>
+                toast.error("Could not print PDF"),
+              );
             }}
           >
             <Printer className="size-4" />
