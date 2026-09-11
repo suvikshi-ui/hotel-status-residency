@@ -230,8 +230,8 @@ describe("buildDueAccounts stays", () => {
       ],
       [receipt({ id: "r1", amount: 2000 })],
     );
-    const fly = accounts.find((a) => a.key === "Flysky");
-    const motor = accounts.find((a) => a.key === "Motor");
+    const fly = accounts.find((a) => a.key === "FLYSKY");
+    const motor = accounts.find((a) => a.key === "MOTOR");
     assert.ok(fly);
     assert.ok(motor);
     assert.equal(fly!.stays.length, 2);

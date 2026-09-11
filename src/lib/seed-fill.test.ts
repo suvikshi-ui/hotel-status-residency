@@ -56,6 +56,20 @@ describe("fillSeedDate", () => {
     assert.ok(next.some((r) => r.date === "2026-09-06"));
   });
 
+  it("keeps a saved source edit instead of restoring seed", () => {
+    const DATE = "2026-09-09";
+    const seedOn = seedJson.guests.filter((g) => g.date === DATE);
+    const edited = seedOn.map((g, i) =>
+      i === 0 ? { ...g, source: "CHANGED-CO" } : g,
+    );
+    const next = fillAllSeedDates(edited, seedJson.guests);
+    assert.equal(
+      next.find((g) => g.id === seedOn[0]?.id)?.source,
+      "CHANGED-CO",
+    );
+    assert.equal(next.filter((g) => g.date === DATE).length, 33);
+  });
+
   it("keeps 6–8 Sep when forcing 9 Sep", () => {
     const by = (d: string) => seedJson.guests.filter((g) => g.date === d);
     const next = fillAllSeedDates(

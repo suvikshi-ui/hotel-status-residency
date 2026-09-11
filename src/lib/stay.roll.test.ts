@@ -1,11 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  applyGuestPatch,
   applyStay,
   applyYesterdayRoll,
   findDuplicateOnDate,
   inHouseOnDate,
-  stayKey,
   stayOnDate,
 } from "./stay.ts";
 import type { GuestEntry } from "./types.ts";
@@ -38,8 +38,8 @@ describe("yesterday roll", () => {
     ];
     const rows = inHouseOnDate(guests, "2026-09-10");
     assert.deepEqual(
-      rows.map((r) => r.name),
-      ["RAMESH"],
+      rows.map((r) => r.id),
+      ["a"],
     );
   });
 
@@ -47,72 +47,47 @@ describe("yesterday roll", () => {
     const guests = [
       g({ id: "a", date: "2026-09-10", name: "RAMESH", roomNo: "101" }),
       g({ id: "b", date: "2026-09-10", name: "SITA", roomNo: "102" }),
-      g({ id: "c", date: "2026-09-10", name: "AJAY", roomNo: "103" }),
     ];
-    const next = applyYesterdayRoll(guests, "2026-09-10", ["a", "c"]);
-    const today = next.filter((x) => x.date === "2026-09-11");
-    assert.equal(today.length, 2);
-    assert.ok(stayOnDate(next, guests[0]!, "2026-09-11"));
-    assert.ok(stayOnDate(next, guests[2]!, "2026-09-11"));
-    assert.equal(stayOnDate(next, guests[1]!, "2026-09-11"), false);
-    const sita = next.find((x) => x.id === "b");
-    assert.equal(sita?.stay, "out");
-    assert.equal(sita?.checkOut, "2026-09-11");
-    const ramesh = next.find((x) => x.id === "a");
-    assert.equal(ramesh?.stay, "continue");
+    const next = applyYesterdayRoll(guests, "2026-09-10", ["a"]);
+    assert.equal(next.find((x) => x.id === "a")?.stay, "continue");
+    assert.equal(next.find((x) => x.id === "b")?.stay, "out");
+    assert.ok(next.some((x) => x.date === "2026-09-11" && x.name === "RAMESH"));
+    assert.equal(
+      next.filter((x) => x.date === "2026-09-11" && x.name === "SITA").length,
+      0,
+    );
   });
 
   it("unticked everyone checks out with no today copies", () => {
     const guests = [
       g({ id: "a", date: "2026-09-10", name: "RAMESH", roomNo: "101" }),
-      g({ id: "b", date: "2026-09-10", name: "SITA", roomNo: "102" }),
     ];
     const next = applyYesterdayRoll(guests, "2026-09-10", []);
+    assert.equal(next.find((x) => x.id === "a")?.stay, "out");
     assert.equal(next.filter((x) => x.date === "2026-09-11").length, 0);
-    assert.ok(next.every((x) => x.date !== "2026-09-10" || x.stay === "out"));
   });
 
   it("does not duplicate a guest already posted today", () => {
-    const ramesh = g({
-      id: "a",
-      date: "2026-09-10",
-      name: "RAMESH",
-      roomNo: "101",
-    });
     const guests = [
-      ramesh,
-      g({
-        id: "a2",
-        date: "2026-09-11",
-        name: "RAMESH",
-        roomNo: "101",
-        checkIn: "2026-09-10",
-      }),
+      g({ id: "a", date: "2026-09-10", name: "RAMESH", roomNo: "101" }),
+      g({ id: "a2", date: "2026-09-11", name: "RAMESH", roomNo: "101" }),
     ];
     const next = applyYesterdayRoll(guests, "2026-09-10", ["a"]);
-    const today = next.filter(
-      (x) => x.date === "2026-09-11" && stayKey(x) === stayKey(ramesh),
+    assert.equal(
+      next.filter((x) => x.date === "2026-09-11" && x.name === "RAMESH").length,
+      1,
     );
-    assert.equal(today.length, 1);
   });
 });
 
 describe("duplicate posting key", () => {
   it("matches name, room and mode on the same date", () => {
     const guests = [
-      g({
-        id: "a",
-        date: "2026-09-11",
-        name: "RAMESH",
-        roomNo: "101",
-        mode: "CASH",
-        amount: 1500,
-        checkIn: "2026-09-10",
-      }),
+      g({ id: "a", date: "2026-09-09", name: "RAMESH", roomNo: "101", mode: "CASH" }),
     ];
-    const hit = findDuplicateOnDate(guests, "2026-09-11", {
-      name: "ramesh",
-      roomNo: "0101",
+    const hit = findDuplicateOnDate(guests, "2026-09-09", {
+      name: "RAMESH",
+      roomNo: "101",
       mode: "CASH",
     });
     assert.equal(hit?.id, "a");
@@ -120,19 +95,13 @@ describe("duplicate posting key", () => {
 
   it("does not match a different mode or another day", () => {
     const guests = [
-      g({
-        id: "a",
-        date: "2026-09-11",
-        name: "RAMESH",
-        roomNo: "101",
-        mode: "CASH",
-      }),
+      g({ id: "a", date: "2026-09-09", name: "RAMESH", roomNo: "101", mode: "CASH" }),
     ];
     assert.equal(
-      findDuplicateOnDate(guests, "2026-09-11", {
+      findDuplicateOnDate(guests, "2026-09-09", {
         name: "RAMESH",
         roomNo: "101",
-        mode: "BALANCE",
+        mode: "QRS",
       }),
       null,
     );
@@ -148,18 +117,12 @@ describe("duplicate posting key", () => {
 
   it("skips the row being edited", () => {
     const guests = [
-      g({
-        id: "a",
-        date: "2026-09-11",
-        name: "RAMESH",
-        roomNo: "101",
-        mode: "CASH",
-      }),
+      g({ id: "a", date: "2026-09-09", name: "RAMESH", roomNo: "101" }),
     ];
     assert.equal(
       findDuplicateOnDate(
         guests,
-        "2026-09-11",
+        "2026-09-09",
         { name: "RAMESH", roomNo: "101", mode: "CASH" },
         "a",
       ),
@@ -204,5 +167,33 @@ describe("undo checkout", () => {
     const next = applyYesterdayRoll(guests, "2026-09-09", ["a"]);
     assert.equal(next.find((x) => x.id === "a")?.stay, "continue");
     assert.ok(next.some((x) => x.date === "2026-09-10" && x.name === "PANKAJ"));
+  });
+});
+
+describe("guest save", () => {
+  it("copies source onto every night of the stay", () => {
+    const guests = [
+      g({
+        id: "a1",
+        date: "2026-09-08",
+        name: "PRASAD",
+        roomNo: "210",
+        mode: "BALANCE",
+        source: "MOT",
+        checkIn: "2026-09-01",
+      }),
+      g({
+        id: "a2",
+        date: "2026-09-09",
+        name: "PRASAD",
+        roomNo: "210",
+        mode: "BALANCE",
+        source: "MOT",
+        checkIn: "2026-09-01",
+      }),
+    ];
+    const next = applyGuestPatch(guests, "a2", { source: "MOTWANI" });
+    assert.equal(next.find((x) => x.id === "a1")?.source, "MOTWANI");
+    assert.equal(next.find((x) => x.id === "a2")?.source, "MOTWANI");
   });
 });

@@ -79,6 +79,29 @@ export function stayDates(guests: GuestEntry[], g: GuestEntry) {
   };
 }
 
+/** Source/name edits follow the whole stay so Balance does not split one company. */
+export function applyGuestPatch(
+  guests: GuestEntry[],
+  id: string,
+  patch: Partial<GuestEntry>,
+): GuestEntry[] {
+  const prev = guests.find((g) => g.id === id);
+  if (!prev) return guests;
+  const oldKey = stayKey(prev);
+  const shareSource = Object.prototype.hasOwnProperty.call(patch, "source");
+  const shareName = Object.prototype.hasOwnProperty.call(patch, "name");
+  return guests.map((g) => {
+    if (g.id === id) return { ...g, ...patch };
+    if (!shareSource && !shareName) return g;
+    if (stayKey(g) !== oldKey) return g;
+    return {
+      ...g,
+      ...(shareSource ? { source: patch.source ?? null } : {}),
+      ...(shareName && patch.name ? { name: patch.name } : {}),
+    };
+  });
+}
+
 export function applyStay(
   guests: GuestEntry[],
   id: string,

@@ -60,9 +60,9 @@ export interface DueAccount {
 }
 
 export function sourceKey(g: GuestEntry): string {
-  const s = (g.source ?? "").trim();
+  const s = (g.source ?? "").trim().toUpperCase();
   if (s) return s;
-  return (g.name ?? "").trim() || "Unknown";
+  return (g.name ?? "").trim().toUpperCase() || "UNKNOWN";
 }
 
 function receiptMatches(particular: string, key: string): boolean {

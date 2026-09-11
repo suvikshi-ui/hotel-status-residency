@@ -18,7 +18,7 @@ import type {
   StaffRow,
 } from "./types";
 import { uid } from "./format";
-import { applyStay, applyYesterdayRoll } from "./stay";
+import { applyGuestPatch, applyStay, applyYesterdayRoll } from "./stay";
 import { rebuildDayBooks } from "./ledger";
 import { fillAllSeedDates, SEEDED_DATES } from "./seed-fill";
 import {
@@ -254,9 +254,7 @@ export const useLedger = create<LedgerState>()(
         save({ guests, ...rebuildFrom(next, date) });
       },
       updateGuest: (id, patch) => {
-        const guests = get().guests.map((g) =>
-          g.id === id ? { ...g, ...patch } : g,
-        );
+        const guests = applyGuestPatch(get().guests, id, patch);
         const row = guests.find((g) => g.id === id);
         const next = { ...get(), guests };
         save({ guests, ...rebuildFrom(next, row?.date ?? get().selectedDate) });
