@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as BalanceRouteImport } from './routes/balance'
+import { Route as ComplaintsRouteImport } from './routes/complaints'
 import { Route as DaySheetRouteImport } from './routes/day-sheet'
 import { Route as ExpensesRouteImport } from './routes/expenses'
 import { Route as InventoryRouteImport } from './routes/inventory'
@@ -29,6 +30,11 @@ const IndexRoute = IndexRouteImport.update({
 const BalanceRoute = BalanceRouteImport.update({
   id: '/balance',
   path: '/balance',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ComplaintsRoute = ComplaintsRouteImport.update({
+  id: '/complaints',
+  path: '/complaints',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DaySheetRoute = DaySheetRouteImport.update({
@@ -80,6 +86,7 @@ const StaffRoute = StaffRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/balance': typeof BalanceRoute
+  '/complaints': typeof ComplaintsRoute
   '/day-sheet': typeof DaySheetRoute
   '/expenses': typeof ExpensesRoute
   '/inventory': typeof InventoryRoute
@@ -93,6 +100,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/balance': typeof BalanceRoute
+  '/complaints': typeof ComplaintsRoute
   '/day-sheet': typeof DaySheetRoute
   '/expenses': typeof ExpensesRoute
   '/inventory': typeof InventoryRoute
@@ -107,6 +115,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/balance': typeof BalanceRoute
+  '/complaints': typeof ComplaintsRoute
   '/day-sheet': typeof DaySheetRoute
   '/expenses': typeof ExpensesRoute
   '/inventory': typeof InventoryRoute
@@ -122,6 +131,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/balance'
+    | '/complaints'
     | '/day-sheet'
     | '/expenses'
     | '/inventory'
@@ -135,6 +145,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/balance'
+    | '/complaints'
     | '/day-sheet'
     | '/expenses'
     | '/inventory'
@@ -148,6 +159,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/balance'
+    | '/complaints'
     | '/day-sheet'
     | '/expenses'
     | '/inventory'
@@ -162,6 +174,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BalanceRoute: typeof BalanceRoute
+  ComplaintsRoute: typeof ComplaintsRoute
   DaySheetRoute: typeof DaySheetRoute
   ExpensesRoute: typeof ExpensesRoute
   InventoryRoute: typeof InventoryRoute
@@ -187,6 +200,13 @@ declare module '@tanstack/react-router' {
       path: '/balance'
       fullPath: '/balance'
       preLoaderRoute: typeof BalanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/complaints': {
+      id: '/complaints'
+      path: '/complaints'
+      fullPath: '/complaints'
+      preLoaderRoute: typeof ComplaintsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/day-sheet': {
@@ -258,6 +278,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BalanceRoute: BalanceRoute,
+  ComplaintsRoute: ComplaintsRoute,
   DaySheetRoute: DaySheetRoute,
   ExpensesRoute: ExpensesRoute,
   InventoryRoute: InventoryRoute,
