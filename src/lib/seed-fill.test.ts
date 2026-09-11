@@ -15,27 +15,44 @@ describe("fillSeedDate", () => {
     );
   });
 
-  it("replaces a fat 9 Sep book left over from yesterday roll", () => {
+  it("replaces the old 6-guest 9 Sep book with the 33-guest chart", () => {
     const DATE = "2026-09-09";
-    const leftover = seedJson.guests
-      .filter((g) => g.date === "2026-09-08")
-      .map((g) => ({ ...g, id: `old-${g.id}`, date: DATE }));
+    const leftover = [
+      {
+        id: "old-pankaj",
+        date: DATE,
+        name: "PANKAJ",
+        roomNo: "105",
+        mode: "BALANCE",
+        amount: 1800,
+      },
+      {
+        id: "old-lucy",
+        date: DATE,
+        name: "LUCY",
+        roomNo: "201",
+        mode: "BALANCE",
+        amount: 1800,
+      },
+    ];
     const next = fillAllSeedDates(leftover, seedJson.guests);
-    assert.equal(next.filter((g) => g.date === DATE).length, 6);
+    assert.equal(next.filter((g) => g.date === DATE).length, 33);
     assert.equal(
       next.filter((g) => g.date === DATE).reduce((s, g) => s + g.amount, 0),
-      12000,
+      51500,
     );
-    assert.ok(next.every((g) => g.date !== DATE || g.mode === "BALANCE"));
   });
 
-  it("clears leftover 9 Sep food when the chart has none", () => {
+  it("replaces leftover 9 Sep food with the chart", () => {
     const leftover = [
       { id: "f-x", date: "2026-09-09", mode: "CASH", amount: 500 },
       { id: "f-6", date: "2026-09-06", mode: "QRS", amount: 100 },
     ];
     const next = fillAllSeedDates(leftover, seedJson.food);
-    assert.equal(next.filter((r) => r.date === "2026-09-09").length, 0);
+    assert.equal(
+      next.filter((r) => r.date === "2026-09-09").reduce((s, r) => s + r.amount, 0),
+      4610,
+    );
     assert.ok(next.some((r) => r.date === "2026-09-06"));
   });
 
@@ -48,6 +65,6 @@ describe("fillSeedDate", () => {
     assert.equal(next.filter((g) => g.date === "2026-09-06").length, 34);
     assert.equal(next.filter((g) => g.date === "2026-09-07").length, 35);
     assert.equal(next.filter((g) => g.date === "2026-09-08").length, 38);
-    assert.equal(next.filter((g) => g.date === "2026-09-09").length, 6);
+    assert.equal(next.filter((g) => g.date === "2026-09-09").length, 33);
   });
 });
