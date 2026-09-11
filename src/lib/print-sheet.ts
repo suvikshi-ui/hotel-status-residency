@@ -94,25 +94,39 @@ export function printDocument({
   openPrintFrame(title, html);
 }
 
-export function printHtmlDocument(title: string, inner: string) {
-  const html = `<!doctype html>
+export const A4_PX = { width: 794, height: 1123, marginMm: 8 };
+
+export const CINZEL_FONT_HREF =
+  "https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Cinzel:wght@600;700&display=swap";
+
+export const A4_PRINT_CSS = `@page { size: A4 portrait; margin: 8mm; background: #fff; }
+html, body { margin: 0; background: #fff !important; }
+* { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+.daily-a4 {
+  background: #fff !important;
+  width: 100%;
+  height: 100%;
+  min-height: 0 !important;
+  border-radius: 16px;
+}
+.daily-a4-head { background: #14352c !important; color: #f4efe4 !important; }
+.day-chart { background: #f7f1e6 !important; }`;
+
+export function a4PrintDocument(title: string, inner: string) {
+  return `<!doctype html>
 <html>
 <head>
   <meta charset="utf-8" />
   <title>${escapeHtml(title)}</title>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Cinzel:wght@600;700&display=swap" />
-  <style>
-    @page { size: A4 portrait; margin: 8mm; background: #fff; }
-    html, body { margin: 0; background: #fff !important; }
-    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
-    .daily-a4 { background: #fff !important; }
-    .daily-a4-head { background: #14352c !important; color: #f4efe4 !important; }
-    .day-chart { background: #f7f1e6 !important; }
-  </style>
+  <link rel="stylesheet" href="${CINZEL_FONT_HREF}" />
+  <style>${A4_PRINT_CSS}</style>
 </head>
 <body>${inner}</body>
 </html>`;
-  openPrintFrame(title, html, true);
+}
+
+export function printHtmlDocument(title: string, inner: string) {
+  openPrintFrame(title, a4PrintDocument(title, inner), true);
 }
 
 type PrintLine = {
