@@ -1,15 +1,31 @@
 export interface InventoryItem {
   id: string;
   name: string;
-  opening: number;
-  received: number;
-  issued: number;
-  laundry: number;
+  lastMonth: number;
+  thisMonth: number;
+  expected: number;
 }
+
+export type InventoryCheck =
+  | { kind: "even" }
+  | { kind: "take-out"; qty: number }
+  | { kind: "replace"; qty: number };
+
+type RawInventory = {
+  id?: string;
+  name?: string;
+  lastMonth?: unknown;
+  thisMonth?: unknown;
+  expected?: unknown;
+  opening?: unknown;
+  received?: unknown;
+  issued?: unknown;
+};
 
 export const LINEN_CATALOG: { id: string; name: string }[] = [
   { id: "inv-single-sheet", name: "Single bed sheet" },
   { id: "inv-double-sheet", name: "Double bed sheet" },
+  { id: "inv-pillow-cover", name: "Pillow cover" },
   { id: "inv-towel", name: "Towel" },
   { id: "inv-single-duvet", name: "Single duvet" },
   { id: "inv-double-duvet", name: "Double duvet" },
@@ -22,25 +38,69 @@ function qty(n: unknown): number {
   return Math.round(v);
 }
 
-export function inventoryClosing(item: Pick<InventoryItem, "opening" | "received" | "issued">) {
-  return item.opening + item.received - item.issued;
+function fieldsFrom(row: RawInventory | undefined): Pick<
+  InventoryItem,
+  "lastMonth" | "thisMonth" | "expected"
+> {
+  if (!row) return { lastMonth: 0, thisMonth: 0, expected: 0 };
+  const lastMonth = row.lastMonth ?? row.opening;
+  const thisMonth =
+    row.thisMonth ??
+    (row.opening != null || row.received != null || row.issued != null
+      ? qty(row.opening) + qty(row.received) - qty(row.issued)
+      : 0);
+  return {
+    lastMonth: qty(lastMonth),
+    thisMonth: qty(thisMonth),
+    expected: qty(row.expected),
+  };
+}
+
+export function emptyInventoryItem(
+  id: string,
+  name: string,
+): InventoryItem {
+  return { id, name, lastMonth: 0, thisMonth: 0, expected: 0 };
+}
+
+export function inventoryDifference(
+  item: Pick<InventoryItem, "lastMonth" | "thisMonth">,
+) {
+  return item.thisMonth - item.lastMonth;
+}
+
+export function signedCount(n: number): string {
+  if (n > 0) return `+${n}`;
+  if (n < 0) return `−${Math.abs(n)}`;
+  return "0";
+}
+
+export function inventoryCheck(
+  item: Pick<InventoryItem, "thisMonth" | "expected">,
+): InventoryCheck {
+  const gap = item.thisMonth - item.expected;
+  if (gap === 0) return { kind: "even" };
+  if (gap > 0) return { kind: "take-out", qty: gap };
+  return { kind: "replace", qty: -gap };
+}
+
+export function inventoryCheckLabel(check: InventoryCheck): string {
+  if (check.kind === "even") return "बराबर है";
+  if (check.kind === "take-out") return `${check.qty} बाहर निकालना पड़ेगा`;
+  return `${check.qty} रिप्लेस करना पड़ेगा`;
 }
 
 export function seedInventory(): InventoryItem[] {
-  return LINEN_CATALOG.map((row) => ({
-    ...row,
-    opening: 0,
-    received: 0,
-    issued: 0,
-    laundry: 0,
-  }));
+  return LINEN_CATALOG.map((row) => emptyInventoryItem(row.id, row.name));
 }
 
-export function normalizeInventory(rows: InventoryItem[] | undefined | null): InventoryItem[] {
+export function normalizeInventory(
+  rows: RawInventory[] | undefined | null,
+): InventoryItem[] {
   const incoming = Array.isArray(rows) ? rows : [];
-  const byId = new Map(incoming.map((r) => [r.id, r]));
+  const byId = new Map(incoming.map((r) => [r.id ?? "", r]));
   const byName = new Map(
-    incoming.map((r) => [r.name.trim().toLowerCase(), r]),
+    incoming.map((r) => [(r.name ?? "").trim().toLowerCase(), r]),
   );
   const out: InventoryItem[] = [];
   const seen = new Set<string>();
@@ -49,27 +109,23 @@ export function normalizeInventory(rows: InventoryItem[] | undefined | null): In
     out.push({
       id: cat.id,
       name: cat.name,
-      opening: qty(hit?.opening),
-      received: qty(hit?.received),
-      issued: qty(hit?.issued),
-      laundry: qty(hit?.laundry),
+      ...fieldsFrom(hit),
     });
     seen.add(cat.id);
     if (hit?.id) seen.add(hit.id);
     seen.add(cat.name.toLowerCase());
   }
   for (const row of incoming) {
-    const nameKey = row.name.trim().toLowerCase();
-    if (!nameKey || seen.has(row.id) || seen.has(nameKey)) continue;
-    seen.add(row.id);
+    const name = (row.name ?? "").trim();
+    const nameKey = name.toLowerCase();
+    const id = row.id ?? "";
+    if (!nameKey || seen.has(id) || seen.has(nameKey)) continue;
+    seen.add(id);
     seen.add(nameKey);
     out.push({
-      id: row.id || `inv-${nameKey.replace(/\s+/g, "-")}`,
-      name: row.name.trim(),
-      opening: qty(row.opening),
-      received: qty(row.received),
-      issued: qty(row.issued),
-      laundry: qty(row.laundry),
+      id: id || `inv-${nameKey.replace(/\s+/g, "-")}`,
+      name,
+      ...fieldsFrom(row),
     });
   }
   return out;
