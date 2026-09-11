@@ -20,7 +20,7 @@ import type {
 import { uid } from "./format";
 import { applyStay, applyYesterdayRoll } from "./stay";
 import { rebuildDayBooks } from "./ledger";
-import { fillSeedDate } from "./seed-fill";
+import { fillAllSeedDates, SEEDED_DATES } from "./seed-fill";
 import {
   normalizeInventory,
   seedInventory,
@@ -34,8 +34,8 @@ function afterSave() {
 const seed = seedJson as SeedData;
 const BASE_OPENING_DATE = seed.days[0]?.date ?? "2026-09-01";
 
-export const LAST_SEEDED = "2026-09-01";
-export const DEFAULT_DATE = "2026-09-06";
+export const LAST_SEEDED = "2026-09-07";
+export const DEFAULT_DATE = "2026-09-07";
 export const LEDGER_STORAGE_KEY = "status-ledger-v5";
 
 export interface LedgerState {
@@ -153,34 +153,27 @@ function mergeSnapshot(
   const advances = normalizeAdvances(persisted.advances ?? current.advances);
   const rooms = (persisted.rooms?.length ? persisted.rooms : current.rooms) as RoomDef[];
   const inventory = normalizeInventory(persisted.inventory ?? current.inventory);
-  const day = "2026-09-06";
-  const guests = fillSeedDate(
+  const guests = fillAllSeedDates(
     persisted.guests,
     (seed.guests as GuestEntry[]) ?? current.guests,
-    day,
   );
-  const food = fillSeedDate(
+  const food = fillAllSeedDates(
     persisted.food,
     (seed.food as ModeAmount[]) ?? current.food,
-    day,
   );
-  const wholesale = fillSeedDate(
+  const wholesale = fillAllSeedDates(
     persisted.wholesale,
     (seed.wholesale as ModeAmount[]) ?? current.wholesale,
-    day,
   );
-  const expenses = fillSeedDate(
+  const expenses = fillAllSeedDates(
     persisted.expenses,
     (seed.expenses as NamedAmount[]) ?? current.expenses,
-    day,
   );
   let selectedDate = persisted.selectedDate ?? current.selectedDate;
-  if (
-    (!persisted.selectedDate || persisted.selectedDate === BASE_OPENING_DATE) &&
-    guests.some((g) => g.date === day) &&
-    !guests.some((g) => g.date === BASE_OPENING_DATE)
-  ) {
-    selectedDate = day;
+  const latest = SEEDED_DATES[SEEDED_DATES.length - 1];
+  const hadLatest = (persisted.guests ?? []).some((g) => g.date === latest);
+  if (!hadLatest && guests.some((g) => g.date === latest)) {
+    selectedDate = latest;
   }
   return {
     ...current,
