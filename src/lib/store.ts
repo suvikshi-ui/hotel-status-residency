@@ -93,6 +93,7 @@ export interface LedgerState {
   setInventory: (inventory: InventoryItem[]) => void;
   setComplaints: (complaints: RoomComplaint[]) => void;
   applySnapshot: (p: Partial<LedgerState>) => void;
+  replaceSnapshot: (p: Partial<LedgerState>) => void;
 }
 
 function seedState(): Omit<
@@ -122,6 +123,7 @@ function seedState(): Omit<
   | "setInventory"
   | "setComplaints"
   | "applySnapshot"
+  | "replaceSnapshot"
 > {
   return {
     hotel: seed.hotel,
@@ -169,7 +171,7 @@ function normalizeAdvances(rows: AdvanceRow[]): AdvanceRow[] {
 function mergeSnapshot(
   persisted: Partial<LedgerState>,
   current: LedgerState,
-  opts?: { skipSeedFill?: boolean },
+  opts?: { skipSeedFill?: boolean; replace?: boolean },
 ): LedgerState {
   const staff = normalizeStaff(persisted.staff ?? current.staff);
   const advances = normalizeAdvances(persisted.advances ?? current.advances);
@@ -184,38 +186,46 @@ function mergeSnapshot(
       : undefined,
     current.lockedDates,
   );
-  const guests = opts?.skipSeedFill
-    ? mergeRowsByDate(persisted.guests, current.guests)
-    : fillAllSeedDates(
-        mergeRowsByDate(persisted.guests, current.guests),
-        (seed.guests as GuestEntry[]) ?? current.guests,
-      );
-  const food = opts?.skipSeedFill
-    ? mergeRowsByDate(persisted.food, current.food)
-    : fillAllSeedDates(
-        mergeRowsByDate(persisted.food, current.food),
-        (seed.food as ModeAmount[]) ?? current.food,
-      );
-  const wholesale = opts?.skipSeedFill
-    ? mergeRowsByDate(persisted.wholesale, current.wholesale)
-    : fillAllSeedDates(
-        mergeRowsByDate(persisted.wholesale, current.wholesale),
-        (seed.wholesale as ModeAmount[]) ?? current.wholesale,
-      );
-  const expenses = opts?.skipSeedFill
-    ? mergeRowsByDate(persisted.expenses, current.expenses)
-    : fillAllSeedDates(
-        mergeRowsByDate(persisted.expenses, current.expenses),
-        (seed.expenses as NamedAmount[]) ?? current.expenses,
-      );
-  const balReceived = mergeRowsByDate(
-    persisted.balReceived,
-    current.balReceived,
-  );
+  const guests = opts?.replace
+    ? (persisted.guests ?? [])
+    : opts?.skipSeedFill
+      ? mergeRowsByDate(persisted.guests, current.guests)
+      : fillAllSeedDates(
+          mergeRowsByDate(persisted.guests, current.guests),
+          (seed.guests as GuestEntry[]) ?? current.guests,
+        );
+  const food = opts?.replace
+    ? (persisted.food ?? [])
+    : opts?.skipSeedFill
+      ? mergeRowsByDate(persisted.food, current.food)
+      : fillAllSeedDates(
+          mergeRowsByDate(persisted.food, current.food),
+          (seed.food as ModeAmount[]) ?? current.food,
+        );
+  const wholesale = opts?.replace
+    ? (persisted.wholesale ?? [])
+    : opts?.skipSeedFill
+      ? mergeRowsByDate(persisted.wholesale, current.wholesale)
+      : fillAllSeedDates(
+          mergeRowsByDate(persisted.wholesale, current.wholesale),
+          (seed.wholesale as ModeAmount[]) ?? current.wholesale,
+        );
+  const expenses = opts?.replace
+    ? (persisted.expenses ?? [])
+    : opts?.skipSeedFill
+      ? mergeRowsByDate(persisted.expenses, current.expenses)
+      : fillAllSeedDates(
+          mergeRowsByDate(persisted.expenses, current.expenses),
+          (seed.expenses as NamedAmount[]) ?? current.expenses,
+        );
+  const balReceived = opts?.replace
+    ? (persisted.balReceived ?? [])
+    : mergeRowsByDate(persisted.balReceived, current.balReceived);
   let selectedDate = persisted.selectedDate ?? current.selectedDate ?? DEFAULT_DATE;
-  const openingDate =
-    earlierDate(persisted.openingDate, current.openingDate) ||
-    current.openingDate;
+  const openingDate = opts?.replace
+    ? persisted.openingDate || current.openingDate
+    : earlierDate(persisted.openingDate, current.openingDate) ||
+      current.openingDate;
   return {
     ...current,
     ...persisted,
@@ -434,6 +444,20 @@ export const useLedger = create<LedgerState>()(
           ...rebuildFrom(merged, merged.openingDate || BASE_OPENING_DATE),
           savedAt: p.savedAt ?? merged.savedAt ?? Date.now(),
         });
+      },
+      replaceSnapshot: (p) => {
+        const merged = mergeSnapshot(
+          { ...p, appRole: get().appRole },
+          get(),
+          { skipSeedFill: true, replace: true },
+        );
+        writeStoredLocks(ledgerOwnerKey(), merged.lockedDates ?? {});
+        set({
+          ...merged,
+          ...rebuildFrom(merged, merged.openingDate || BASE_OPENING_DATE),
+          savedAt: Date.now(),
+        });
+        afterSave();
       },
     };
     },

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { Download, Upload } from "lucide-react";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -15,8 +16,123 @@ import { HotelLogo } from "@/components/hotel-logo";
 import { CloudSchemaSetup } from "@/components/cloud-schema-setup";
 import { useStaffSession } from "@/lib/supabase-auth";
 import { useCloudSync } from "@/lib/supabase-sync";
+import {
+  backupCounts,
+  backupFilename,
+  buildBackupFile,
+  downloadBackupJson,
+  parseBackupFile,
+} from "@/lib/backup";
+import { hotelForCloud } from "@/lib/register-lock";
+import { snapshotFromUnknown, type LedgerSnapshot } from "@/lib/supabase-db";
 
-export const Route = createFileRoute("/profile")({ component: ProfilePage });
+function snapshotNow(): LedgerSnapshot {
+  const s = useLedger.getState();
+  return {
+    hotel: hotelForCloud(s.hotel, s.lockedDates ?? {}),
+    opening: s.opening,
+    rooms: s.rooms,
+    guests: s.guests,
+    food: s.food,
+    wholesale: s.wholesale,
+    expenses: s.expenses,
+    balReceived: s.balReceived,
+    staff: s.staff,
+    advances: s.advances,
+    ota: s.ota,
+    janSales: s.janSales,
+    janFood: s.janFood,
+    creditGuests: s.creditGuests,
+    selectedDate: s.selectedDate,
+    openingDate: s.openingDate,
+    securityCode: s.securityCode,
+    lockedDates: s.lockedDates ?? {},
+    inventory: s.inventory,
+    complaints: s.complaints,
+    savedAt: s.savedAt,
+  };
+}
+
+function BackupCard() {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const { gate } = useGate();
+  const guests = useLedger((s) => s.guests.length);
+  const replaceSnapshot = useLedger((s) => s.replaceSnapshot);
+
+  function download() {
+    const snap = snapshotNow();
+    downloadBackupJson(buildBackupFile(snap), backupFilename());
+    const n = backupCounts(snap);
+    toast.success(
+      `Backup saved · ${n.guests} guests · ${n.dates.length || 0} days`,
+    );
+  }
+
+  function onFile(file: File) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = parseBackupFile(JSON.parse(String(reader.result)));
+        const tables = snapshotFromUnknown(parsed.tables, snapshotNow());
+        const n = backupCounts(tables);
+        gate(
+          () => {
+            replaceSnapshot({
+              ...tables,
+              lockedDates: tables.lockedDates ?? {},
+            });
+            toast.success(
+              `Books restored · ${n.guests} guests · ${n.dates[0] ?? "—"} to ${n.dates.at(-1) ?? "—"}`,
+            );
+          },
+          {
+            title: "Restore this backup?",
+            message: `This replaces the live books with the file (${n.guests} guests, ${n.food} food, ${n.expenses} expenses).`,
+            confirmLabel: "Import",
+          },
+        );
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Could not read backup");
+      }
+    };
+    reader.onerror = () => toast.error("Could not read backup");
+    reader.readAsText(file);
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Backup</CardTitle>
+        <p className="text-sm text-muted">
+          Download every table as a JSON file. Import that file to put the books
+          back — including 1–5 Sep if they were in the file.
+        </p>
+      </CardHeader>
+      <CardContent className="flex flex-wrap items-center gap-3">
+        <Button type="button" onClick={download}>
+          <Download className="size-4" />
+          Download backup
+        </Button>
+        <Button type="button" variant="outline" onClick={() => fileRef.current?.click()}>
+          <Upload className="size-4" />
+          Import backup
+        </Button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="application/json,.json"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (file) onFile(file);
+          }}
+        />
+        <p className="text-xs text-muted">{guests} guests in the live books</p>
+      </CardContent>
+    </Card>
+  );
+}
 
 function ProfilePage() {
   const hotel = useLedger((s) => s.hotel);
@@ -59,6 +175,8 @@ function ProfilePage() {
       </div>
 
       {canAddUsers(role) ? <AddUserCard /> : null}
+
+      {role === "admin" || role === "supervisor" ? <BackupCard /> : null}
 
       {user ? (
         <Card>

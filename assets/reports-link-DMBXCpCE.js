@@ -1,0 +1,1 @@
+import{t as e}from"./arrow-up-right-sQr_JwWo.js";import{D as t,K as n,W as r,r as i}from"./index-BqwhRajO.js";var a=n();function o({view:n,label:o=`Reports`}){return(0,a.jsx)(t,{asChild:!0,variant:`outline`,children:(0,a.jsxs)(r,{to:`/reports`,search:{view:i(n)},children:[o,(0,a.jsx)(e,{className:`size-4`})]})})}export{o as t};

@@ -64,7 +64,7 @@ function NavLinks({
           return (
             <Link
               key={item.to}
-              to={item.to}
+              to={item.to as "/"}
               onClick={onNavigate}
               className={cn(
                 "flex min-h-12 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg text-[11px] font-medium",
@@ -87,7 +87,7 @@ function NavLinks({
         return (
           <Link
             key={item.to}
-            to={item.to}
+            to={item.to as "/"}
             onClick={onNavigate}
             className={cn(
               "flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors",
