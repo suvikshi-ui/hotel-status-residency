@@ -1,4 +1,4 @@
-export const SEEDED_DATES = ["2026-09-06", "2026-09-07"] as const;
+export const SEEDED_DATES = ["2026-09-06", "2026-09-07", "2026-09-08"] as const;
 
 export function fillSeedDate<T extends { date: string; amount?: number }>(
   persisted: T[] | undefined,

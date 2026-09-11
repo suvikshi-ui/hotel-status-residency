@@ -34,8 +34,8 @@ function afterSave() {
 const seed = seedJson as SeedData;
 const BASE_OPENING_DATE = seed.days[0]?.date ?? "2026-09-01";
 
-export const LAST_SEEDED = "2026-09-07";
-export const DEFAULT_DATE = "2026-09-07";
+export const LAST_SEEDED = "2026-09-08";
+export const DEFAULT_DATE = "2026-09-08";
 export const LEDGER_STORAGE_KEY = "status-ledger-v5";
 
 export interface LedgerState {
