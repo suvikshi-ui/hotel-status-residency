@@ -14,6 +14,26 @@ function waitImages(root: HTMLElement) {
   );
 }
 
+async function inlineImages(root: HTMLElement) {
+  await Promise.all(
+    [...root.querySelectorAll("img")].map(async (img) => {
+      try {
+        const res = await fetch(img.currentSrc || img.src);
+        if (!res.ok) return;
+        const blob = await res.blob();
+        img.src = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(blob);
+        });
+      } catch {
+        /* keep original src */
+      }
+    }),
+  );
+}
+
 function downloadDataUrl(dataUrl: string, filename: string) {
   const a = document.createElement("a");
   a.href = dataUrl;
@@ -25,10 +45,7 @@ function downloadDataUrl(dataUrl: string, filename: string) {
   a.remove();
 }
 
-/** Same A4 page the PDF print uses, saved as a JPEG. */
-export async function saveElementJpeg(el: HTMLElement, filename: string) {
-  const { toJpeg } = await import("html-to-image");
-
+function mountPrintPage(el: HTMLElement) {
   const page = document.createElement("div");
   page.setAttribute("aria-hidden", "true");
   page.style.cssText = [
@@ -67,47 +84,100 @@ ${A4_PRINT_CSS}
   clone.style.margin = "0";
   clone.style.transform = "none";
   sheet.appendChild(clone);
-
   page.appendChild(style);
   page.appendChild(sheet);
   document.body.appendChild(page);
+  return { page, sheet, clone };
+}
 
+async function rasterPrintPage(sheet: HTMLElement) {
+  const html2canvas = (await import("html2canvas")).default;
+  const opts = {
+    scale: 2,
+    useCORS: true,
+    allowTaint: true,
+    backgroundColor: "#ffffff",
+    width: A4_PX.width,
+    height: A4_PX.height,
+    windowWidth: A4_PX.width,
+    windowHeight: A4_PX.height,
+    imageTimeout: 4000,
+    logging: false,
+  };
+  let canvas = await html2canvas(sheet, { ...opts, foreignObjectRendering: true });
+  if (canvasLooksEmpty(canvas)) {
+    canvas = await html2canvas(sheet, { ...opts, foreignObjectRendering: false });
+  }
+  return canvas;
+}
+
+function canvasLooksEmpty(canvas: HTMLCanvasElement) {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return true;
+  const w = Math.min(48, canvas.width);
+  const h = Math.min(48, canvas.height);
+  const { data } = ctx.getImageData(0, 0, w, h);
+  let dark = 0;
+  for (let i = 0; i < data.length; i += 16) {
+    if (data[i] < 248 || data[i + 1] < 248 || data[i + 2] < 248) dark += 1;
+  }
+  return dark < 4;
+}
+
+/** Build the same A4 PDF the Print button produces. */
+export async function pdfFromPrintElement(el: HTMLElement): Promise<Blob> {
+  const { page, sheet, clone } = mountPrintPage(el);
   try {
     await document.fonts?.ready.catch(() => undefined);
+    await inlineImages(clone);
     await waitImages(clone);
     await new Promise((r) => requestAnimationFrame(() => r(null)));
-
-    const dataUrl = await toJpeg(sheet, {
-      quality: 0.95,
-      pixelRatio: 2,
-      width: A4_PX.width,
-      height: A4_PX.height,
-      canvasWidth: A4_PX.width * 2,
-      canvasHeight: A4_PX.height * 2,
-      backgroundColor: "#ffffff",
-      cacheBust: true,
-      skipAutoScale: true,
-      style: {
-        width: `${A4_PX.width}px`,
-        height: `${A4_PX.height}px`,
-        transform: "none",
-        overflow: "hidden",
-        background: "#ffffff",
-      },
-    });
-
-    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const i = new Image();
-      i.onload = () => resolve(i);
-      i.onerror = () => reject(new Error("jpeg load failed"));
-      i.src = dataUrl;
-    });
-    if (img.width < A4_PX.width || img.height < A4_PX.height * 0.9) {
-      throw new Error("jpeg was cropped");
-    }
-
-    downloadDataUrl(dataUrl, filename);
+    const canvas = await rasterPrintPage(sheet);
+    const { jsPDF } = await import("jspdf");
+    const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
+    pdf.addImage(
+      canvas.toDataURL("image/jpeg", 0.95),
+      "JPEG",
+      0,
+      0,
+      210,
+      297,
+    );
+    return pdf.output("blob");
   } finally {
     page.remove();
   }
+}
+
+export async function jpegFromPdfBlob(pdfBlob: Blob): Promise<string> {
+  const pdfjs = await import("pdfjs-dist");
+  const worker = await import("pdfjs-dist/build/pdf.worker.min.mjs?url");
+  pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
+  const data = new Uint8Array(await pdfBlob.arrayBuffer());
+  const doc = await pdfjs.getDocument({ data }).promise;
+  const page = await doc.getPage(1);
+  const viewport = page.getViewport({ scale: 2 });
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.floor(viewport.width);
+  canvas.height = Math.floor(viewport.height);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("jpeg canvas missing");
+  await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+  return canvas.toDataURL("image/jpeg", 0.95);
+}
+
+/** Print the A4 sheet to PDF, then convert that PDF page to JPEG. */
+export async function saveElementJpeg(el: HTMLElement, filename: string) {
+  const pdf = await pdfFromPrintElement(el);
+  const dataUrl = await jpegFromPdfBlob(pdf);
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const i = new Image();
+    i.onload = () => resolve(i);
+    i.onerror = () => reject(new Error("jpeg load failed"));
+    i.src = dataUrl;
+  });
+  if (img.width < 400 || img.height < 400) {
+    throw new Error("jpeg was cropped");
+  }
+  downloadDataUrl(dataUrl, filename);
 }
