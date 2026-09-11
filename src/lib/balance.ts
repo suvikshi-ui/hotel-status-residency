@@ -104,42 +104,38 @@ export function splitStayNights(nights: DueLine[]): DueLine[][] {
   return chunks;
 }
 
-export function stayFromNights(nights: DueLine[]): DueStay {
+export function stayFromNights(nights: DueLine[], asOf?: string): DueStay {
   const dates = nights.map((n) => n.date).sort();
   const first = dates[0] ?? "";
   const lastNight = dates[dates.length - 1] ?? first;
+  const lastRow =
+    [...nights].reverse().find((n) => n.date === lastNight) ?? nights[nights.length - 1];
   const out = [...nights].reverse().find((n) => n.stay === "out" || Boolean(n.checkOut));
   const checkIn =
     nights.reduce((m, n) => {
       const v = n.checkIn || n.date;
       return m && m < v ? m : v;
     }, first) || first;
-  const explicitOut = out?.checkOut || null;
-  const left =
-    Boolean(out) || nights.some((n) => n.stay === "out" || Boolean(n.checkOut));
   const morning = checkoutFromLastNight(lastNight);
-  const checkOut = left
-    ? explicitOut && explicitOut > lastNight
-      ? explicitOut
-      : morning
-    : explicitOut && explicitOut > lastNight
-      ? explicitOut
-      : null;
+  const explicitOut = out?.checkOut || lastRow?.checkOut || null;
+  const checkOut =
+    explicitOut && explicitOut > lastNight ? explicitOut : morning;
   const billed = nights.reduce((s, n) => s + n.amount, 0);
-  const days = nightsFromDates(checkIn, checkOut || morning);
+  const days = nightsFromDates(checkIn, checkOut);
   const same = nights.length > 0 && nights.every((n) => n.amount === nights[0]!.amount);
   const perDay = nights.length
     ? same
       ? nights[0]!.amount
       : Math.round(billed / nights.length)
     : 0;
+  const openNight = Boolean(asOf) && lastNight === asOf && lastRow?.stay !== "out";
   return {
     id: nights[0]?.id ?? `${checkIn}-${lastNight}`,
     name: nights[0]?.name ?? "",
     roomNo: nights[0]?.roomNo ?? "",
     checkIn,
     checkOut,
-    inHouse: !checkOut,
+    inHouse: openNight,
     days,
     perDay,
     billed,
@@ -167,7 +163,7 @@ export function allocateStaysFifo(stays: DueStay[], collected: number): DueStay[
   });
 }
 
-function buildStays(lines: DueLine[]): DueStay[] {
+function buildStays(lines: DueLine[], asOf?: string): DueStay[] {
   const groups = new Map<string, DueLine[]>();
   for (const g of lines) {
     const k = personKey(g);
@@ -178,7 +174,7 @@ function buildStays(lines: DueLine[]): DueStay[] {
   const stays: DueStay[] = [];
   for (const list of groups.values()) {
     for (const chunk of splitStayNights(list)) {
-      stays.push(stayFromNights(chunk));
+      stays.push(stayFromNights(chunk, asOf));
     }
   }
   return stays;
@@ -189,6 +185,7 @@ export function buildDueAccounts(
   receipts: NamedAmount[],
 ): DueAccount[] {
   const map = new Map<string, DueAccount>();
+  const asOf = guests.reduce((m, g) => (m > g.date ? m : g.date), "");
 
   function ensure(key: string): DueAccount {
     let row = map.get(key);
@@ -276,18 +273,25 @@ export function buildDueAccounts(
           (m, g) => (m < (g.checkIn || g.date) ? m : g.checkIn || g.date),
           chunk[0]!.date,
         );
+        const lastNight = chunk.reduce(
+          (m, g) => (m > g.date ? m : g.date),
+          chunk[0]!.date,
+        );
         for (const g of chunk) {
           g.checkIn = g.checkIn || chunkIn || inDate;
           g.checkOut =
             out?.checkOut ||
-            (out ? checkoutFromLastNight(out.date) : null);
+            checkoutFromLastNight(out?.date || lastNight);
         }
       }
     }
     row.guestCount = new Set(
       row.guests.map((g) => g.name.trim().toUpperCase()),
     ).size;
-    row.stays = allocateStaysFifo(buildStays(row.guests), row.collected);
+    row.stays = allocateStaysFifo(
+      buildStays(row.guests, asOf),
+      row.collected,
+    );
     row.nights = row.stays.reduce((s, stay) => s + stay.days, 0);
   }
 

@@ -5,13 +5,6 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { DayChart } from "@/components/day-chart";
 import { GuestForm } from "@/components/guest-form";
@@ -49,11 +42,9 @@ function RegisterPage() {
   const { gate } = useGate();
   const [q, setQ] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [continueGuest, setContinueGuest] = useState<GuestEntry | null>(null);
 
   useEffect(() => {
     setEditingId(null);
-    setContinueGuest(null);
   }, [date]);
 
   const editing = allGuests.find((g) => g.id === editingId) ?? null;
@@ -188,17 +179,7 @@ function RegisterPage() {
                   </td>
                   <td className="px-3 py-2">
                     {g.stay === "out" ? (
-                      <div className="flex flex-wrap items-center gap-1">
-                        <Badge variant="muted">Out</Badge>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setContinueGuest(g)}
-                        >
-                          Continue
-                        </Button>
-                      </div>
+                      <Badge variant="muted">Out</Badge>
                     ) : (
                       <Button
                         type="button"
@@ -267,47 +248,6 @@ function RegisterPage() {
           ) : null}
         </CardContent>
       </Card>
-
-      <Dialog
-        open={Boolean(continueGuest)}
-        onOpenChange={(open) => {
-          if (!open) setContinueGuest(null);
-        }}
-      >
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Continue this guest?</DialogTitle>
-            <DialogDescription>
-              {continueGuest
-                ? `${continueGuest.name} · Room ${continueGuest.roomNo} was checked out. Continue rakhna hai? Checkout date clear ho jayegi.`
-                : "Confirm continue."}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-end gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setContinueGuest(null)}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              onClick={() => {
-                if (!continueGuest) return;
-                const guest = continueGuest;
-                setContinueGuest(null);
-                setStay(guest.id, "continue");
-                toast.success(
-                  `${guest.name} is continue again · room ${guest.roomNo}`,
-                );
-              }}
-            >
-              Yes, continue
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <RegisterLines />
         </TabsContent>

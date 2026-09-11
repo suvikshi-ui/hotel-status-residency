@@ -189,4 +189,20 @@ describe("undo checkout", () => {
     assert.equal(row?.checkOut ?? null, null);
     assert.ok(next.some((x) => x.date === "2026-09-10" && x.name === "PRASAD"));
   });
+
+  it("lets yesterday roll re-tick a guest who was checked out by mistake", () => {
+    const guests = [
+      g({
+        id: "a",
+        date: "2026-09-09",
+        name: "PANKAJ",
+        roomNo: "105",
+        stay: "out",
+        checkOut: "2026-09-10",
+      }),
+    ];
+    const next = applyYesterdayRoll(guests, "2026-09-09", ["a"]);
+    assert.equal(next.find((x) => x.id === "a")?.stay, "continue");
+    assert.ok(next.some((x) => x.date === "2026-09-10" && x.name === "PANKAJ"));
+  });
 });

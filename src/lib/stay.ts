@@ -71,12 +71,11 @@ export function stayDates(guests: GuestEntry[], g: GuestEntry) {
   const checkOut =
     g.checkOut ||
     out?.checkOut ||
-    (out?.stay === "out" ? checkoutFromLastNight(out.date) : null) ||
-    null;
+    checkoutFromLastNight(out?.stay === "out" ? out.date : lastNight);
   return {
     checkIn,
     checkOut,
-    nights: nightsFromDates(checkIn, checkOut || checkoutFromLastNight(lastNight)),
+    nights: nightsFromDates(checkIn, checkOut),
   };
 }
 
@@ -156,13 +155,12 @@ export function applyStay(
   return nextGuests;
 }
 
-/** In-house guests on a date, one row per stay. Already checked out are skipped. */
-export function inHouseOnDate(guests: GuestEntry[], date: string): GuestEntry[] {
+/** Occupied rooms on a date — includes guests already marked out that night. */
+export function occupantsOnDate(guests: GuestEntry[], date: string): GuestEntry[] {
   const seen = new Set<string>();
   const out: GuestEntry[] = [];
   for (const g of guests) {
     if (g.date !== date) continue;
-    if (g.stay === "out") continue;
     const k = stayKey(g);
     if (seen.has(k)) continue;
     seen.add(k);
@@ -173,6 +171,11 @@ export function inHouseOnDate(guests: GuestEntry[], date: string): GuestEntry[] 
       a.roomNo.localeCompare(b.roomNo, undefined, { numeric: true }) ||
       a.slNo - b.slNo,
   );
+}
+
+/** In-house guests on a date, one row per stay. Already checked out are skipped. */
+export function inHouseOnDate(guests: GuestEntry[], date: string): GuestEntry[] {
+  return occupantsOnDate(guests, date).filter((g) => g.stay !== "out");
 }
 
 export function stayOnDate(
@@ -194,7 +197,7 @@ export function applyYesterdayRoll(
   continueIds: Iterable<string>,
 ): GuestEntry[] {
   const keep = new Set(continueIds);
-  const rows = inHouseOnDate(guests, fromDate);
+  const rows = occupantsOnDate(guests, fromDate);
   let next = guests;
   for (const g of rows) {
     next = applyStay(next, g.id, keep.has(g.id) ? "continue" : "out");

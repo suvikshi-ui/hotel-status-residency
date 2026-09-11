@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useGate } from "@/components/security-gate";
 import { ModeBadge } from "@/components/mode-badge";
 import { formatDay, formatDayShort, money } from "@/lib/format";
-import { addDaysIso, inHouseOnDate, stayOnDate } from "@/lib/stay";
+import { addDaysIso, occupantsOnDate, stayOnDate } from "@/lib/stay";
 import { useLedger } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
@@ -18,7 +18,7 @@ export function YesterdayRoll() {
   const { gate } = useGate();
   const yesterday = addDaysIso(date, -1);
   const rows = useMemo(
-    () => inHouseOnDate(guests, yesterday),
+    () => occupantsOnDate(guests, yesterday),
     [guests, yesterday],
   );
 
@@ -90,7 +90,8 @@ export function YesterdayRoll() {
             {formatDay(yesterday)}
           </h2>
           <p className="mt-1 text-sm text-muted">
-            Tick who continues today. Unticked guests check out automatically.
+            Tick who continues today. Unticked guests check out at 11:00 AM.
+            Tick again if you checked out by mistake.
           </p>
         </div>
         <p className="text-sm tabular text-muted">
@@ -138,6 +139,8 @@ export function YesterdayRoll() {
                       {g.source ? <span>{g.source}</span> : null}
                       {posted ? (
                         <span className="font-medium text-ok">On today</span>
+                      ) : g.stay === "out" ? (
+                        <span className="font-medium text-muted">Checked out</span>
                       ) : null}
                     </span>
                   </span>

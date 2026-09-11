@@ -110,6 +110,26 @@ describe("stay grouping", () => {
     assert.equal(row.billed, 8000);
   });
 
+  it("auto checkouts at 11:00 AM the morning after the last night", () => {
+    const row = stayFromNights([
+      night({
+        id: "1",
+        date: "2026-09-08",
+        name: "PANKAJ",
+        checkIn: "2026-09-08",
+      }),
+      night({
+        id: "2",
+        date: "2026-09-09",
+        name: "PANKAJ",
+        checkIn: "2026-09-08",
+      }),
+    ]);
+    assert.equal(row.checkOut, "2026-09-10");
+    assert.equal(row.days, 2);
+    assert.equal(row.inHouse, false);
+  });
+
   it("splits a return visit after checkout", () => {
     const stays = splitStayNights([
       night({ id: "1", date: "2026-09-01", name: "RAMESH", stay: "out" }),
