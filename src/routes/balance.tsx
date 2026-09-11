@@ -1,6 +1,12 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { ChevronDown, Printer, Search, Trash2 } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  Printer,
+  Search,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,12 +24,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ModeBadge } from "@/components/mode-badge";
 import {
   buildDueAccounts,
+  dueStatusLabel,
   lookupDueAccount,
   uniqueSources,
   type DueAccount,
+  type DueStay,
 } from "@/lib/balance";
+import { printSourceGuests, printSourceSummary } from "@/lib/balance-print";
 import { DUE_PAY_MODES, formatDayShort, MODE_LABEL, money } from "@/lib/format";
-import { escapeHtml, printDocument } from "@/lib/print-sheet";
 import { useLedger, useDayBooks } from "@/lib/store";
 import { useGate } from "@/components/security-gate";
 import type { PayMode } from "@/lib/types";
@@ -31,62 +39,9 @@ import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/balance")({ component: BalancePage });
 
-function printSourceAccount(
-  account: DueAccount,
-  hotelName: string,
-  place: string,
-) {
-  const guests = account.guests
-    .map(
-      (g) => `<tr>
-        <td>${escapeHtml(formatDayShort(g.date))}</td>
-        <td>${escapeHtml(g.name)}</td>
-        <td>${escapeHtml(g.roomNo)}</td>
-        <td class="num">${escapeHtml(money(g.amount))}</td>
-      </tr>`,
-    )
-    .join("");
-  const pays = account.receipts
-    .map(
-      (r) => `<tr>
-        <td>${escapeHtml(formatDayShort(r.date))}</td>
-        <td>${escapeHtml(r.particular)}</td>
-        <td>${escapeHtml(MODE_LABEL[r.mode])}</td>
-        <td class="num">${escapeHtml(money(r.amount))}</td>
-      </tr>`,
-    )
-    .join("");
-  const table = `
-    <p class="sub">${account.guestCount} guest${account.guestCount === 1 ? "" : "s"} · ${account.nights} night${account.nights === 1 ? "" : "s"}</p>
-    <table>
-      <thead><tr>
-        <th>Date</th><th>Guest</th><th>Room</th><th class="num">Amount</th>
-      </tr></thead>
-      <tbody>${guests}</tbody>
-      <tfoot><tr>
-        <td colspan="3">Billed</td>
-        <td class="num">${escapeHtml(money(account.billed))}</td>
-      </tr></tfoot>
-    </table>
-    <p class="sub" style="margin-top:18px">Payments</p>
-    <table>
-      <thead><tr>
-        <th>Date</th><th>From</th><th>Paid by</th><th class="num">Amount</th>
-      </tr></thead>
-      <tbody>${pays || `<tr><td colspan="4">No collections yet</td></tr>`}</tbody>
-      <tfoot>
-        <tr><td colspan="3">Paid</td><td class="num">${escapeHtml(money(account.collected))}</td></tr>
-        <tr><td colspan="3">Balance due</td><td class="num">${escapeHtml(money(Math.max(0, account.remaining)))}</td></tr>
-      </tfoot>
-    </table>
-  `;
-  toast.message("Opening print…");
-  printDocument({
-    title: `${account.key} balance`,
-    heading: hotelName,
-    sub: `${place} · ${account.key} · billed ${money(account.billed)} · paid ${money(account.collected)} · due ${money(Math.max(0, account.remaining))}`,
-    table,
-  });
+function checkoutLabel(stay: DueStay) {
+  if (stay.checkOut) return formatDayShort(stay.checkOut);
+  return "In house";
 }
 
 function BalancePage() {
@@ -143,6 +98,40 @@ function BalancePage() {
     .reduce((s, r) => s + r.amount, 0);
   const otherTotal = otherRows.reduce((s, r) => s + r.amount, 0);
 
+  function collectFrom(account: DueAccount, mode: PayMode, amount: number) {
+    gate(
+      () => {
+        addBalReceived({
+          particular: account.key,
+          mode,
+          amount,
+          kind: "due",
+        });
+        toast.success(`Collected ${money(amount)} from ${account.key}`);
+      },
+      {
+        title: "Are you sure?",
+        message: `Collect ${money(amount)} from ${account.key}? Oldest open stays will tick Paid first.`,
+        confirmLabel: "Collect",
+      },
+    );
+  }
+
+  function removeReceipt(id: string) {
+    gate(
+      () => {
+        removeBalReceived(id);
+        toast.success("Collection removed");
+      },
+      {
+        title: "Are you sure?",
+        message: "Delete this collection?",
+        confirmLabel: "Delete",
+        danger: true,
+      },
+    );
+  }
+
   return (
     <div className="flex flex-col gap-5">
       <div>
@@ -153,9 +142,9 @@ function BalancePage() {
           Balance
         </h1>
         <p className="mt-1 text-sm text-muted">
-          Guest dues that are not collected carry into the next month with
-          full guest detail. Other cuts the main books balance with no source
-          name.
+          Guest stays with check-in, days and rate. Print sources for Flysky /
+          Motor totals, or print guests under one source. Collections tick the
+          oldest stay Paid.
         </p>
       </div>
 
@@ -197,12 +186,12 @@ function BalancePage() {
         </TabsList>
 
         <TabsContent value="balance" className="flex flex-col gap-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="relative min-w-0 flex-1">
+          <div className="flex flex-col gap-3">
+            <div className="relative min-w-0">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
               <Input
                 className="pl-9"
-                placeholder="Type source name — guests and total open above"
+                placeholder="Source or guest — Flysky, Motor, name"
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 aria-label="Search dues"
@@ -215,12 +204,34 @@ function BalancePage() {
                 ))}
               </datalist>
             </div>
-            <Button
-              variant={onlyOpen ? "default" : "outline"}
-              onClick={() => setOnlyOpen((v) => !v)}
-            >
-              {onlyOpen ? "Open dues" : "All sources"}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant={onlyOpen ? "default" : "outline"}
+                onClick={() => setOnlyOpen((v) => !v)}
+              >
+                {onlyOpen ? "Open dues" : "All sources"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (filtered.length === 0) {
+                    toast.error("No sources to print");
+                    return;
+                  }
+                  toast.message("Opening source print…");
+                  printSourceSummary(filtered, hotel.name, hotel.place);
+                }}
+              >
+                <Printer className="size-4" />
+                Print sources
+              </Button>
+            </div>
+            <p className="text-xs text-muted">
+              <span className="font-medium text-fg">Print sources</span> — Flysky,
+              Motor, remaining only, no guest names.{" "}
+              <span className="font-medium text-fg">Print guests</span> on a
+              source — that company, then each guest stay.
+            </p>
           </div>
 
           {searchHit ? (
@@ -230,7 +241,8 @@ function BalancePage() {
               {searchHit.guestCount} guest
               {searchHit.guestCount === 1 ? "" : "s"}
               {" · "}
-              {searchHit.nights} night{searchHit.nights === 1 ? "" : "s"}
+              {searchHit.stays.length} stay
+              {searchHit.stays.length === 1 ? "" : "s"}
               {" · billed "}
               {money(searchHit.billed)}
               {" · due "}
@@ -244,42 +256,12 @@ function BalancePage() {
               open
               pinned
               month={date.slice(0, 7)}
-              hotelName={hotel.name}
-              place={hotel.place}
               onToggle={() => setQ("")}
-              onCollect={(mode, amount) => {
-                gate(
-                  () => {
-                    addBalReceived({
-                      particular: searchHit.key,
-                      mode,
-                      amount,
-                      kind: "due",
-                    });
-                    toast.success(
-                      `Collected ${money(amount)} from ${searchHit.key}`,
-                    );
-                  },
-                  {
-                    title: "Are you sure?",
-                    message: `Collect ${money(amount)} from ${searchHit.key}?`,
-                    confirmLabel: "Collect",
-                  },
-                );
-              }}
-              onRemoveReceipt={(id) => {
-                gate(
-                  () => {
-                    removeBalReceived(id);
-                    toast.success("Collection removed");
-                  },
-                  {
-                    title: "Are you sure?",
-                    message: "Delete this collection?",
-                    confirmLabel: "Delete",
-                    danger: true,
-                  },
-                );
+              onCollect={(mode, amount) => collectFrom(searchHit, mode, amount)}
+              onRemoveReceipt={removeReceipt}
+              onPrintGuests={() => {
+                toast.message("Opening guest print…");
+                printSourceGuests(searchHit, hotel.name, hotel.place);
               }}
             />
           ) : null}
@@ -291,44 +273,14 @@ function BalancePage() {
                 account={account}
                 open={openKey === account.key}
                 month={date.slice(0, 7)}
-                hotelName={hotel.name}
-                place={hotel.place}
                 onToggle={() =>
                   setOpenKey((k) => (k === account.key ? null : account.key))
                 }
-                onCollect={(mode, amount) => {
-                  gate(
-                    () => {
-                      addBalReceived({
-                        particular: account.key,
-                        mode,
-                        amount,
-                        kind: "due",
-                      });
-                      toast.success(
-                        `Collected ${money(amount)} from ${account.key}`,
-                      );
-                    },
-                    {
-                      title: "Are you sure?",
-                      message: `Collect ${money(amount)} from ${account.key}?`,
-                      confirmLabel: "Collect",
-                    },
-                  );
-                }}
-                onRemoveReceipt={(id) => {
-                  gate(
-                    () => {
-                      removeBalReceived(id);
-                      toast.success("Collection removed");
-                    },
-                    {
-                      title: "Are you sure?",
-                      message: "Delete this collection?",
-                      confirmLabel: "Delete",
-                      danger: true,
-                    },
-                  );
+                onCollect={(mode, amount) => collectFrom(account, mode, amount)}
+                onRemoveReceipt={removeReceipt}
+                onPrintGuests={() => {
+                  toast.message("Opening guest print…");
+                  printSourceGuests(account, hotel.name, hotel.place);
                 }}
               />
             ))}
@@ -553,21 +505,19 @@ function SourceCard({
   open,
   pinned,
   month,
-  hotelName,
-  place,
   onToggle,
   onCollect,
   onRemoveReceipt,
+  onPrintGuests,
 }: {
   account: DueAccount;
   open: boolean;
   pinned?: boolean;
   month: string;
-  hotelName: string;
-  place: string;
   onToggle: () => void;
   onCollect: (mode: PayMode, amount: number) => void;
   onRemoveReceipt: (id: string) => void;
+  onPrintGuests: () => void;
 }) {
   const [mode, setMode] = useState<PayMode>("CASH");
   const [amount, setAmount] = useState("");
@@ -577,7 +527,7 @@ function SourceCard({
 
   return (
     <Card className={cn("overflow-hidden", pinned && "ring-1 ring-primary/30")}>
-      <div className="flex w-full min-h-14 items-center gap-2 px-4 py-3 md:px-5">
+      <div className="flex w-full min-h-14 flex-wrap items-center gap-2 px-4 py-3 md:px-5">
         <button
           type="button"
           onClick={onToggle}
@@ -596,6 +546,7 @@ function SourceCard({
             </div>
             <div className="text-xs text-muted">
               {account.guestCount} guest{account.guestCount === 1 ? "" : "s"} ·{" "}
+              {account.stays.length} stay{account.stays.length === 1 ? "" : "s"} ·{" "}
               {account.nights} night{account.nights === 1 ? "" : "s"}
               {account.firstDate
                 ? ` · ${formatDayShort(account.firstDate)}–${formatDayShort(account.lastDate)}`
@@ -608,10 +559,10 @@ function SourceCard({
           variant="outline"
           size="sm"
           className="shrink-0"
-          onClick={() => printSourceAccount(account, hotelName, place)}
+          onClick={onPrintGuests}
         >
           <Printer className="size-4" />
-          Print
+          Print guests
         </Button>
         <div className="text-right">
           <div
@@ -631,33 +582,58 @@ function SourceCard({
       {shown ? (
         <CardContent className="border-t border-border pt-4">
           <div className="-mx-5 overflow-x-auto">
-            <table className="w-full min-w-[32rem] text-left text-sm">
+            <table className="w-full min-w-[52rem] text-left text-sm">
               <thead className="text-xs uppercase tracking-wide text-muted">
                 <tr className="border-b border-border">
-                  <th className="px-5 py-2 font-medium">Date</th>
+                  <th className="px-5 py-2 font-medium"> </th>
                   <th className="px-3 py-2 font-medium">Guest</th>
-                  <th className="px-3 py-2 font-medium">Room</th>
-                  <th className="px-5 py-2 text-right font-medium">Amount</th>
+                  <th className="px-3 py-2 font-medium">Check-in</th>
+                  <th className="px-3 py-2 font-medium">Check-out</th>
+                  <th className="px-3 py-2 text-right font-medium">Days</th>
+                  <th className="px-3 py-2 text-right font-medium">Per day</th>
+                  <th className="px-3 py-2 text-right font-medium">Total</th>
+                  <th className="px-5 py-2 font-medium">Status</th>
                 </tr>
               </thead>
               <tbody>
-                {account.guests.map((g) => (
-                    <tr key={g.id} className="border-b border-border/70">
-                      <td className="px-5 py-2.5 tabular text-muted">
-                        {formatDayShort(g.date)}
-                      </td>
-                      <td className="px-3 py-2.5 font-medium">{g.name}</td>
-                      <td className="px-3 py-2.5 tabular">{g.roomNo}</td>
-                      <td className="px-5 py-2.5 text-right tabular">
-                        {money(g.amount)}
-                      </td>
-                    </tr>
+                {account.stays.map((stay) => (
+                  <tr
+                    key={stay.id}
+                    className={cn(
+                      "border-b border-border/70",
+                      stay.status === "paid" && "bg-ok/5",
+                    )}
+                  >
+                    <td className="px-5 py-2.5">
+                      <PaidTick stay={stay} />
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <div className="font-medium">{stay.name}</div>
+                      <div className="text-xs text-muted">Room {stay.roomNo}</div>
+                    </td>
+                    <td className="px-3 py-2.5 tabular">
+                      {formatDayShort(stay.checkIn)}
+                    </td>
+                    <td className="px-3 py-2.5 tabular text-muted">
+                      {checkoutLabel(stay)}
+                    </td>
+                    <td className="px-3 py-2.5 text-right tabular">{stay.days}</td>
+                    <td className="px-3 py-2.5 text-right tabular">
+                      {money(stay.perDay)}
+                    </td>
+                    <td className="px-3 py-2.5 text-right tabular font-medium">
+                      {money(stay.billed)}
+                    </td>
+                    <td className="px-5 py-2.5">
+                      <StayStatus stay={stay} />
+                    </td>
+                  </tr>
                 ))}
               </tbody>
             </table>
-            {account.guests.length === 0 ? (
+            {account.stays.length === 0 ? (
               <p className="px-5 py-4 text-sm text-muted">
-                No guest nights on this source.
+                No guest stays on this source.
               </p>
             ) : null}
           </div>
@@ -753,10 +729,48 @@ function SourceCard({
               </div>
             </form>
           ) : (
-            <p className="mt-4 text-sm text-ok">This source is settled.</p>
+            <p className="mt-4 text-sm text-ok">
+              This source is settled. Every stay is ticked Paid.
+            </p>
           )}
         </CardContent>
       ) : null}
     </Card>
   );
+}
+
+function PaidTick({ stay }: { stay: DueStay }) {
+  const on = stay.status === "paid";
+  return (
+    <span
+      className={cn(
+        "grid size-7 place-items-center rounded-md border",
+        on
+          ? "border-ok/40 bg-ok text-primary-fg"
+          : stay.status === "partial"
+            ? "border-due/40 bg-due/10 text-due"
+            : "border-border bg-card text-transparent",
+      )}
+      aria-label={dueStatusLabel(stay.status)}
+    >
+      <Check className="size-3.5" strokeWidth={3} />
+    </span>
+  );
+}
+
+function StayStatus({ stay }: { stay: DueStay }) {
+  if (stay.status === "paid") {
+    return <Badge variant="ok">Paid</Badge>;
+  }
+  if (stay.status === "partial") {
+    return (
+      <div className="flex flex-col gap-0.5">
+        <Badge variant="warn">Partial</Badge>
+        <span className="text-xs tabular text-muted">
+          Due {money(stay.remaining)}
+        </span>
+      </div>
+    );
+  }
+  return <Badge variant="warn">Open</Badge>;
 }

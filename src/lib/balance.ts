@@ -1,3 +1,4 @@
+import { differenceInCalendarDays, parseISO } from "date-fns";
 import type { GuestEntry, NamedAmount, PayMode } from "./types";
 
 export interface DueLine {
@@ -22,6 +23,23 @@ export interface DueReceipt {
   amount: number;
 }
 
+export type DueStatus = "paid" | "partial" | "open";
+
+export interface DueStay {
+  id: string;
+  name: string;
+  roomNo: string;
+  checkIn: string;
+  checkOut: string | null;
+  inHouse: boolean;
+  days: number;
+  perDay: number;
+  billed: number;
+  paid: number;
+  remaining: number;
+  status: DueStatus;
+}
+
 export interface DueAccount {
   key: string;
   billed: number;
@@ -32,6 +50,7 @@ export interface DueAccount {
   firstDate: string;
   lastDate: string;
   guests: DueLine[];
+  stays: DueStay[];
   receipts: DueReceipt[];
   settled: boolean;
 }
@@ -49,6 +68,102 @@ function receiptMatches(particular: string, key: string): boolean {
   if (p === k) return true;
   const escaped = k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`(^|[^A-Z0-9])${escaped}([^A-Z0-9]|$)`).test(p);
+}
+
+function personKey(g: { name: string; roomNo: string }) {
+  return `${g.name.trim().toUpperCase()}|${g.roomNo.trim()}`;
+}
+
+export function splitStayNights(nights: DueLine[]): DueLine[][] {
+  const sorted = [...nights].sort(
+    (a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id),
+  );
+  const chunks: DueLine[][] = [];
+  let cur: DueLine[] = [];
+  for (const n of sorted) {
+    const prev = cur[cur.length - 1];
+    if (prev) {
+      let gap = true;
+      try {
+        gap = differenceInCalendarDays(parseISO(n.date), parseISO(prev.date)) > 1;
+      } catch {
+        gap = n.date !== prev.date;
+      }
+      if (gap || prev.stay === "out") {
+        chunks.push(cur);
+        cur = [];
+      }
+    }
+    cur.push(n);
+  }
+  if (cur.length) chunks.push(cur);
+  return chunks;
+}
+
+export function stayFromNights(nights: DueLine[]): DueStay {
+  const dates = nights.map((n) => n.date).sort();
+  const first = dates[0] ?? "";
+  const last = dates[dates.length - 1] ?? first;
+  const out = [...nights].reverse().find((n) => n.stay === "out" || Boolean(n.checkOut));
+  const checkIn =
+    nights.reduce((m, n) => {
+      const v = n.checkIn || n.date;
+      return m && m < v ? m : v;
+    }, first) || first;
+  const checkOut = out?.checkOut || (out?.stay === "out" ? out.date : null) || null;
+  const billed = nights.reduce((s, n) => s + n.amount, 0);
+  const days = nights.length;
+  const same = nights.length > 0 && nights.every((n) => n.amount === nights[0]!.amount);
+  const perDay = days ? (same ? nights[0]!.amount : Math.round(billed / days)) : 0;
+  return {
+    id: nights[0]?.id ?? `${checkIn}-${last}`,
+    name: nights[0]?.name ?? "",
+    roomNo: nights[0]?.roomNo ?? "",
+    checkIn,
+    checkOut,
+    inHouse: !checkOut,
+    days,
+    perDay,
+    billed,
+    paid: 0,
+    remaining: billed,
+    status: billed <= 0 ? "paid" : "open",
+  };
+}
+
+export function allocateStaysFifo(stays: DueStay[], collected: number): DueStay[] {
+  const ordered = [...stays].sort(
+    (a, b) =>
+      a.checkIn.localeCompare(b.checkIn) ||
+      a.name.localeCompare(b.name) ||
+      a.roomNo.localeCompare(b.roomNo),
+  );
+  let left = Math.max(0, collected);
+  return ordered.map((stay) => {
+    const take = Math.min(stay.billed, left);
+    left -= take;
+    const remaining = Math.max(0, stay.billed - take);
+    const status: DueStatus =
+      remaining <= 0 ? "paid" : take > 0 ? "partial" : "open";
+    return { ...stay, paid: take, remaining, status };
+  });
+}
+
+function buildStays(lines: DueLine[]): DueStay[] {
+  const groups = new Map<string, DueLine[]>();
+  for (const g of lines) {
+    const k = personKey(g);
+    const list = groups.get(k) ?? [];
+    list.push(g);
+    groups.set(k, list);
+  }
+  const stays: DueStay[] = [];
+  for (const list of groups.values()) {
+    for (const chunk of splitStayNights(list)) {
+      stays.push(stayFromNights(chunk));
+    }
+  }
+  return stays;
 }
 
 export function buildDueAccounts(
@@ -70,6 +185,7 @@ export function buildDueAccounts(
         firstDate: "",
         lastDate: "",
         guests: [],
+        stays: [],
         receipts: [],
         settled: false,
       };
@@ -126,7 +242,7 @@ export function buildDueAccounts(
     row.receipts.sort((a, b) => a.date.localeCompare(b.date));
     const groups = new Map<string, DueLine[]>();
     for (const g of row.guests) {
-      const k = `${g.name.trim().toUpperCase()}|${g.roomNo}`;
+      const k = personKey(g);
       const list = groups.get(k) ?? [];
       list.push(g);
       groups.set(k, list);
@@ -136,15 +252,23 @@ export function buildDueAccounts(
         (m, g) => (m < g.date ? m : g.date),
         list[0]!.date,
       );
-      const out = list.find((g) => g.stay === "out");
-      for (const g of list) {
-        g.checkIn = g.checkIn || inDate;
-        g.checkOut = out?.checkOut || out?.date || null;
+      const chunks = splitStayNights(list);
+      for (const chunk of chunks) {
+        const out = chunk.find((g) => g.stay === "out");
+        const chunkIn = chunk.reduce(
+          (m, g) => (m < (g.checkIn || g.date) ? m : g.checkIn || g.date),
+          chunk[0]!.date,
+        );
+        for (const g of chunk) {
+          g.checkIn = g.checkIn || chunkIn || inDate;
+          g.checkOut = out?.checkOut || out?.date || null;
+        }
       }
     }
     row.guestCount = new Set(
       row.guests.map((g) => g.name.trim().toUpperCase()),
     ).size;
+    row.stays = allocateStaysFifo(buildStays(row.guests), row.collected);
   }
 
   return [...map.values()].sort((a, b) => {
@@ -187,4 +311,10 @@ export function lookupDueAccount(
   );
   if (guestHits.length === 1) return guestHits[0] ?? null;
   return null;
+}
+
+export function dueStatusLabel(status: DueStatus) {
+  if (status === "paid") return "Paid";
+  if (status === "partial") return "Partial";
+  return "Open";
 }
