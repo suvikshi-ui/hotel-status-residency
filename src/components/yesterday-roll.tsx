@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -31,10 +31,15 @@ export function YesterdayRoll() {
   }, [rows, guests, date]);
 
   const [ticked, setTicked] = useState<Set<string>>(() => new Set());
+  const [open, setOpen] = useState(true);
 
   useEffect(() => {
     setTicked(new Set(alreadyIds ? alreadyIds.split(",") : []));
   }, [date, alreadyIds]);
+
+  useEffect(() => {
+    setOpen(true);
+  }, [date]);
 
   if (!rows.length) return null;
   if (yesterday < (openingDate || "2026-09-01")) return null;
@@ -73,6 +78,7 @@ export function YesterdayRoll() {
             ? `Checked out ${outN}`
             : `Continued ${continueN} · checked out ${outN}`,
         );
+        setOpen(false);
       },
       {
         title: "Are you sure?",
@@ -87,21 +93,47 @@ export function YesterdayRoll() {
   return (
     <Card className="overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-bg-warm/60 px-3 py-2 sm:px-4">
-        <div className="min-w-0">
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">
-            Continue · {formatDayShort(yesterday)}
-          </p>
-          <p className="text-sm tabular text-muted">
-            <span className="font-medium text-fg">{continueN}</span> continue ·{" "}
-            <span className="font-medium text-fg">{outN}</span> check out
-          </p>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="flex min-w-0 flex-1 items-center gap-2 text-left"
+        >
+          <ChevronDown
+            className={cn(
+              "size-4 shrink-0 text-muted transition-transform duration-150",
+              open ? "rotate-0" : "-rotate-90",
+            )}
+          />
+          <span className="min-w-0">
+            <span className="block text-xs font-medium uppercase tracking-[0.18em] text-muted">
+              Continue · {formatDayShort(yesterday)}
+            </span>
+            <span className="block text-sm tabular text-muted">
+              <span className="font-medium text-fg">{continueN}</span> continue ·{" "}
+              <span className="font-medium text-fg">{outN}</span> check out
+            </span>
+          </span>
+        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => setOpen((v) => !v)}
+          >
+            {open ? "Minimize" : "Expand"}
+          </Button>
+          {open ? (
+            <Button type="button" size="sm" onClick={apply}>
+              {continueN === 0
+                ? `Check out all ${outN}`
+                : `Continue ${continueN} · check out ${outN}`}
+            </Button>
+          ) : null}
         </div>
-        <Button type="button" size="sm" onClick={apply}>
-          {continueN === 0
-            ? `Check out all ${outN}`
-            : `Continue ${continueN} · check out ${outN}`}
-        </Button>
       </div>
+      {open ? (
       <CardContent className="p-2 sm:p-3">
         <div
           className={cn(
@@ -126,6 +158,7 @@ export function YesterdayRoll() {
           ))}
         </div>
       </CardContent>
+      ) : null}
     </Card>
   );
 }
