@@ -34,7 +34,7 @@ function RegisterPage() {
   const food = allFood.filter((f) => f.date === date);
   const ws = allWs.filter((w) => w.date === date);
   const expenses = allExp.filter((e) => e.date === date);
-  const receipts = allRecv.filter((r) => r.date === date && r.kind !== "other");
+  const receipts = allRecv.filter((r) => r.date === date);
   const take = buildDayTake(guests, food, ws);
   const removeGuest = useLedger((s) => s.removeGuest);
   const setStay = useLedger((s) => s.setStay);

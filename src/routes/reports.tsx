@@ -382,9 +382,7 @@ function DailyReportPanel() {
   const food = allFood.filter((f) => f.date === date);
   const ws = allWs.filter((w) => w.date === date);
   const expenses = allExp.filter((e) => e.date === date);
-  const receipts = allRecv.filter(
-    (r) => r.date === date && r.kind !== "other",
-  );
+  const receipts = allRecv.filter((r) => r.date === date);
   const books = days.find((d) => d.date === date);
   const take = buildDayTake(guests, food, ws);
 

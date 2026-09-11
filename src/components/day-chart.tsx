@@ -61,6 +61,15 @@ function Pill({ mode }: { mode: PayMode }) {
   );
 }
 
+function receiptLine(r: NamedAmount) {
+  const mode = PILL[r.mode]?.label ?? r.mode;
+  if (r.kind === "other") {
+    const note = r.particular.trim();
+    return note ? `Other · ${note} · ${mode}` : `Other · ${mode}`;
+  }
+  return `${r.particular} · ${mode}`;
+}
+
 function Section({
   title,
   children,
@@ -349,7 +358,7 @@ export function DayChart({
       <Section title="Balance received">
         <SimpleList
           rows={due.map((r) => ({
-            label: `${r.particular} · ${PILL[r.mode].label}`,
+            label: receiptLine(r),
             amount: r.amount,
           }))}
           total={allRecv}
