@@ -106,3 +106,49 @@ export function applyStay(
   }
   return nextGuests;
 }
+
+/** In-house guests on a date, one row per stay. Already checked out are skipped. */
+export function inHouseOnDate(guests: GuestEntry[], date: string): GuestEntry[] {
+  const seen = new Set<string>();
+  const out: GuestEntry[] = [];
+  for (const g of guests) {
+    if (g.date !== date) continue;
+    if (g.stay === "out") continue;
+    const k = stayKey(g);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(g);
+  }
+  return out.sort(
+    (a, b) =>
+      a.roomNo.localeCompare(b.roomNo, undefined, { numeric: true }) ||
+      a.slNo - b.slNo,
+  );
+}
+
+export function stayOnDate(
+  guests: GuestEntry[],
+  g: GuestEntry,
+  date: string,
+): boolean {
+  const k = stayKey(g);
+  return guests.some((x) => x.date === date && stayKey(x) === k);
+}
+
+/**
+ * Night audit: ticked ids continue onto the next calendar day.
+ * Everyone else in-house that night is checked out.
+ */
+export function applyYesterdayRoll(
+  guests: GuestEntry[],
+  fromDate: string,
+  continueIds: Iterable<string>,
+): GuestEntry[] {
+  const keep = new Set(continueIds);
+  const rows = inHouseOnDate(guests, fromDate);
+  let next = guests;
+  for (const g of rows) {
+    next = applyStay(next, g.id, keep.has(g.id) ? "continue" : "out");
+  }
+  return next;
+}

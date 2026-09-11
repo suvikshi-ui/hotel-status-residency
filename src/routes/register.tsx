@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Pencil, Printer, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,7 +10,7 @@ import { DayChart } from "@/components/day-chart";
 import { GuestForm } from "@/components/guest-form";
 import { RegisterLines } from "@/components/register-lines";
 import { ModeBadge } from "@/components/mode-badge";
-import { StayToggle } from "@/components/stay-toggle";
+import { YesterdayRoll } from "@/components/yesterday-roll";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useGate } from "@/components/security-gate";
 import { buildDayTake } from "@/lib/day-report";
@@ -91,6 +92,7 @@ function RegisterPage() {
         </TabsList>
 
         <TabsContent value="register" className="mt-0 flex flex-col gap-5">
+      <YesterdayRoll />
       <GuestForm
         editing={editing}
         onCancelEdit={() => setEditingId(null)}
@@ -176,21 +178,27 @@ function RegisterPage() {
                       : "—"}
                   </td>
                   <td className="px-3 py-2">
-                    <StayToggle
-                      stay={g.stay}
-                      onChange={(stay) =>
-                        gate(
-                          () => setStay(g.id, stay),
-                          {
-                            title: "Are you sure?",
-                            message:
-                              stay === "out"
-                                ? `Check out ${g.name} from room ${g.roomNo}?`
-                                : `Continue ${g.name} to the next day?`,
-                          },
-                        )
-                      }
-                    />
+                    {g.stay === "out" ? (
+                      <Badge variant="muted">Out</Badge>
+                    ) : (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          gate(
+                            () => setStay(g.id, "out"),
+                            {
+                              title: "Are you sure?",
+                              message: `Check out ${g.name} from room ${g.roomNo}?`,
+                              confirmLabel: "Check out",
+                            },
+                          )
+                        }
+                      >
+                        Check out
+                      </Button>
+                    )}
                   </td>
                   <td className="px-3 py-2.5 text-right">
                     <div className="flex justify-end gap-0.5">

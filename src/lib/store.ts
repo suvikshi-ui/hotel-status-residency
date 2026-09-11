@@ -18,7 +18,7 @@ import type {
   StaffRow,
 } from "./types";
 import { uid } from "./format";
-import { applyStay } from "./stay";
+import { applyStay, applyYesterdayRoll } from "./stay";
 import { rebuildDayBooks } from "./ledger";
 
 function afterSave() {
@@ -58,6 +58,7 @@ export interface LedgerState {
   addGuest: (g: Omit<GuestEntry, "id" | "slNo" | "date"> & { date?: string }) => void;
   updateGuest: (id: string, patch: Partial<GuestEntry>) => void;
   setStay: (id: string, stay: "continue" | "out") => void;
+  rollYesterday: (fromDate: string, continueIds: string[]) => void;
   removeGuest: (id: string) => void;
   addFood: (row: Omit<ModeAmount, "id" | "date"> & { date?: string }) => void;
   removeFood: (id: string) => void;
@@ -81,6 +82,7 @@ function seedState(): Omit<
   | "addGuest"
   | "updateGuest"
   | "setStay"
+  | "rollYesterday"
   | "removeGuest"
   | "addFood"
   | "removeFood"
@@ -222,6 +224,11 @@ export const useLedger = create<LedgerState>()(
         const guests = applyStay(get().guests, id, stay);
         const next = { ...get(), guests };
         save({ guests, ...rebuildFrom(next, row?.date ?? get().selectedDate) });
+      },
+      rollYesterday: (fromDate, continueIds) => {
+        const guests = applyYesterdayRoll(get().guests, fromDate, continueIds);
+        const next = { ...get(), guests };
+        save({ guests, ...rebuildFrom(next, fromDate) });
       },
       removeGuest: (id) => {
         const row = get().guests.find((g) => g.id === id);
