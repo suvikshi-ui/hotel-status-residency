@@ -26,6 +26,8 @@ import {
 import { hotelForCloud } from "@/lib/register-lock";
 import { snapshotFromUnknown, type LedgerSnapshot } from "@/lib/supabase-db";
 
+export const Route = createFileRoute("/profile")({ component: ProfilePage });
+
 function snapshotNow(): LedgerSnapshot {
   const s = useLedger.getState();
   return {
