@@ -5,6 +5,7 @@ import { SUPABASE_SQL_EDITOR } from "@/lib/supabase-config";
 import { retryCloudHydrate } from "@/lib/supabase-sync";
 import ledgerSql from "../../supabase/migrations/0001_ledger.sql?raw";
 import usersSql from "../../supabase/migrations/0002_hotel_users.sql?raw";
+import appUsersSql from "../../supabase/migrations/0003_public_users.sql?raw";
 
 export function CloudSchemaSetup({ userId }: { userId?: string | null }) {
   const [retrying, setRetrying] = useState(false);
@@ -14,7 +15,9 @@ export function CloudSchemaSetup({ userId }: { userId?: string | null }) {
       <Button
         type="button"
         onClick={() => {
-          void navigator.clipboard.writeText(`${ledgerSql}\n\n${usersSql}`).then(
+          void navigator.clipboard.writeText(
+            `${ledgerSql}\n\n${usersSql}\n\n${appUsersSql}`,
+          ).then(
             () =>
               toast.success(
                 "SQL copied. Paste it in the SQL editor, run it, then retry.",

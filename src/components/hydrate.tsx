@@ -33,7 +33,7 @@ export function HydrateLedger({ children }: { children: ReactNode }) {
     void (async () => {
       const ownerId = user?.ownerId || user?.id || null;
       await setLedgerOwner(ownerId);
-      if (user && user.ownerId !== user.id) {
+      if (user) {
         useLedger.getState().setAppRole(user.role);
       }
       if (ownerId && user) {

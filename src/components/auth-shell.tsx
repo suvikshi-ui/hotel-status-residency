@@ -21,7 +21,8 @@ function SessionSkeleton() {
 export function AuthShell({ children }: { children: ReactNode }) {
   const { user, isPending, configured } = useStaffSession();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const role = useLedger((s) => s.appRole);
+  const storedRole = useLedger((s) => s.appRole);
+  const role = user?.role ?? storedRole;
   const onLogin = pathname === "/login";
 
   if (!configured) {

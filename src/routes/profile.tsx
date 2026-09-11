@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { AddUserCard } from "@/components/add-user-form";
 import { useGate } from "@/components/security-gate";
 import { formatDay, money } from "@/lib/format";
-import { APP_ROLES, ROLE_LABEL, canAddUsers, type AppRole } from "@/lib/roles";
+import { canAddUsers } from "@/lib/roles";
 import { codeOk, hashCode } from "@/lib/pin";
 import { useLedger } from "@/lib/store";
 import { HotelLogo } from "@/components/hotel-logo";
@@ -26,7 +26,6 @@ function ProfilePage() {
   const role = useLedger((s) => s.appRole);
   const setOpening = useLedger((s) => s.setOpening);
   const setSecurityCode = useLedger((s) => s.setSecurityCode);
-  const setAppRole = useLedger((s) => s.setAppRole);
   const { gate, hasCode } = useGate();
   const { user } = useStaffSession();
   const cloud = useCloudSync();
@@ -58,31 +57,6 @@ function ProfilePage() {
           </p>
         </div>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Login role</CardTitle>
-          <p className="text-sm text-muted">
-            Start with Housekeeping to try inventory count and complaint
-            register. Switch back to Admin if it is wrong.
-          </p>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          {APP_ROLES.map((id: AppRole) => (
-            <Button
-              key={id}
-              type="button"
-              variant={role === id ? "default" : "outline"}
-              onClick={() => {
-                setAppRole(id);
-                toast.success(`This login is ${ROLE_LABEL[id]}`);
-              }}
-            >
-              {ROLE_LABEL[id]}
-            </Button>
-          ))}
-        </CardContent>
-      </Card>
 
       {canAddUsers(role) ? <AddUserCard /> : null}
 

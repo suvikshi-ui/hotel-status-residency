@@ -9,12 +9,12 @@ describe("housekeeping role", () => {
     assert.equal(parseAppRole("staff"), "staff");
   });
 
-  it("opens inventory and complaints only", () => {
-    assert.equal(canOpenPath("housekeeping", "/inventory"), true);
+  it("opens only the complaint sheet", () => {
     assert.equal(canOpenPath("housekeeping", "/complaints"), true);
-    assert.equal(canOpenPath("housekeeping", "/profile"), true);
+    assert.equal(canOpenPath("housekeeping", "/inventory"), false);
+    assert.equal(canOpenPath("housekeeping", "/profile"), false);
     assert.equal(canOpenPath("housekeeping", "/register"), false);
-    assert.equal(canOpenPath("housekeeping", "/staff"), false);
+    assert.equal(canOpenPath("housekeeping", "/"), false);
   });
 
   it("lands housekeeping on complaints", () => {

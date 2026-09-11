@@ -45,12 +45,14 @@ function NavLinks({
   variant: "side" | "bottom";
 }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const role = useLedger((s) => s.appRole);
+  const storedRole = useLedger((s) => s.appRole);
+  const { user } = useStaffSession();
+  const role = user?.role ?? storedRole;
   const items = NAV.filter((item) => canOpenPath(role, item.to));
   if (variant === "bottom") {
     const primary = items.filter((item) =>
       role === "housekeeping"
-        ? ["/complaints", "/inventory", "/profile"].includes(item.to)
+        ? item.to === "/complaints"
         : role === "staff"
           ? ["/", "/register", "/complaints", "/profile"].includes(item.to)
           : ["/", "/register", "/balance", "/reports"].includes(item.to),
@@ -229,7 +231,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               {hotel.name}
             </div>
           </div>
-          <DateNav />
+          {role === "housekeeping" ? null : <DateNav />}
           {user ? (
             <Button
               variant="ghost"
@@ -250,6 +252,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-card/95 px-1 pb-[env(safe-area-inset-bottom)] pt-1 backdrop-blur-md print:hidden md:hidden">
         <NavLinks variant="bottom" />
+        {role === "housekeeping" ? null : (
         <Sheet>
           <SheetTrigger asChild>
             <button
@@ -286,6 +289,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             ) : null}
           </SheetContent>
         </Sheet>
+        )}
       </nav>
     </div>
   );

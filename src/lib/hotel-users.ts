@@ -28,9 +28,71 @@ function rowOf(r: Record<string, unknown>): HotelUser {
   };
 }
 
+export async function fetchPublicUser(userId: string, username?: string | null) {
+  if (!isSupabaseConfigured()) return null;
+  const sb = getSupabase();
+  const byId = await sb
+    .from("users")
+    .select("id, owner_id, name, username, role")
+    .eq("id", userId)
+    .maybeSingle();
+  if (byId.error) {
+    if (isMissingSchema(byId.error)) return null;
+    throw new Error(byId.error.message);
+  }
+  if (byId.data) return rowOf(byId.data as Record<string, unknown>);
+
+  const uname = username ? normalizeUsername(username) : "";
+  if (!uname) return null;
+
+  const byName = await sb
+    .from("users")
+    .select("id, owner_id, name, username, role")
+    .ilike("username", uname)
+    .maybeSingle();
+  if (byName.data) return rowOf(byName.data as Record<string, unknown>);
+
+  const hotel = await sb
+    .from("hotel_users")
+    .select("id, owner_id, name, username, role, created_at")
+    .ilike("username", uname)
+    .maybeSingle();
+  if (hotel.data) return rowOf(hotel.data as Record<string, unknown>);
+  return null;
+}
+
+export async function ensurePublicUser(input: {
+  id: string;
+  ownerId: string;
+  name: string;
+  username: string | null;
+  role: AppRole;
+}) {
+  if (!isSupabaseConfigured()) return;
+  const { error } = await getSupabase().from("users").upsert(
+    {
+      id: input.id,
+      owner_id: input.ownerId,
+      name: input.name,
+      username: input.username ? normalizeUsername(input.username) : null,
+      role: input.role,
+    },
+    { onConflict: "id" },
+  );
+  if (error && !isMissingSchema(error)) throw new Error(error.message);
+}
+
 export async function listHotelUsers(): Promise<HotelUser[]> {
   if (!isSupabaseConfigured()) return [];
-  const { data, error } = await getSupabase()
+  const sb = getSupabase();
+  const fromUsers = await sb
+    .from("users")
+    .select("id, owner_id, name, username, role")
+    .order("name");
+  if (!fromUsers.error && fromUsers.data?.length) {
+    return fromUsers.data.map((r) => rowOf(r as Record<string, unknown>));
+  }
+  const { data, error } = await sb
     .from("hotel_users")
     .select("id, owner_id, name, username, role, created_at")
     .order("name");
@@ -87,7 +149,7 @@ export async function createHotelUser(input: {
     throw new Error(insertErr.message);
   }
 
-  const { error: signErr } = await sb.auth.signUp({
+  const { data: signed, error: signErr } = await sb.auth.signUp({
     email: usernameToEmail(username),
     password: input.password,
     options: {
@@ -105,6 +167,31 @@ export async function createHotelUser(input: {
     if (!msg.includes("already")) {
       throw new Error(signErr.message);
     }
+  }
+
+  const authId = signed?.user?.id;
+  if (authId) {
+    const { error: usersErr } = await sb.from("users").upsert(
+      {
+        id: authId,
+        owner_id: ownerId,
+        name,
+        username,
+        role: input.role,
+      },
+      { onConflict: "id" },
+    );
+    if (usersErr && !isMissingSchema(usersErr)) {
+      throw new Error(usersErr.message);
+    }
+    return {
+      id: authId,
+      ownerId,
+      name,
+      username,
+      role: input.role,
+      createdAt: new Date().toISOString().slice(0, 10),
+    };
   }
 
   return rowOf((inserted ?? {}) as Record<string, unknown>);

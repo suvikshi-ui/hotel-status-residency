@@ -14,6 +14,8 @@ import { getSupabase } from "./supabase";
 import { setLedgerOwner } from "./store";
 import { stopCloudSync } from "./supabase-sync";
 import {
+  ensurePublicUser,
+  fetchPublicUser,
   loginHotelUser,
 } from "./hotel-users";
 import { loginIsEmail, usernameToEmail } from "./hotel-login";
@@ -50,7 +52,11 @@ function toStaff(user: User | null): StaffUser | null {
     (typeof meta.name === "string" && meta.name) ||
     null;
   const username =
-    (typeof meta.username === "string" && meta.username) || null;
+    (typeof meta.username === "string" && meta.username) ||
+    (user.email && !user.email.endsWith("@status-residency.local")
+      ? null
+      : user.email?.split("@")[0]) ||
+    null;
   const ownerId =
     (typeof meta.owner_id === "string" && meta.owner_id) || user.id;
   return {
@@ -61,6 +67,39 @@ function toStaff(user: User | null): StaffUser | null {
     role: parseAppRole(meta.role),
     ownerId,
   };
+}
+
+async function staffFromDb(user: User | null): Promise<StaffUser | null> {
+  const base = toStaff(user);
+  if (!base) return null;
+  try {
+    const row = await fetchPublicUser(base.id, base.username);
+    if (row) {
+      return {
+        ...base,
+        name: row.name || base.name,
+        username: row.username || base.username,
+        role: row.role,
+        ownerId: row.ownerId || base.ownerId,
+      };
+    }
+  } catch {
+    /* keep metadata role if public.users is not ready */
+  }
+  if (base.ownerId === base.id && base.role === "admin") {
+    try {
+      await ensurePublicUser({
+        id: base.id,
+        ownerId: base.id,
+        name: base.name ?? "",
+        username: base.username,
+        role: "admin",
+      });
+    } catch {
+      /* ignore */
+    }
+  }
+  return base;
 }
 
 function friendlyAuthError(message: string) {
@@ -91,17 +130,23 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
     const supabase = getSupabase();
     let alive = true;
 
-    void supabase.auth.getSession().then(({ data }) => {
+    void supabase.auth.getSession().then(async ({ data }) => {
       if (!alive) return;
-      setUser(toStaff(data.session?.user ?? null));
+      const next = await staffFromDb(data.session?.user ?? null);
+      if (!alive) return;
+      setUser(next);
       setPending(false);
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange(
       (_event: string, session: Session | null) => {
         if (!alive) return;
-        setUser(toStaff(session?.user ?? null));
-        setPending(false);
+        setPending(true);
+        void staffFromDb(session?.user ?? null).then((next) => {
+          if (!alive) return;
+          setUser(next);
+          setPending(false);
+        });
       },
     );
 

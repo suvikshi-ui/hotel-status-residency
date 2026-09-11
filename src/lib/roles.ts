@@ -8,11 +8,7 @@ export const ROLE_LABEL: Record<AppRole, string> = {
   housekeeping: "Housekeeping",
 };
 
-const HOUSEKEEPING_PATHS = new Set([
-  "/complaints",
-  "/inventory",
-  "/profile",
-]);
+const HOUSEKEEPING_PATHS = new Set(["/complaints"]);
 
 const STAFF_PATHS = new Set([
   "/",
@@ -47,7 +43,7 @@ export function navFor(role: AppRole, items: readonly { to: string }[]) {
 }
 
 export function canCountInventory(role: AppRole) {
-  return role === "admin" || role === "supervisor" || role === "housekeeping";
+  return role === "admin" || role === "supervisor";
 }
 
 export function canEditComplaints(role: AppRole) {
