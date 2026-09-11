@@ -8,8 +8,17 @@ export function DateNav() {
   const date = useLedger((s) => s.selectedDate);
   const setDate = useLedger((s) => s.setDate);
   const openingDate = useLedger((s) => s.openingDate);
+  const guests = useLedger((s) => s.guests);
   const d = parseISO(date);
-  const min = parseISO(openingDate || "2026-09-01");
+  const earliestGuest = guests.reduce((m, g) => {
+    const day = (g.date || "").slice(0, 10);
+    if (!day) return m;
+    return !m || day < m ? day : m;
+  }, "");
+  const min = parseISO(
+    [openingDate || "", earliestGuest, "2026-09-01"].filter(Boolean).sort()[0] ||
+      "2026-09-01",
+  );
 
   function shift(n: number) {
     const next = addDays(d, n);

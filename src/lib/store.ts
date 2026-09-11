@@ -21,6 +21,7 @@ import { uid } from "./format";
 import { applyGuestPatch, applyStay, applyYesterdayRoll } from "./stay";
 import { rebuildDayBooks } from "./ledger";
 import { fillAllSeedDates } from "./seed-fill";
+import { earlierDate, mergeRowsByDate } from "./cloud-save";
 import { parseAppRole, type AppRole } from "./roles";
 import { isDayLocked, withLocked, withoutLocked, pickLockedDates, parseLockedDates, readStoredLocks, writeStoredLocks, hotelFromCloud } from "./register-lock";
 import {
@@ -40,6 +41,7 @@ const BASE_OPENING_DATE = seed.days[0]?.date ?? "2026-09-01";
 export const LAST_SEEDED = "2026-09-09";
 export const DEFAULT_DATE = "2026-09-09";
 export const LEDGER_STORAGE_KEY = "status-ledger-v6";
+const LEGACY_STORAGE_KEYS = ["status-ledger-v5", "status-ledger-v4"];
 
 export interface LedgerState {
   hotel: HotelInfo;
@@ -183,30 +185,37 @@ function mergeSnapshot(
     current.lockedDates,
   );
   const guests = opts?.skipSeedFill
-    ? (persisted.guests ?? current.guests)
+    ? mergeRowsByDate(persisted.guests, current.guests)
     : fillAllSeedDates(
-        persisted.guests,
+        mergeRowsByDate(persisted.guests, current.guests),
         (seed.guests as GuestEntry[]) ?? current.guests,
       );
   const food = opts?.skipSeedFill
-    ? (persisted.food ?? current.food)
+    ? mergeRowsByDate(persisted.food, current.food)
     : fillAllSeedDates(
-        persisted.food,
+        mergeRowsByDate(persisted.food, current.food),
         (seed.food as ModeAmount[]) ?? current.food,
       );
   const wholesale = opts?.skipSeedFill
-    ? (persisted.wholesale ?? current.wholesale)
+    ? mergeRowsByDate(persisted.wholesale, current.wholesale)
     : fillAllSeedDates(
-        persisted.wholesale,
+        mergeRowsByDate(persisted.wholesale, current.wholesale),
         (seed.wholesale as ModeAmount[]) ?? current.wholesale,
       );
   const expenses = opts?.skipSeedFill
-    ? (persisted.expenses ?? current.expenses)
+    ? mergeRowsByDate(persisted.expenses, current.expenses)
     : fillAllSeedDates(
-        persisted.expenses,
+        mergeRowsByDate(persisted.expenses, current.expenses),
         (seed.expenses as NamedAmount[]) ?? current.expenses,
       );
+  const balReceived = mergeRowsByDate(
+    persisted.balReceived,
+    current.balReceived,
+  );
   let selectedDate = persisted.selectedDate ?? current.selectedDate ?? DEFAULT_DATE;
+  const openingDate =
+    earlierDate(persisted.openingDate, current.openingDate) ||
+    current.openingDate;
   return {
     ...current,
     ...persisted,
@@ -219,7 +228,9 @@ function mergeSnapshot(
     food,
     wholesale,
     expenses,
+    balReceived,
     selectedDate,
+    openingDate,
     appRole,
     lockedDates,
     hotel: fromHotel.name ? fromHotel : current.hotel,
@@ -456,6 +467,92 @@ export const useLedger = create<LedgerState>()(
   ),
 );
 
+function persistKey(version: string, userId: string | null) {
+  return userId ? `${version}:${userId}` : version;
+}
+
+function persistState(raw: string | null): Record<string, unknown> | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as { state?: Record<string, unknown> };
+    const state = (parsed.state ?? parsed) as Record<string, unknown>;
+    return state && typeof state === "object" ? state : null;
+  } catch {
+    return null;
+  }
+}
+
+function datesOf(state: Record<string, unknown> | null) {
+  const guests = (state?.guests as { date?: string }[] | undefined) ?? [];
+  return guests.map((g) => (g.date ?? "").slice(0, 10)).filter(Boolean);
+}
+
+/** Bring 1–5 Sep (and any other missing days) back from the previous save key. */
+export function adoptLegacyLedger(userId: string | null): boolean {
+  if (typeof localStorage === "undefined") return false;
+  const v6key = persistKey(LEDGER_STORAGE_KEY, userId);
+  let v6raw = localStorage.getItem(v6key);
+  const legacyKeys = [
+    persistKey("status-ledger-v5", userId),
+    persistKey("status-ledger-v4", userId),
+    ...(!userId ? [] : LEGACY_STORAGE_KEYS),
+    LEDGER_STORAGE_KEY,
+  ];
+  let donor: Record<string, unknown> | null = null;
+  for (const key of legacyKeys) {
+    if (key === v6key) continue;
+    const state = persistState(localStorage.getItem(key));
+    if (!state) continue;
+    const early = datesOf(state).some((d) => d && d < "2026-09-06");
+    if (early) {
+      donor = state;
+      break;
+    }
+    if (!donor) donor = state;
+  }
+  if (!donor) return false;
+  const v6 = persistState(v6raw);
+  if (!v6) {
+    const wrap = JSON.stringify({ state: donor, version: 0 });
+    localStorage.setItem(v6key, wrap);
+    return true;
+  }
+  const v6early = datesOf(v6).some((d) => d && d < "2026-09-06");
+  const donorEarly = datesOf(donor).some((d) => d && d < "2026-09-06");
+  if (v6early || !donorEarly) return false;
+  const guests = mergeRowsByDate(
+    (v6.guests as { date: string }[]) ?? [],
+    (donor.guests as { date: string }[]) ?? [],
+  );
+  const food = mergeRowsByDate(
+    (v6.food as { date: string }[]) ?? [],
+    (donor.food as { date: string }[]) ?? [],
+  );
+  const wholesale = mergeRowsByDate(
+    (v6.wholesale as { date: string }[]) ?? [],
+    (donor.wholesale as { date: string }[]) ?? [],
+  );
+  const expenses = mergeRowsByDate(
+    (v6.expenses as { date: string }[]) ?? [],
+    (donor.expenses as { date: string }[]) ?? [],
+  );
+  const balReceived = mergeRowsByDate(
+    (v6.balReceived as { date: string }[]) ?? [],
+    (donor.balReceived as { date: string }[]) ?? [],
+  );
+  const next = {
+    ...v6,
+    guests,
+    food,
+    wholesale,
+    expenses,
+    balReceived,
+    openingDate: earlierDate(String(v6.openingDate ?? ""), String(donor.openingDate ?? "")) || "2026-09-01",
+  };
+  localStorage.setItem(v6key, JSON.stringify({ state: next, version: 0 }));
+  return true;
+}
+
 let persistName = LEDGER_STORAGE_KEY;
 
 export function ledgerOwnerKey() {
@@ -474,17 +571,26 @@ export async function setLedgerOwner(userId: string | null) {
   const name = userId
     ? `${LEDGER_STORAGE_KEY}:${userId}`
     : LEDGER_STORAGE_KEY;
+  const adopted = adoptLegacyLedger(userId) || (userId ? adoptLegacyLedger(null) : false);
   if (persistName === name && useLedger.persist.hasHydrated()) {
+    if (adopted) {
+      try {
+        await useLedger.persist.rehydrate();
+      } catch {
+        /* keep current */
+      }
+      const s = useLedger.getState();
+      useLedger.setState(rebuildFrom(s, s.openingDate || BASE_OPENING_DATE));
+    }
     restoreStoredLocks(userId);
     return;
   }
   persistName = name;
   useLedger.persist.setOptions({ name });
-  useLedger.setState(seedState());
   try {
     await useLedger.persist.rehydrate();
   } catch {
-    /* keep seed if saved ledger cannot restore */
+    useLedger.setState(seedState());
   }
   restoreStoredLocks(userId);
   const s = useLedger.getState();

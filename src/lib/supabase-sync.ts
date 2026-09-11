@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { preferLocalOverCloud } from "./cloud-save";
+import { earlierDate, mergeRowsByDate, preferLocalOverCloud } from "./cloud-save";
 import {
   anonymousLedgerUnclaimed,
   claimAnonymousLedger,
@@ -87,6 +87,19 @@ function snapshotFromStore(): LedgerSnapshot {
     inventory: s.inventory,
     complaints: s.complaints,
     savedAt: s.savedAt,
+  };
+}
+
+function withMissingDates(primary: LedgerSnapshot, filler: LedgerSnapshot): LedgerSnapshot {
+  return {
+    ...primary,
+    guests: mergeRowsByDate(primary.guests, filler.guests),
+    food: mergeRowsByDate(primary.food, filler.food),
+    wholesale: mergeRowsByDate(primary.wholesale, filler.wholesale),
+    expenses: mergeRowsByDate(primary.expenses, filler.expenses),
+    balReceived: mergeRowsByDate(primary.balReceived, filler.balReceived),
+    openingDate:
+      earlierDate(primary.openingDate, filler.openingDate) || primary.openingDate,
   };
 }
 
@@ -235,11 +248,20 @@ export async function hydrateFromCloud(userId: string): Promise<CloudPhase> {
     const current = snapshotFromStore();
     const localRicher = (): LedgerSnapshot => {
       let local = current;
+      const keys = [
+        LEDGER_STORAGE_KEY,
+        `${LEDGER_STORAGE_KEY}:${userId}`,
+        "status-ledger-v5",
+        `status-ledger-v5:${userId}`,
+      ];
+      for (const key of keys) {
+        const snap = readLocalLedger(key, current);
+        if (!snap) continue;
+        local = withMissingDates(local, snap);
+      }
       if (anonymousLedgerUnclaimed()) {
-        const anon = readLocalLedger(LEDGER_STORAGE_KEY, current);
-        if (anon && ledgerActivityScore(anon) > ledgerActivityScore(local)) {
-          local = anon;
-        }
+        const anon = readLocalLedger("status-ledger-v5", current);
+        if (anon) local = withMissingDates(local, anon);
       }
       return local;
     };
@@ -247,17 +269,32 @@ export async function hydrateFromCloud(userId: string): Promise<CloudPhase> {
     if (pulled.kind === "data") {
       const cloud = pulled.snapshot;
       const local = localRicher();
-      if (preferLocalOverCloud({
+      const useLocal = preferLocalOverCloud({
         localSavedAt: local.savedAt ?? 0,
         cloudUpdatedAt: cloud.savedAt ?? 0,
         localScore: ledgerActivityScore(local),
         cloudScore: ledgerActivityScore(cloud),
-      })) {
-        useLedger.getState().applySnapshot({ ...local, savedAt: local.savedAt ?? Date.now() });
+      });
+      const chosen = useLocal ? local : cloud;
+      const other = useLocal ? cloud : local;
+      const merged = withMissingDates(chosen, other);
+      if (!merged.rooms.length) merged.rooms = current.rooms;
+      if (!merged.staff.length) merged.staff = current.staff;
+      if (!merged.hotel?.name) merged.hotel = current.hotel;
+      if (!merged.inventory?.length) merged.inventory = current.inventory;
+      if (!merged.complaints?.length) merged.complaints = current.complaints;
+      useLedger.getState().applySnapshot({
+        ...merged,
+        savedAt: merged.savedAt ?? Date.now(),
+      });
+      const recovered =
+        merged.guests.length > (cloud.guests?.length ?? 0) ||
+        (merged.openingDate || "") < (cloud.openingDate || "9999");
+      if (useLocal || recovered) {
         const pushed = await pushLedger(
           userId,
-          local,
-          "localStorage",
+          snapshotFromStore(),
+          useLocal ? "localStorage" : "merge",
           useLedger.getState().appRole,
         );
         if (!pushed.ok) {
@@ -275,18 +312,10 @@ export async function hydrateFromCloud(userId: string): Promise<CloudPhase> {
         claimAnonymousLedger(userId);
         lastHash = hashOf(snapshotFromStore());
         setPhase("migrated");
-        toast.success("This device's books were copied to your account.");
+        if (recovered) toast.success("Earlier days were put back in the books.");
+        else toast.success("This device's books were copied to your account.");
         return "migrated";
       }
-      if (!cloud.rooms.length) cloud.rooms = current.rooms;
-      if (!cloud.staff.length) cloud.staff = current.staff;
-      if (!cloud.hotel?.name) cloud.hotel = current.hotel;
-      if (!cloud.inventory?.length) cloud.inventory = current.inventory;
-      if (!cloud.complaints?.length) cloud.complaints = current.complaints;
-      useLedger.getState().applySnapshot({
-        ...cloud,
-        savedAt: cloud.savedAt ?? Date.now(),
-      });
       lastHash = hashOf(snapshotFromStore());
       claimAnonymousLedger(userId);
       setPhase("synced");
