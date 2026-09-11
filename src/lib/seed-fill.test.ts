@@ -45,16 +45,26 @@ describe("fillSeedDate", () => {
     assert.ok(next.some((g) => g.name === "ASHWET"));
   });
 
-  it("keeps 6 Sep and 7 Sep when filling 8 Sep", () => {
-    const six = seedJson.guests.filter((g) => g.date === "2026-09-06");
-    const seven = seedJson.guests.filter((g) => g.date === "2026-09-07");
-    const eight = seedJson.guests.filter((g) => g.date === "2026-09-08");
+  it("replaces a short 9 Sep register so sale becomes ₹12,000", () => {
+    const DATE = "2026-09-09";
+    const seedGuests = seedJson.guests.filter((g) => g.date === DATE);
+    const next = fillSeedDate(seedGuests.slice(0, 2), seedJson.guests, DATE);
+    assert.equal(next.filter((g) => g.date === DATE).length, 6);
+    assert.equal(
+      next.reduce((s, g) => s + g.amount, 0),
+      12000,
+    );
+  });
+
+  it("keeps earlier days when filling 9 Sep", () => {
+    const by = (d: string) => seedJson.guests.filter((g) => g.date === d);
     const next = fillAllSeedDates(
-      [...six, ...seven, ...eight.slice(0, 5)],
+      [...by("2026-09-06"), ...by("2026-09-07"), ...by("2026-09-08"), ...by("2026-09-09").slice(0, 1)],
       seedJson.guests,
     );
     assert.equal(next.filter((g) => g.date === "2026-09-06").length, 34);
     assert.equal(next.filter((g) => g.date === "2026-09-07").length, 35);
     assert.equal(next.filter((g) => g.date === "2026-09-08").length, 38);
+    assert.equal(next.filter((g) => g.date === "2026-09-09").length, 6);
   });
 });

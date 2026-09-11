@@ -1,0 +1,1 @@
+import{y as e}from"./store-Dk6h00PJ.js";import{r as t}from"./utils-CcPyv1WN.js";import{t as n}from"./badge-Dr_7DZ8a.js";var r=t(),i={CASH:`cash`,QRS:`qr`,QRPK:`pk`,ONLINE:`online`,BALANCE:`balance`};function a({mode:t}){return(0,r.jsx)(n,{variant:i[t],children:e[t]})}export{a as t};
