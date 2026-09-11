@@ -8,7 +8,6 @@ import {
   type ReactNode,
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
-import type { AppRole } from "./roles";
 import { roleFromUsersTable } from "./user-role";
 import { isSupabaseConfigured } from "./supabase-config";
 import { getSupabase } from "./supabase";
@@ -20,15 +19,13 @@ import {
   loginHotelUser,
 } from "./hotel-users";
 import { loginIsEmail, usernameToEmail } from "./hotel-login";
+import {
+  authEventReloadsBooks,
+  sameStaffUser,
+  type StaffUser,
+} from "./staff-user";
 
-export type StaffUser = {
-  id: string;
-  email: string | null;
-  name: string | null;
-  username: string | null;
-  role: AppRole;
-  ownerId: string;
-};
+export type { StaffUser } from "./staff-user";
 
 type AuthCtx = {
   user: StaffUser | null;
@@ -132,12 +129,12 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange(
-      (_event: string, session: Session | null) => {
+      (event: string, session: Session | null) => {
         if (!alive) return;
-        setPending(true);
+        if (!authEventReloadsBooks(event)) return;
         void staffFromDb(session?.user ?? null).then((next) => {
           if (!alive) return;
-          setUser(next);
+          setUser((prev) => (sameStaffUser(prev, next) ? prev : next));
           setPending(false);
         });
       },

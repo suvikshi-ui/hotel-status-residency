@@ -20,7 +20,7 @@ import type {
 import { uid } from "./format";
 import { applyGuestPatch, applyStay, applyYesterdayRoll } from "./stay";
 import { rebuildDayBooks } from "./ledger";
-import { fillAllSeedDates, SEEDED_DATES } from "./seed-fill";
+import { fillAllSeedDates } from "./seed-fill";
 import { parseAppRole, type AppRole } from "./roles";
 import { isDayLocked, withLocked, withoutLocked } from "./register-lock";
 import {
@@ -189,9 +189,7 @@ function mergeSnapshot(
     persisted.expenses,
     (seed.expenses as NamedAmount[]) ?? current.expenses,
   );
-  let selectedDate = persisted.selectedDate ?? current.selectedDate;
-  const latest = SEEDED_DATES[SEEDED_DATES.length - 1];
-  selectedDate = latest;
+  let selectedDate = persisted.selectedDate ?? current.selectedDate ?? DEFAULT_DATE;
   return {
     ...current,
     ...persisted,
@@ -264,9 +262,9 @@ export const useLedger = create<LedgerState>()(
       setSecurityCode: (hash) => save({ securityCode: hash }),
       setAppRole: (role) => save({ appRole: parseAppRole(role) }),
       lockRegister: (date) =>
-        save({ lockedDates: withLocked(get().lockedDates ?? {}, date) }),
+        set({ lockedDates: withLocked(get().lockedDates ?? {}, date) }),
       unlockRegister: (date) =>
-        save({ lockedDates: withoutLocked(get().lockedDates ?? {}, date) }),
+        set({ lockedDates: withoutLocked(get().lockedDates ?? {}, date) }),
       addGuest: (g) => {
         const date = g.date ?? get().selectedDate;
         if (dayIsLocked(get(), date)) return;
@@ -430,10 +428,14 @@ export const useLedger = create<LedgerState>()(
   ),
 );
 
+let persistName = LEDGER_STORAGE_KEY;
+
 export async function setLedgerOwner(userId: string | null) {
   const name = userId
     ? `${LEDGER_STORAGE_KEY}:${userId}`
     : LEDGER_STORAGE_KEY;
+  if (persistName === name && useLedger.persist.hasHydrated()) return;
+  persistName = name;
   useLedger.persist.setOptions({ name });
   useLedger.setState(seedState());
   try {

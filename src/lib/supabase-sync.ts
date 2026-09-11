@@ -27,7 +27,6 @@ type CloudState = { phase: CloudPhase; message?: string };
 let phase: CloudPhase = "off";
 let message: string | undefined;
 const listeners = new Set<(s: CloudState) => void>();
-let unsubStore: (() => void) | null = null;
 let timer: ReturnType<typeof setTimeout> | null = null;
 let retryTimer: ReturnType<typeof setInterval> | null = null;
 let hydrating = false;
@@ -167,8 +166,6 @@ export function stopCloudSync() {
     timer = null;
   }
   disarmRetry();
-  unsubStore?.();
-  unsubStore = null;
   lastUserId = null;
   lastHash = "";
   hydrating = false;
@@ -186,10 +183,6 @@ export function stopCloudSync() {
 
 export function startCloudSync(userId: string) {
   lastUserId = userId;
-  unsubStore?.();
-  unsubStore = useLedger.subscribe(() => {
-    requestCloudSave();
-  });
   if (typeof window !== "undefined") {
     if (hideFlush) window.removeEventListener("pagehide", hideFlush);
     if (hideVis) document.removeEventListener("visibilitychange", hideVis);

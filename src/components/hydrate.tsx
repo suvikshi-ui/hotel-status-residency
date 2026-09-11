@@ -27,17 +27,17 @@ export function HydrateLedger({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (isPending) return;
     let cancelled = false;
+    const ownerId = user?.ownerId || user?.id || null;
     setReady(false);
     stopCloudSync();
 
     void (async () => {
-      const ownerId = user?.ownerId || user?.id || null;
       await setLedgerOwner(ownerId);
-      if (user) {
-        useLedger.getState().setAppRole(user.role);
-      }
+      if (cancelled) return;
+      if (user) useLedger.getState().setAppRole(user.role);
       if (ownerId && user) {
         await hydrateFromCloud(ownerId);
+        if (cancelled) return;
         startCloudSync(ownerId);
       }
       if (!cancelled) setReady(true);
@@ -46,7 +46,11 @@ export function HydrateLedger({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [user?.id, user?.ownerId, user?.role, isPending]);
+  }, [user?.id, user?.ownerId, isPending]);
+
+  useEffect(() => {
+    if (user) useLedger.getState().setAppRole(user.role);
+  }, [user?.id, user?.role]);
 
   if (isPending) return <>{children}</>;
   if (user && !ready) return <CloudSkeleton />;
