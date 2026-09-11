@@ -51,7 +51,7 @@ function roomsFor(
 const SIZE = { fs: 12.5, pad: "5px 8px", head: 13, title: 24 };
 
 const B = "1px solid #1a1a1a";
-const FRAME = "2.5px solid #1a1a1a";
+const FRAME = "2px solid #1a1a1a";
 const SPLIT = "1px solid #d8d0c0";
 const BODY = '"Cinzel", "Times New Roman", Times, Georgia, serif';
 const DISPLAY = '"Cinzel Decorative", Algerian, "Times New Roman", serif';

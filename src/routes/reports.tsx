@@ -26,7 +26,6 @@ import {
 } from "@/lib/inventory";
 import { printHtmlDocument } from "@/lib/print-sheet";
 import { REPORT_TAB, parseReportView } from "@/lib/report-views";
-import { printDailyPdf } from "@/lib/daily-pdf";
 import { staffPay } from "@/lib/staff-pay";
 import { useLedger, useDayBooks } from "@/lib/store";
 import { useGate } from "@/components/security-gate";
@@ -708,16 +707,6 @@ function DailyReportPanel() {
   const receipts = allRecv.filter((r) => r.date === date);
   const books = useDayBooks(date);
   const take = buildDayTake(guests, food, ws);
-  const pdfInput = {
-    hotel: hotel.name,
-    blessing: hotel.blessing,
-    date,
-    books,
-    take,
-    expenses,
-    receipts,
-    guests,
-  };
 
   return (
     <div className="flex flex-col gap-4">
@@ -729,10 +718,13 @@ function DailyReportPanel() {
           <Button
             type="button"
             onClick={() => {
-              toast.message("Opening PDF…");
-              void printDailyPdf(pdfInput).catch(() =>
-                toast.error("Could not print PDF"),
-              );
+              const el = document.getElementById("daily-a4");
+              if (!el) {
+                window.print();
+                return;
+              }
+              toast.message("Opening print…");
+              printHtmlDocument("Daily report", el.outerHTML);
             }}
           >
             <Printer className="size-4" />
