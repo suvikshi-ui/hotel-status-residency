@@ -1,8 +1,16 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { DateNav } from "@/components/date-nav";
+import { ModeBadge } from "@/components/mode-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -13,10 +21,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { uniqueSources } from "@/lib/balance";
-import { formatDay, MODES, MODE_LABEL } from "@/lib/format";
+import { formatDay, formatDayShort, MODES, MODE_LABEL, money } from "@/lib/format";
+import { findDuplicateOnDate } from "@/lib/stay";
 import { useLedger } from "@/lib/store";
 import { useGate } from "@/components/security-gate";
 import type { GuestEntry, PayMode } from "@/lib/types";
+
+type PendingPost = {
+  name: string;
+  roomNo: string;
+  mode: PayMode;
+  source: string | null;
+  amount: number;
+};
 
 export function GuestForm({
   editing,
@@ -39,6 +56,8 @@ export function GuestForm({
   const [mode, setMode] = useState<PayMode>("CASH");
   const [amount, setAmount] = useState("1500");
   const [source, setSource] = useState("");
+  const [dup, setDup] = useState<GuestEntry | null>(null);
+  const pending = useRef<PendingPost | null>(null);
   const isEdit = Boolean(editing);
 
   useEffect(() => {
@@ -58,6 +77,36 @@ export function GuestForm({
     setAmount("1500");
     setMode("CASH");
     setRoomNo(rooms[0]?.no ?? "101");
+    pending.current = null;
+    setDup(null);
+  }
+
+  function postNew(payload: PendingPost) {
+    addGuest(payload);
+    toast.success(`Posted ${payload.name} · Room ${payload.roomNo} · ${formatDay(date)}`);
+    setName("");
+    setSource("");
+    pending.current = null;
+    setDup(null);
+    nameRef.current?.focus();
+  }
+
+  function saveEdit(payload: PendingPost) {
+    if (!editing) return;
+    gate(
+      () => {
+        updateGuest(editing.id, payload);
+        toast.success(`Updated ${payload.name} · Room ${payload.roomNo}`);
+        resetAdd();
+        onCancelEdit?.();
+        nameRef.current?.focus();
+      },
+      {
+        title: "Are you sure?",
+        message: `Save changes to ${payload.name} · Room ${payload.roomNo}?`,
+        confirmLabel: "Save",
+      },
+    );
   }
 
   function submit(e: FormEvent) {
@@ -72,38 +121,40 @@ export function GuestForm({
       toast.error("Enter a valid amount");
       return;
     }
-    const posted = name.trim().toUpperCase();
-    const payload = {
-      name: posted,
+    const payload: PendingPost = {
+      name: name.trim().toUpperCase(),
       roomNo,
       mode,
       source: source.trim() || null,
       amount: amt,
     };
-    if (editing) {
-      gate(
-        () => {
-          updateGuest(editing.id, payload);
-          toast.success(`Updated ${posted} · Room ${roomNo}`);
-          resetAdd();
-          onCancelEdit?.();
-          nameRef.current?.focus();
-        },
-        {
-          title: "Are you sure?",
-          message: `Save changes to ${posted} · Room ${roomNo}?`,
-          confirmLabel: "Save",
-        },
-      );
+    const onDate = editing?.date ?? date;
+    const hit = findDuplicateOnDate(guests, onDate, payload, editing?.id);
+    if (hit) {
+      pending.current = payload;
+      setDup(hit);
       return;
-    } else {
-      addGuest(payload);
-      toast.success(`Posted ${posted} · Room ${roomNo} · ${formatDay(date)}`);
-      setName("");
-      setSource("");
     }
-    nameRef.current?.focus();
+    if (editing) saveEdit(payload);
+    else postNew(payload);
   }
+
+  function addAnyway() {
+    const payload = pending.current;
+    if (!payload) {
+      setDup(null);
+      return;
+    }
+    if (editing) {
+      setDup(null);
+      saveEdit(payload);
+      return;
+    }
+    postNew(payload);
+  }
+
+  const continued =
+    dup && dup.checkIn && dup.checkIn !== dup.date ? dup.checkIn : null;
 
   return (
     <div ref={cardRef}>
@@ -232,6 +283,66 @@ export function GuestForm({
         </form>
       </CardContent>
     </Card>
+
+    <Dialog
+      open={Boolean(dup)}
+      onOpenChange={(open) => {
+        if (!open) {
+          setDup(null);
+          pending.current = null;
+        }
+      }}
+    >
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Duplicate entry</DialogTitle>
+          <DialogDescription>
+            {continued
+              ? `Already continued from ${formatDayShort(continued)} onto ${formatDayShort(dup?.date ?? date)}. Same name, room and mode.`
+              : `Already entered on ${formatDayShort(dup?.date ?? date)}. Same name, room and mode.`}
+          </DialogDescription>
+        </DialogHeader>
+        {dup ? (
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-lg bg-bg-warm/70 px-4 py-3 text-sm">
+            <dt className="text-muted">Name</dt>
+            <dd className="font-medium">{dup.name}</dd>
+            <dt className="text-muted">Room</dt>
+            <dd className="tabular">{dup.roomNo}</dd>
+            <dt className="text-muted">Mode</dt>
+            <dd>
+              <ModeBadge mode={dup.mode} />
+            </dd>
+            <dt className="text-muted">Amount</dt>
+            <dd className="tabular font-medium">{money(dup.amount)}</dd>
+            <dt className="text-muted">Source</dt>
+            <dd>{dup.source || "—"}</dd>
+            <dt className="text-muted">Check-in</dt>
+            <dd className="tabular">
+              {formatDayShort(dup.checkIn || dup.date)}
+            </dd>
+          </dl>
+        ) : null}
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={addAnyway}
+          >
+            {isEdit ? "Save anyway" : "Add anyway"}
+          </Button>
+          <Button
+            type="button"
+            onClick={() => {
+              setDup(null);
+              pending.current = null;
+              nameRef.current?.focus();
+            }}
+          >
+            {isEdit ? "Don't save" : "Don't add"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
     </div>
   );
 }

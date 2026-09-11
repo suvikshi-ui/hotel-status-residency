@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   applyYesterdayRoll,
+  findDuplicateOnDate,
   inHouseOnDate,
   stayKey,
   stayOnDate,
@@ -92,5 +93,76 @@ describe("yesterday roll", () => {
       (x) => x.date === "2026-09-11" && stayKey(x) === stayKey(ramesh),
     );
     assert.equal(today.length, 1);
+  });
+});
+
+describe("duplicate posting key", () => {
+  it("matches name, room and mode on the same date", () => {
+    const guests = [
+      g({
+        id: "a",
+        date: "2026-09-11",
+        name: "RAMESH",
+        roomNo: "101",
+        mode: "CASH",
+        amount: 1500,
+        checkIn: "2026-09-10",
+      }),
+    ];
+    const hit = findDuplicateOnDate(guests, "2026-09-11", {
+      name: "ramesh",
+      roomNo: "0101",
+      mode: "CASH",
+    });
+    assert.equal(hit?.id, "a");
+  });
+
+  it("does not match a different mode or another day", () => {
+    const guests = [
+      g({
+        id: "a",
+        date: "2026-09-11",
+        name: "RAMESH",
+        roomNo: "101",
+        mode: "CASH",
+      }),
+    ];
+    assert.equal(
+      findDuplicateOnDate(guests, "2026-09-11", {
+        name: "RAMESH",
+        roomNo: "101",
+        mode: "BALANCE",
+      }),
+      null,
+    );
+    assert.equal(
+      findDuplicateOnDate(guests, "2026-09-10", {
+        name: "RAMESH",
+        roomNo: "101",
+        mode: "CASH",
+      }),
+      null,
+    );
+  });
+
+  it("skips the row being edited", () => {
+    const guests = [
+      g({
+        id: "a",
+        date: "2026-09-11",
+        name: "RAMESH",
+        roomNo: "101",
+        mode: "CASH",
+      }),
+    ];
+    assert.equal(
+      findDuplicateOnDate(
+        guests,
+        "2026-09-11",
+        { name: "RAMESH", roomNo: "101", mode: "CASH" },
+        "a",
+      ),
+      null,
+    );
   });
 });

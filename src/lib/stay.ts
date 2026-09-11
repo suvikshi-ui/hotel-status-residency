@@ -1,5 +1,5 @@
 import { addDays, format, parseISO } from "date-fns";
-import { uid } from "./format";
+import { uid, normRoom } from "./format";
 import type { GuestEntry } from "./types";
 
 export function stayKey(g: {
@@ -14,6 +14,28 @@ export function stayKey(g: {
     (g.source ?? "").trim().toUpperCase(),
     g.mode,
   ].join("|");
+}
+
+/** Name + room + mode — the register duplicate key. */
+export function postingKey(g: { name: string; roomNo: string; mode: string }) {
+  return `${g.name.trim().toUpperCase()}|${normRoom(g.roomNo)}|${g.mode}`;
+}
+
+export function findDuplicateOnDate(
+  guests: GuestEntry[],
+  date: string,
+  match: { name: string; roomNo: string; mode: string },
+  exceptId?: string,
+): GuestEntry | null {
+  const key = postingKey(match);
+  return (
+    guests.find(
+      (g) =>
+        g.date === date &&
+        g.id !== exceptId &&
+        postingKey(g) === key,
+    ) ?? null
+  );
 }
 
 export function addDaysIso(iso: string, days: number) {
