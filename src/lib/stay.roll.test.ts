@@ -56,7 +56,7 @@ describe("yesterday roll", () => {
     assert.equal(stayOnDate(next, guests[1]!, "2026-09-11"), false);
     const sita = next.find((x) => x.id === "b");
     assert.equal(sita?.stay, "out");
-    assert.equal(sita?.checkOut, "2026-09-10");
+    assert.equal(sita?.checkOut, "2026-09-11");
     const ramesh = next.find((x) => x.id === "a");
     assert.equal(ramesh?.stay, "continue");
   });

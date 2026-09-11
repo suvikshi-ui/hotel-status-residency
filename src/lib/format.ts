@@ -44,6 +44,13 @@ export function formatDayShort(iso: string) {
   return format(d, "d MMM");
 }
 
+/** Hotel cycle is always 11:00 AM → 11:00 AM. */
+export const HOTEL_CLOCK = "11:00 AM";
+
+export function stayStamp(iso: string) {
+  return `${formatDayShort(iso)} · ${HOTEL_CLOCK}`;
+}
+
 export function weekday(iso: string) {
   const d = parseISO(iso);
   if (!isValid(d)) return "";

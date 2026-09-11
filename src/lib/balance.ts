@@ -1,4 +1,8 @@
 import { differenceInCalendarDays, parseISO } from "date-fns";
+import {
+  checkoutFromLastNight,
+  nightsFromDates,
+} from "./stay";
 import type { GuestEntry, NamedAmount, PayMode } from "./types";
 
 export interface DueLine {
@@ -103,20 +107,34 @@ export function splitStayNights(nights: DueLine[]): DueLine[][] {
 export function stayFromNights(nights: DueLine[]): DueStay {
   const dates = nights.map((n) => n.date).sort();
   const first = dates[0] ?? "";
-  const last = dates[dates.length - 1] ?? first;
+  const lastNight = dates[dates.length - 1] ?? first;
   const out = [...nights].reverse().find((n) => n.stay === "out" || Boolean(n.checkOut));
   const checkIn =
     nights.reduce((m, n) => {
       const v = n.checkIn || n.date;
       return m && m < v ? m : v;
     }, first) || first;
-  const checkOut = out?.checkOut || (out?.stay === "out" ? out.date : null) || null;
+  const explicitOut = out?.checkOut || null;
+  const left =
+    Boolean(out) || nights.some((n) => n.stay === "out" || Boolean(n.checkOut));
+  const morning = checkoutFromLastNight(lastNight);
+  const checkOut = left
+    ? explicitOut && explicitOut > lastNight
+      ? explicitOut
+      : morning
+    : explicitOut && explicitOut > lastNight
+      ? explicitOut
+      : null;
   const billed = nights.reduce((s, n) => s + n.amount, 0);
-  const days = nights.length;
+  const days = nightsFromDates(checkIn, checkOut || morning);
   const same = nights.length > 0 && nights.every((n) => n.amount === nights[0]!.amount);
-  const perDay = days ? (same ? nights[0]!.amount : Math.round(billed / days)) : 0;
+  const perDay = nights.length
+    ? same
+      ? nights[0]!.amount
+      : Math.round(billed / nights.length)
+    : 0;
   return {
-    id: nights[0]?.id ?? `${checkIn}-${last}`,
+    id: nights[0]?.id ?? `${checkIn}-${lastNight}`,
     name: nights[0]?.name ?? "",
     roomNo: nights[0]?.roomNo ?? "",
     checkIn,
@@ -199,7 +217,6 @@ export function buildDueAccounts(
     const key = sourceKey(g);
     const row = ensure(key);
     row.billed += g.amount;
-    row.nights += 1;
     row.guests.push({
       id: g.id,
       date: g.date,
@@ -261,7 +278,9 @@ export function buildDueAccounts(
         );
         for (const g of chunk) {
           g.checkIn = g.checkIn || chunkIn || inDate;
-          g.checkOut = out?.checkOut || out?.date || null;
+          g.checkOut =
+            out?.checkOut ||
+            (out ? checkoutFromLastNight(out.date) : null);
         }
       }
     }
@@ -269,6 +288,7 @@ export function buildDueAccounts(
       row.guests.map((g) => g.name.trim().toUpperCase()),
     ).size;
     row.stays = allocateStaysFifo(buildStays(row.guests), row.collected);
+    row.nights = row.stays.reduce((s, stay) => s + stay.days, 0);
   }
 
   return [...map.values()].sort((a, b) => {

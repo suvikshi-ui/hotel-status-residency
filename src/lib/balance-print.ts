@@ -2,6 +2,7 @@ import { format, isValid, parseISO } from "date-fns";
 import type { DueAccount, DueStay } from "./balance";
 import { escapeHtml } from "./print-sheet";
 import { publicUrl } from "./public-url";
+import { HOTEL_CLOCK, stayStamp } from "./format";
 
 function sheetDate(iso: string) {
   try {
@@ -17,7 +18,7 @@ function inr(n: number) {
 }
 
 function checkoutLabel(stay: DueStay) {
-  if (stay.checkOut) return sheetDate(stay.checkOut);
+  if (stay.checkOut) return stayStamp(stay.checkOut);
   return "In house";
 }
 
@@ -184,7 +185,7 @@ function stayRows(stays: DueStay[]) {
     .map(
       (s) => `<tr>
         <td>${escapeHtml(s.name)}</td>
-        <td>${sheetDate(s.checkIn)}</td>
+        <td>${stayStamp(s.checkIn)}</td>
         <td>${checkoutLabel(s)}</td>
         <td class="ctr">${s.days}</td>
         <td class="num">${inr(s.perDay)}</td>
@@ -223,7 +224,7 @@ export function printSourceGuests(
             <th>Guest</th>
             <th>Check-in</th>
             <th>Check-out</th>
-            <th class="ctr">Days</th>
+            <th class="ctr">Nights</th>
             <th class="num">Per day</th>
             <th class="num">Total</th>
             <th>Status</th>
@@ -234,7 +235,7 @@ export function printSourceGuests(
         </tbody>
         ${stayFoot(account)}
       </table>
-      <p class="note">Paid ${inr(account.collected)} · billed ${inr(account.billed)} · oldest stays tick Paid first when a collection is posted.</p>
+      <p class="note">Hotel day ${HOTEL_CLOCK}–${HOTEL_CLOCK}. Nights = check-out date minus check-in date. Paid ${inr(account.collected)} · billed ${inr(account.billed)} · oldest stays tick Paid first when a collection is posted.</p>
     </div>
   </div>`;
   printFrame(`${account.key} guests`, inner);

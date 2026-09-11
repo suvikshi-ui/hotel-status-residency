@@ -61,8 +61,53 @@ describe("stay grouping", () => {
     assert.equal(row.perDay, 2000);
     assert.equal(row.billed, 6000);
     assert.equal(row.checkIn, "2026-09-01");
-    assert.equal(row.checkOut, "2026-09-03");
+    assert.equal(row.checkOut, "2026-09-04");
     assert.equal(row.inHouse, false);
+  });
+
+  it("counts nights from check-in 11:00 AM to checkout 11:00 AM", () => {
+    const stays = splitStayNights([
+      night({
+        id: "1",
+        date: "2026-09-06",
+        name: "PRASAD",
+        roomNo: "210",
+        source: "MOT",
+        checkIn: "2026-09-01",
+      }),
+      night({
+        id: "2",
+        date: "2026-09-07",
+        name: "PRASAD",
+        roomNo: "210",
+        source: "MOT",
+        checkIn: "2026-09-01",
+      }),
+      night({
+        id: "3",
+        date: "2026-09-08",
+        name: "PRASAD",
+        roomNo: "210",
+        source: "MOT",
+        checkIn: "2026-09-01",
+      }),
+      night({
+        id: "4",
+        date: "2026-09-09",
+        name: "PRASAD",
+        roomNo: "210",
+        source: "MOT",
+        checkIn: "2026-09-01",
+        stay: "out",
+      }),
+    ]);
+    assert.equal(stays.length, 1);
+    const row = stayFromNights(stays[0]!);
+    assert.equal(row.checkIn, "2026-09-01");
+    assert.equal(row.checkOut, "2026-09-10");
+    assert.equal(row.days, 9);
+    assert.equal(row.perDay, 2000);
+    assert.equal(row.billed, 8000);
   });
 
   it("splits a return visit after checkout", () => {

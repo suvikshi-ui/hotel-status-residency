@@ -1,4 +1,4 @@
-import { addDays, format, parseISO } from "date-fns";
+import { addDays, differenceInCalendarDays, format, parseISO } from "date-fns";
 import { uid, normRoom } from "./format";
 import type { GuestEntry } from "./types";
 
@@ -42,19 +42,41 @@ export function addDaysIso(iso: string, days: number) {
   return format(addDays(parseISO(iso), days), "yyyy-MM-dd");
 }
 
+/** Last occupied night D checks out next morning (hotel day 11:00 AM → 11:00 AM). */
+export function checkoutFromLastNight(lastNight: string) {
+  return addDaysIso(lastNight, 1);
+}
+
+export function nightsFromDates(checkIn: string, checkOut: string) {
+  try {
+    return Math.max(
+      0,
+      differenceInCalendarDays(parseISO(checkOut), parseISO(checkIn)),
+    );
+  } catch {
+    return 0;
+  }
+}
+
 export function stayDates(guests: GuestEntry[], g: GuestEntry) {
   const nights = guests.filter((x) => stayKey(x) === stayKey(g));
   const checkIn =
     g.checkIn ||
     nights.reduce((m, x) => (m && m < x.date ? m : x.date), g.date);
   const out = nights.find((x) => x.stay === "out" || Boolean(x.checkOut));
+  const lastNight = nights.reduce(
+    (m, x) => (m > x.date ? m : x.date),
+    g.date,
+  );
+  const checkOut =
+    g.checkOut ||
+    out?.checkOut ||
+    (out?.stay === "out" ? checkoutFromLastNight(out.date) : null) ||
+    null;
   return {
     checkIn,
-    checkOut:
-      g.checkOut ||
-      out?.checkOut ||
-      (out?.stay === "out" ? out.date : null) ||
-      null,
+    checkOut,
+    nights: nightsFromDates(checkIn, checkOut || checkoutFromLastNight(lastNight)),
   };
 }
 
@@ -78,10 +100,15 @@ export function applyStay(
       .map((g) => {
         if (stayKey(g) !== key) return g;
         if (g.id === id) {
-          return { ...g, stay: "out", checkIn, checkOut: row.date };
+          return {
+            ...g,
+            stay: "out",
+            checkIn,
+            checkOut: checkoutFromLastNight(row.date),
+          };
         }
         if (g.date <= row.date) {
-          return { ...g, checkIn, checkOut: row.date };
+          return { ...g, checkIn, checkOut: checkoutFromLastNight(row.date) };
         }
         return g;
       });

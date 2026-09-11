@@ -31,7 +31,7 @@ import {
   type DueStay,
 } from "@/lib/balance";
 import { printSourceGuests, printSourceSummary } from "@/lib/balance-print";
-import { DUE_PAY_MODES, formatDayShort, MODE_LABEL, money } from "@/lib/format";
+import { DUE_PAY_MODES, formatDayShort, HOTEL_CLOCK, MODE_LABEL, money, stayStamp } from "@/lib/format";
 import { useLedger, useDayBooks } from "@/lib/store";
 import { useGate } from "@/components/security-gate";
 import type { PayMode } from "@/lib/types";
@@ -40,7 +40,7 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/balance")({ component: BalancePage });
 
 function checkoutLabel(stay: DueStay) {
-  if (stay.checkOut) return formatDayShort(stay.checkOut);
+  if (stay.checkOut) return stayStamp(stay.checkOut);
   return "In house";
 }
 
@@ -142,9 +142,9 @@ function BalancePage() {
           Balance
         </h1>
         <p className="mt-1 text-sm text-muted">
-          Guest stays with check-in, days and rate. Print sources for Flysky /
-          Motor totals, or print guests under one source. Collections tick the
-          oldest stay Paid.
+          Hotel day is {HOTEL_CLOCK} to {HOTEL_CLOCK}. Nights = check-out date
+          minus check-in date. Stay the 9th, leave the 10th {HOTEL_CLOCK} — that
+          is 1 night. Grab the check-out morning, not the last night date.
         </p>
       </div>
 
@@ -589,7 +589,7 @@ function SourceCard({
                   <th className="px-3 py-2 font-medium">Guest</th>
                   <th className="px-3 py-2 font-medium">Check-in</th>
                   <th className="px-3 py-2 font-medium">Check-out</th>
-                  <th className="px-3 py-2 text-right font-medium">Days</th>
+                  <th className="px-3 py-2 text-right font-medium">Nights</th>
                   <th className="px-3 py-2 text-right font-medium">Per day</th>
                   <th className="px-3 py-2 text-right font-medium">Total</th>
                   <th className="px-5 py-2 font-medium">Status</th>
@@ -612,7 +612,7 @@ function SourceCard({
                       <div className="text-xs text-muted">Room {stay.roomNo}</div>
                     </td>
                     <td className="px-3 py-2.5 tabular">
-                      {formatDayShort(stay.checkIn)}
+                      {stayStamp(stay.checkIn)}
                     </td>
                     <td className="px-3 py-2.5 tabular text-muted">
                       {checkoutLabel(stay)}
