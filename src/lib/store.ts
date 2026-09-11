@@ -34,7 +34,7 @@ const seed = seedJson as SeedData;
 const BASE_OPENING_DATE = seed.days[0]?.date ?? "2026-09-01";
 
 export const LAST_SEEDED = "2026-09-01";
-export const DEFAULT_DATE = LAST_SEEDED;
+export const DEFAULT_DATE = "2026-09-06";
 export const LEDGER_STORAGE_KEY = "status-ledger-v5";
 
 export interface LedgerState {
@@ -144,6 +144,17 @@ function normalizeAdvances(rows: AdvanceRow[]): AdvanceRow[] {
   }));
 }
 
+function fillMissingDate<T extends { date: string }>(
+  persisted: T[] | undefined,
+  seedRows: T[],
+  date: string,
+): T[] {
+  const have = persisted ?? [];
+  if (have.some((r) => r.date === date)) return have;
+  const extra = seedRows.filter((r) => r.date === date);
+  return extra.length ? [...have, ...extra] : have;
+}
+
 function mergeSnapshot(
   persisted: Partial<LedgerState>,
   current: LedgerState,
@@ -152,7 +163,48 @@ function mergeSnapshot(
   const advances = normalizeAdvances(persisted.advances ?? current.advances);
   const rooms = (persisted.rooms?.length ? persisted.rooms : current.rooms) as RoomDef[];
   const inventory = normalizeInventory(persisted.inventory ?? current.inventory);
-  return { ...current, ...persisted, staff, advances, rooms, inventory };
+  const day = "2026-09-06";
+  const guests = fillMissingDate(
+    persisted.guests,
+    (seed.guests as GuestEntry[]) ?? current.guests,
+    day,
+  );
+  const food = fillMissingDate(
+    persisted.food,
+    (seed.food as ModeAmount[]) ?? current.food,
+    day,
+  );
+  const wholesale = fillMissingDate(
+    persisted.wholesale,
+    (seed.wholesale as ModeAmount[]) ?? current.wholesale,
+    day,
+  );
+  const expenses = fillMissingDate(
+    persisted.expenses,
+    (seed.expenses as NamedAmount[]) ?? current.expenses,
+    day,
+  );
+  let selectedDate = persisted.selectedDate ?? current.selectedDate;
+  if (
+    (!persisted.selectedDate || persisted.selectedDate === BASE_OPENING_DATE) &&
+    guests.some((g) => g.date === day) &&
+    !guests.some((g) => g.date === BASE_OPENING_DATE)
+  ) {
+    selectedDate = day;
+  }
+  return {
+    ...current,
+    ...persisted,
+    staff,
+    advances,
+    rooms,
+    inventory,
+    guests,
+    food,
+    wholesale,
+    expenses,
+    selectedDate,
+  };
 }
 
 function rebuildFrom(
