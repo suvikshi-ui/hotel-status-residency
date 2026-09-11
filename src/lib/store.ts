@@ -20,6 +20,7 @@ import type {
 import { uid } from "./format";
 import { applyStay, applyYesterdayRoll } from "./stay";
 import { rebuildDayBooks } from "./ledger";
+import { fillSeedDate } from "./seed-fill";
 import {
   normalizeInventory,
   seedInventory,
@@ -144,17 +145,6 @@ function normalizeAdvances(rows: AdvanceRow[]): AdvanceRow[] {
   }));
 }
 
-function fillMissingDate<T extends { date: string }>(
-  persisted: T[] | undefined,
-  seedRows: T[],
-  date: string,
-): T[] {
-  const have = persisted ?? [];
-  if (have.some((r) => r.date === date)) return have;
-  const extra = seedRows.filter((r) => r.date === date);
-  return extra.length ? [...have, ...extra] : have;
-}
-
 function mergeSnapshot(
   persisted: Partial<LedgerState>,
   current: LedgerState,
@@ -164,22 +154,22 @@ function mergeSnapshot(
   const rooms = (persisted.rooms?.length ? persisted.rooms : current.rooms) as RoomDef[];
   const inventory = normalizeInventory(persisted.inventory ?? current.inventory);
   const day = "2026-09-06";
-  const guests = fillMissingDate(
+  const guests = fillSeedDate(
     persisted.guests,
     (seed.guests as GuestEntry[]) ?? current.guests,
     day,
   );
-  const food = fillMissingDate(
+  const food = fillSeedDate(
     persisted.food,
     (seed.food as ModeAmount[]) ?? current.food,
     day,
   );
-  const wholesale = fillMissingDate(
+  const wholesale = fillSeedDate(
     persisted.wholesale,
     (seed.wholesale as ModeAmount[]) ?? current.wholesale,
     day,
   );
-  const expenses = fillMissingDate(
+  const expenses = fillSeedDate(
     persisted.expenses,
     (seed.expenses as NamedAmount[]) ?? current.expenses,
     day,
