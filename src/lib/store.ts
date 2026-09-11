@@ -21,6 +21,7 @@ import { uid } from "./format";
 import { applyGuestPatch, applyStay, applyYesterdayRoll } from "./stay";
 import { rebuildDayBooks } from "./ledger";
 import { fillAllSeedDates, SEEDED_DATES } from "./seed-fill";
+import { parseAppRole, type AppRole } from "./roles";
 import {
   normalizeInventory,
   seedInventory,
@@ -61,9 +62,11 @@ export interface LedgerState {
   dirty: Record<string, true>;
   openingDate: string;
   securityCode: string;
+  appRole: AppRole;
   setDate: (date: string) => void;
   setOpening: (date: string, opening: OpeningBalances) => void;
   setSecurityCode: (hash: string) => void;
+  setAppRole: (role: AppRole) => void;
   addGuest: (g: Omit<GuestEntry, "id" | "slNo" | "date"> & { date?: string }) => void;
   updateGuest: (id: string, patch: Partial<GuestEntry>) => void;
   setStay: (id: string, stay: "continue" | "out") => void;
@@ -90,6 +93,7 @@ function seedState(): Omit<
   | "setDate"
   | "setOpening"
   | "setSecurityCode"
+  | "setAppRole"
   | "addGuest"
   | "updateGuest"
   | "setStay"
@@ -132,6 +136,7 @@ function seedState(): Omit<
     dirty: {},
     openingDate: BASE_OPENING_DATE,
     securityCode: "",
+    appRole: "admin",
   };
 }
 
@@ -159,6 +164,7 @@ function mergeSnapshot(
   const rooms = (persisted.rooms?.length ? persisted.rooms : current.rooms) as RoomDef[];
   const inventory = normalizeInventory(persisted.inventory ?? current.inventory);
   const complaints = normalizeComplaints(persisted.complaints ?? current.complaints);
+  const appRole = parseAppRole(persisted.appRole ?? current.appRole);
   const guests = fillAllSeedDates(
     persisted.guests,
     (seed.guests as GuestEntry[]) ?? current.guests,
@@ -191,6 +197,7 @@ function mergeSnapshot(
     wholesale,
     expenses,
     selectedDate,
+    appRole,
   };
 }
 
@@ -242,6 +249,7 @@ export const useLedger = create<LedgerState>()(
         });
       },
       setSecurityCode: (hash) => save({ securityCode: hash }),
+      setAppRole: (role) => save({ appRole: parseAppRole(role) }),
       addGuest: (g) => {
         const date = g.date ?? get().selectedDate;
         const existing = get().guests.filter((x) => x.date === date);
@@ -381,6 +389,7 @@ export const useLedger = create<LedgerState>()(
         securityCode: s.securityCode,
         inventory: s.inventory,
         complaints: s.complaints,
+        appRole: s.appRole,
       }),
       merge: (persisted, current) =>
         withBooks(mergeSnapshot((persisted ?? {}) as Partial<LedgerState>, current)),

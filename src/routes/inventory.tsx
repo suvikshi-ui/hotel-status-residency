@@ -17,6 +17,7 @@ import {
   signedCount,
   type InventoryItem,
 } from "@/lib/inventory";
+import { canManageCatalog } from "@/lib/roles";
 import { escapeHtml, printDocument } from "@/lib/print-sheet";
 import { useLedger } from "@/lib/store";
 import { cn } from "@/lib/utils";
@@ -36,7 +37,9 @@ function InventoryPage() {
   const date = useLedger((s) => s.selectedDate);
   const inventory = useLedger((s) => s.inventory);
   const setInventory = useLedger((s) => s.setInventory);
+  const role = useLedger((s) => s.appRole);
   const { gate } = useGate();
+  const manage = canManageCatalog(role);
   const [draft, setDraft] = useState<InventoryItem[]>(inventory);
   const [newName, setNewName] = useState("");
 
@@ -81,17 +84,19 @@ function InventoryPage() {
   }
 
   function save() {
-    gate(
-      () => {
-        setInventory(rows);
-        toast.success("Monthly inventory saved");
-      },
-      {
-        title: "Are you sure?",
-        message: "Save this month's inventory check?",
-        confirmLabel: "Save",
-      },
-    );
+    const go = () => {
+      setInventory(rows);
+      toast.success("Monthly inventory saved");
+    };
+    if (!manage) {
+      go();
+      return;
+    }
+    gate(go, {
+      title: "Are you sure?",
+      message: "Save this month's inventory check?",
+      confirmLabel: "Save",
+    });
   }
 
   function printSheet() {
@@ -241,7 +246,7 @@ function InventoryPage() {
                       />
                     </td>
                     <td className="px-3 py-2.5 text-right">
-                      {CATALOG_IDS.has(r.id) ? null : (
+                      {manage && !CATALOG_IDS.has(r.id) ? (
                         <Button
                           variant="ghost"
                           size="icon"
@@ -251,7 +256,7 @@ function InventoryPage() {
                         >
                           <Trash2 className="size-4" />
                         </Button>
-                      )}
+                      ) : null}
                     </td>
                   </tr>
                 );
@@ -278,6 +283,7 @@ function InventoryPage() {
         </CardContent>
       </Card>
 
+      {manage ? (
       <Card>
         <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-end">
           <div className="grid min-w-0 flex-1 gap-1.5">
@@ -295,6 +301,7 @@ function InventoryPage() {
           </Button>
         </CardContent>
       </Card>
+      ) : null}
     </div>
   );
 }

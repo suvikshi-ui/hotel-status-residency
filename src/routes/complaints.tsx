@@ -48,6 +48,7 @@ function ComplaintsPage() {
   const rooms = useLedger((s) => s.rooms);
   const complaints = useLedger((s) => s.complaints);
   const setComplaints = useLedger((s) => s.setComplaints);
+  const role = useLedger((s) => s.appRole);
   const { gate } = useGate();
   const [open, setOpen] = useState<{
     roomNo: string;
@@ -89,32 +90,31 @@ function ComplaintsPage() {
       return;
     }
     const existing = open.existing;
-    gate(
-      () => {
-        if (existing) {
-          setComplaints(
-            complaints.map((c) =>
-              c.id === existing.id ? { ...c, note: text, level } : c,
-            ),
-          );
-          toast.success(`Room ${roomNo} updated`);
-        } else {
-          setComplaints([
-            ...complaints,
-            emptyComplaint(roomNo, level, text),
-          ]);
-          toast.success(`Room ${roomNo} complaint logged`);
-        }
-        setOpen(null);
-      },
-      {
-        title: "Are you sure?",
-        message: existing
-          ? `Update room ${roomNo} to ${level}?`
-          : `Register ${level} complaint for room ${roomNo}?`,
-        confirmLabel: existing ? "Save" : "Register",
-      },
-    );
+    const apply = () => {
+      if (existing) {
+        setComplaints(
+          complaints.map((c) =>
+            c.id === existing.id ? { ...c, note: text, level } : c,
+          ),
+        );
+        toast.success(`Room ${roomNo} updated`);
+      } else {
+        setComplaints([...complaints, emptyComplaint(roomNo, level, text)]);
+        toast.success(`Room ${roomNo} complaint logged`);
+      }
+      setOpen(null);
+    };
+    if (role === "housekeeping") {
+      apply();
+      return;
+    }
+    gate(apply, {
+      title: "Are you sure?",
+      message: existing
+        ? `Update room ${roomNo} to ${level}?`
+        : `Register ${level} complaint for room ${roomNo}?`,
+      confirmLabel: existing ? "Save" : "Register",
+    });
   }
 
   return (

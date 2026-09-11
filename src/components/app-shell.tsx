@@ -20,6 +20,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { DateNav } from "@/components/date-nav";
 import { HotelLogo } from "@/components/hotel-logo";
 import { useLedger } from "@/lib/store";
+import { canOpenPath, ROLE_LABEL } from "@/lib/roles";
 import { useStaffSession } from "@/lib/supabase-auth";
 import { useCloudSync } from "@/lib/supabase-sync";
 
@@ -44,9 +45,13 @@ function NavLinks({
   variant: "side" | "bottom";
 }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const role = useLedger((s) => s.appRole);
+  const items = NAV.filter((item) => canOpenPath(role, item.to));
   if (variant === "bottom") {
-    const primary = NAV.filter((item) =>
-      ["/", "/register", "/balance", "/reports"].includes(item.to),
+    const primary = items.filter((item) =>
+      role === "housekeeping"
+        ? ["/complaints", "/inventory", "/profile"].includes(item.to)
+        : ["/", "/register", "/balance", "/reports"].includes(item.to),
     );
     return (
       <>
@@ -73,7 +78,7 @@ function NavLinks({
   }
   return (
     <nav className="flex flex-col gap-1 px-3">
-      {NAV.map((item) => {
+      {items.map((item) => {
         const active = pathname === item.to;
         const Icon = item.icon;
         return (
@@ -99,6 +104,7 @@ function NavLinks({
 
 export function AppShell({ children }: { children: ReactNode }) {
   const hotel = useLedger((s) => s.hotel);
+  const role = useLedger((s) => s.appRole);
   const { user, signOut } = useStaffSession();
   const cloud = useCloudSync();
   const [menu, setMenu] = useState(false);
@@ -138,6 +144,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             <>
               <div className="truncate text-xs font-medium text-sidebar-fg">
                 {accountLabel}
+              </div>
+              <div className="truncate text-[11px] text-sidebar-muted">
+                {ROLE_LABEL[role]}
               </div>
               {user.email && user.name ? (
                 <div className="truncate text-[11px] text-sidebar-muted">

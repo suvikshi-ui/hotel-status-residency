@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useGate } from "@/components/security-gate";
 import { formatDay, money } from "@/lib/format";
+import { APP_ROLES, ROLE_LABEL, type AppRole } from "@/lib/roles";
 import { codeOk, hashCode } from "@/lib/pin";
 import { useLedger } from "@/lib/store";
 import { HotelLogo } from "@/components/hotel-logo";
@@ -21,8 +22,10 @@ function ProfilePage() {
   const opening = useLedger((s) => s.opening);
   const openingDate = useLedger((s) => s.openingDate);
   const stored = useLedger((s) => s.securityCode);
+  const role = useLedger((s) => s.appRole);
   const setOpening = useLedger((s) => s.setOpening);
   const setSecurityCode = useLedger((s) => s.setSecurityCode);
+  const setAppRole = useLedger((s) => s.setAppRole);
   const { gate, hasCode } = useGate();
   const { user } = useStaffSession();
   const cloud = useCloudSync();
@@ -55,6 +58,31 @@ function ProfilePage() {
         </div>
       </div>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>Login role</CardTitle>
+          <p className="text-sm text-muted">
+            Start with Housekeeping to try inventory count and complaint
+            register. Switch back to Admin if it is wrong.
+          </p>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          {APP_ROLES.map((id: AppRole) => (
+            <Button
+              key={id}
+              type="button"
+              variant={role === id ? "default" : "outline"}
+              onClick={() => {
+                setAppRole(id);
+                toast.success(`This login is ${ROLE_LABEL[id]}`);
+              }}
+            >
+              {ROLE_LABEL[id]}
+            </Button>
+          ))}
+        </CardContent>
+      </Card>
+
       {user ? (
         <Card>
           <CardHeader>
@@ -84,6 +112,8 @@ function ProfilePage() {
         </Card>
       ) : null}
 
+      {role === "admin" ? (
+      <>
       <Card>
         <CardHeader>
           <CardTitle>Opening balance</CardTitle>
@@ -249,6 +279,13 @@ function ProfilePage() {
           </form>
         </CardContent>
       </Card>
+      </>
+      ) : (
+        <p className="text-sm text-muted">
+          Housekeeping can open Inventory to count linen and Complaints to
+          register or edit a room issue.
+        </p>
+      )}
     </div>
   );
 }

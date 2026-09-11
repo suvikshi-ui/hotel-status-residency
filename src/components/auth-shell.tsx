@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import { Navigate, useRouterState } from "@tanstack/react-router";
 import { AppShell } from "@/components/app-shell";
 import { HotelLogo } from "@/components/hotel-logo";
+import { canOpenPath, homePath } from "@/lib/roles";
+import { useLedger } from "@/lib/store";
 import { useStaffSession } from "@/lib/supabase-auth";
 
 function SessionSkeleton() {
@@ -19,6 +21,7 @@ function SessionSkeleton() {
 export function AuthShell({ children }: { children: ReactNode }) {
   const { user, isPending, configured } = useStaffSession();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const role = useLedger((s) => s.appRole);
   const onLogin = pathname === "/login";
 
   if (!configured) {
@@ -35,7 +38,11 @@ export function AuthShell({ children }: { children: ReactNode }) {
     return <Navigate to="/login" />;
   }
 
-  if (onLogin) return <Navigate to="/" />;
+  if (onLogin) return <Navigate to={homePath(role)} />;
+
+  if (!canOpenPath(role, pathname)) {
+    return <Navigate to={homePath(role)} />;
+  }
 
   return <AppShell>{children}</AppShell>;
 }
