@@ -24,6 +24,7 @@ import { uniqueSources } from "@/lib/balance";
 import { formatDay, formatDayShort, MODES, MODE_LABEL, money } from "@/lib/format";
 import { findDuplicateOnDate } from "@/lib/stay";
 import { useLedger } from "@/lib/store";
+import { isDayLocked } from "@/lib/register-lock";
 import { useGate } from "@/components/security-gate";
 import type { GuestEntry, PayMode } from "@/lib/types";
 
@@ -47,6 +48,7 @@ export function GuestForm({
   const guests = useLedger((s) => s.guests);
   const addGuest = useLedger((s) => s.addGuest);
   const updateGuest = useLedger((s) => s.updateGuest);
+  const locked = isDayLocked(useLedger((s) => s.lockedDates), date);
   const { gate } = useGate();
   const sourceHints = uniqueSources(guests);
   const nameRef = useRef<HTMLInputElement>(null);
@@ -111,6 +113,10 @@ export function GuestForm({
 
   function submit(e: FormEvent) {
     e.preventDefault();
+    if (locked) {
+      toast.error("This day's register is locked");
+      return;
+    }
     if (!name.trim()) {
       toast.error("Guest name is required");
       nameRef.current?.focus();

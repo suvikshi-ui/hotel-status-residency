@@ -22,6 +22,7 @@ import { applyGuestPatch, applyStay, applyYesterdayRoll } from "./stay";
 import { rebuildDayBooks } from "./ledger";
 import { fillAllSeedDates, SEEDED_DATES } from "./seed-fill";
 import { parseAppRole, type AppRole } from "./roles";
+import { isDayLocked, withLocked, withoutLocked } from "./register-lock";
 import {
   normalizeInventory,
   seedInventory,
@@ -63,10 +64,13 @@ export interface LedgerState {
   openingDate: string;
   securityCode: string;
   appRole: AppRole;
+  lockedDates: Record<string, true>;
   setDate: (date: string) => void;
   setOpening: (date: string, opening: OpeningBalances) => void;
   setSecurityCode: (hash: string) => void;
   setAppRole: (role: AppRole) => void;
+  lockRegister: (date: string) => void;
+  unlockRegister: (date: string) => void;
   addGuest: (g: Omit<GuestEntry, "id" | "slNo" | "date"> & { date?: string }) => void;
   updateGuest: (id: string, patch: Partial<GuestEntry>) => void;
   setStay: (id: string, stay: "continue" | "out") => void;
@@ -94,6 +98,8 @@ function seedState(): Omit<
   | "setOpening"
   | "setSecurityCode"
   | "setAppRole"
+  | "lockRegister"
+  | "unlockRegister"
   | "addGuest"
   | "updateGuest"
   | "setStay"
@@ -137,6 +143,7 @@ function seedState(): Omit<
     openingDate: BASE_OPENING_DATE,
     securityCode: "",
     appRole: "admin",
+    lockedDates: {},
   };
 }
 
@@ -165,6 +172,7 @@ function mergeSnapshot(
   const inventory = normalizeInventory(persisted.inventory ?? current.inventory);
   const complaints = normalizeComplaints(persisted.complaints ?? current.complaints);
   const appRole = parseAppRole(persisted.appRole ?? current.appRole);
+  const lockedDates = persisted.lockedDates ?? current.lockedDates ?? {};
   const guests = fillAllSeedDates(
     persisted.guests,
     (seed.guests as GuestEntry[]) ?? current.guests,
@@ -198,7 +206,12 @@ function mergeSnapshot(
     expenses,
     selectedDate,
     appRole,
+    lockedDates,
   };
+}
+
+function dayIsLocked(state: { lockedDates?: Record<string, true> }, date: string) {
+  return isDayLocked(state.lockedDates, date);
 }
 
 function rebuildFrom(
@@ -250,8 +263,13 @@ export const useLedger = create<LedgerState>()(
       },
       setSecurityCode: (hash) => save({ securityCode: hash }),
       setAppRole: (role) => save({ appRole: parseAppRole(role) }),
+      lockRegister: (date) =>
+        save({ lockedDates: withLocked(get().lockedDates ?? {}, date) }),
+      unlockRegister: (date) =>
+        save({ lockedDates: withoutLocked(get().lockedDates ?? {}, date) }),
       addGuest: (g) => {
         const date = g.date ?? get().selectedDate;
+        if (dayIsLocked(get(), date)) return;
         const existing = get().guests.filter((x) => x.date === date);
         const slNo = existing.reduce((m, x) => Math.max(m, x.slNo), 0) + 1;
         const guests = [
@@ -269,6 +287,8 @@ export const useLedger = create<LedgerState>()(
         save({ guests, ...rebuildFrom(next, date) });
       },
       updateGuest: (id, patch) => {
+        const current = get().guests.find((g) => g.id === id);
+        if (current && dayIsLocked(get(), current.date)) return;
         const guests = applyGuestPatch(get().guests, id, patch);
         const row = guests.find((g) => g.id === id);
         const next = { ...get(), guests };
@@ -276,41 +296,49 @@ export const useLedger = create<LedgerState>()(
       },
       setStay: (id, stay) => {
         const row = get().guests.find((g) => g.id === id);
+        if (row && dayIsLocked(get(), row.date)) return;
         const guests = applyStay(get().guests, id, stay);
         const next = { ...get(), guests };
         save({ guests, ...rebuildFrom(next, row?.date ?? get().selectedDate) });
       },
       rollYesterday: (fromDate, continueIds) => {
+        const onto = /* today is selectedDate */ get().selectedDate;
+        if (dayIsLocked(get(), onto)) return;
         const guests = applyYesterdayRoll(get().guests, fromDate, continueIds);
         const next = { ...get(), guests };
         save({ guests, ...rebuildFrom(next, fromDate) });
       },
       removeGuest: (id) => {
         const row = get().guests.find((g) => g.id === id);
+        if (row && dayIsLocked(get(), row.date)) return;
         const guests = get().guests.filter((g) => g.id !== id);
         const next = { ...get(), guests };
         save({ guests, ...rebuildFrom(next, row?.date ?? get().selectedDate) });
       },
       addFood: (row) => {
         const date = row.date ?? get().selectedDate;
+        if (dayIsLocked(get(), date)) return;
         const food = [...get().food, { ...row, id: uid("f"), date }];
         const next = { ...get(), food };
         save({ food, ...rebuildFrom(next, date) });
       },
       removeFood: (id) => {
         const row = get().food.find((x) => x.id === id);
+        if (row && dayIsLocked(get(), row.date)) return;
         const food = get().food.filter((x) => x.id !== id);
         const next = { ...get(), food };
         save({ food, ...rebuildFrom(next, row?.date ?? get().selectedDate) });
       },
       addWholesale: (row) => {
         const date = row.date ?? get().selectedDate;
+        if (dayIsLocked(get(), date)) return;
         const wholesale = [...get().wholesale, { ...row, id: uid("w"), date }];
         const next = { ...get(), wholesale };
         save({ wholesale, ...rebuildFrom(next, date) });
       },
       removeWholesale: (id) => {
         const row = get().wholesale.find((x) => x.id === id);
+        if (row && dayIsLocked(get(), row.date)) return;
         const wholesale = get().wholesale.filter((x) => x.id !== id);
         const next = { ...get(), wholesale };
         save({
@@ -320,12 +348,14 @@ export const useLedger = create<LedgerState>()(
       },
       addExpense: (row) => {
         const date = row.date ?? get().selectedDate;
+        if (dayIsLocked(get(), date)) return;
         const expenses = [...get().expenses, { ...row, id: uid("e"), date }];
         const next = { ...get(), expenses };
         save({ expenses, ...rebuildFrom(next, date) });
       },
       removeExpense: (id) => {
         const row = get().expenses.find((x) => x.id === id);
+        if (row && dayIsLocked(get(), row.date)) return;
         const expenses = get().expenses.filter((x) => x.id !== id);
         const next = { ...get(), expenses };
         save({
@@ -335,6 +365,7 @@ export const useLedger = create<LedgerState>()(
       },
       addBalReceived: (row) => {
         const date = row.date ?? get().selectedDate;
+        if (dayIsLocked(get(), date)) return;
         const balReceived = [
           ...get().balReceived,
           { ...row, id: uid("b"), date },
@@ -344,6 +375,7 @@ export const useLedger = create<LedgerState>()(
       },
       removeBalReceived: (id) => {
         const row = get().balReceived.find((x) => x.id === id);
+        if (row && dayIsLocked(get(), row.date)) return;
         const balReceived = get().balReceived.filter((x) => x.id !== id);
         const next = { ...get(), balReceived };
         save({
@@ -390,6 +422,7 @@ export const useLedger = create<LedgerState>()(
         inventory: s.inventory,
         complaints: s.complaints,
         appRole: s.appRole,
+        lockedDates: s.lockedDates,
       }),
       merge: (persisted, current) =>
         withBooks(mergeSnapshot((persisted ?? {}) as Partial<LedgerState>, current)),

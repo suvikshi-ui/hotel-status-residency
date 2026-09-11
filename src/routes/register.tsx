@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Pencil, Printer, Search, Trash2 } from "lucide-react";
+import { Pencil, Printer, Search, Trash2, Lock, LockOpen } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import { formatDay, formatDayShort, money } from "@/lib/format";
 import { printHtmlDocument } from "@/lib/print-sheet";
 import { stayDates } from "@/lib/stay";
 import { useLedger, useDayBooks } from "@/lib/store";
+import { isDayLocked } from "@/lib/register-lock";
 import type { DayBooks, GuestEntry, ModeAmount, NamedAmount } from "@/lib/types";
 
 export const Route = createFileRoute("/register")({ component: RegisterPage });
@@ -39,7 +40,11 @@ function RegisterPage() {
   const take = buildDayTake(guests, food, ws);
   const removeGuest = useLedger((s) => s.removeGuest);
   const setStay = useLedger((s) => s.setStay);
-  const { gate } = useGate();
+  const lockedDates = useLedger((s) => s.lockedDates);
+  const lockRegister = useLedger((s) => s.lockRegister);
+  const unlockRegister = useLedger((s) => s.unlockRegister);
+  const { gate, hasCode } = useGate();
+  const locked = isDayLocked(lockedDates, date);
   const [q, setQ] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -79,6 +84,55 @@ function RegisterPage() {
         </p>
         </div>
         <div className="flex flex-wrap gap-2 print:hidden">
+          {locked ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                gate(
+                  () => {
+                    unlockRegister(date);
+                    toast.success(`Unlocked ${formatDay(date)}`);
+                  },
+                  {
+                    title: "Unlock this day's register?",
+                    message: hasCode
+                      ? "Enter the digit code to edit this day's register again."
+                      : "Confirm to unlock. Set a digit code in Profile so only you can unlock later.",
+                    confirmLabel: "Unlock",
+                    requireCode: hasCode,
+                  },
+                );
+              }}
+            >
+              <LockOpen className="size-4" />
+              Unlock
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() =>
+                gate(
+                  () => {
+                    lockRegister(date);
+                    setEditingId(null);
+                    toast.success(`Locked ${formatDay(date)}`);
+                  },
+                  {
+                    title: "Lock this day's register?",
+                    message:
+                      "No more edits for this date until you unlock with the digit code.",
+                    confirmLabel: "Lock",
+                    requireCode: false,
+                  },
+                )
+              }
+            >
+              <Lock className="size-4" />
+              Lock
+            </Button>
+          )}
           <Button asChild variant="outline">
             <Link to="/reports">Daily report</Link>
           </Button>
@@ -92,11 +146,19 @@ function RegisterPage() {
         </TabsList>
 
         <TabsContent value="register" className="mt-0 flex flex-col gap-5">
+      {locked ? (
+        <p className="rounded-lg bg-bg-warm px-4 py-3 text-sm">
+          This day's register is locked. Unlock with the digit code to add or
+          edit.
+        </p>
+      ) : null}
       <YesterdayRoll />
+      {locked ? null : (
       <GuestForm
         editing={editing}
         onCancelEdit={() => setEditingId(null)}
       />
+      )}
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
         {[
@@ -180,6 +242,8 @@ function RegisterPage() {
                   <td className="px-3 py-2">
                     {g.stay === "out" ? (
                       <Badge variant="muted">Out</Badge>
+                    ) : locked ? (
+                      <Badge variant="muted">Continue</Badge>
                     ) : (
                       <Button
                         type="button"
@@ -201,6 +265,7 @@ function RegisterPage() {
                     )}
                   </td>
                   <td className="px-3 py-2.5 text-right">
+                    {locked ? null : (
                     <div className="flex justify-end gap-0.5">
                       <Button
                         variant="ghost"
@@ -235,6 +300,7 @@ function RegisterPage() {
                         <Trash2 className="size-4" />
                       </Button>
                     </div>
+                    )}
                   </td>
                 </tr>
                 );

@@ -25,6 +25,8 @@ export type GateOpts = {
   message?: string;
   confirmLabel?: string;
   danger?: boolean;
+  /** Default true when a code is set. Locking a day skips the code. */
+  requireCode?: boolean;
 };
 
 const SecurityCtx = createContext<{
@@ -55,7 +57,8 @@ export function SecurityProvider({ children }: { children: ReactNode }) {
   }
 
   function run() {
-    if (stored && !codeOk(stored, value)) {
+    const needCode = opts.requireCode !== false && stored;
+    if (needCode && !codeOk(stored, value)) {
       toast.error("Wrong security code");
       return;
     }
@@ -90,7 +93,7 @@ export function SecurityProvider({ children }: { children: ReactNode }) {
               run();
             }}
           >
-            {hasCode ? (
+            {hasCode && opts.requireCode !== false ? (
               <div className="grid gap-1.5">
                 <Label htmlFor="sec-code">Security code</Label>
                 <Input

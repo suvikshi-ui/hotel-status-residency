@@ -23,6 +23,8 @@ import {
   money,
 } from "@/lib/format";
 import { useLedger } from "@/lib/store";
+import { isDayLocked } from "@/lib/register-lock";
+import { cn } from "@/lib/utils";
 import type { ModeAmount, NamedAmount, PayMode } from "@/lib/types";
 
 function ModeLineCard({
@@ -299,6 +301,7 @@ export function RegisterLines() {
   const removeBal = useLedger((s) => s.removeBalReceived);
   const addExpense = useLedger((s) => s.addExpense);
   const removeExpense = useLedger((s) => s.removeExpense);
+  const locked = isDayLocked(useLedger((s) => s.lockedDates), date);
   const { gate } = useGate();
   const sources = useMemo(() => uniqueSources(guests), [guests]);
   const accounts = useMemo(
@@ -322,7 +325,10 @@ export function RegisterLines() {
   );
 
   return (
-    <div className="flex flex-col gap-5">
+    <fieldset
+      disabled={locked}
+      className={cn("flex min-w-0 flex-col gap-5 border-0 p-0", locked && "opacity-80")}
+    >
       <div className="grid gap-3 lg:grid-cols-2">
         <ModeLineCard
           title="Food"
@@ -576,6 +582,6 @@ export function RegisterLines() {
           </form>
         </CardContent>
       </Card>
-    </div>
+    </fieldset>
   );
 }

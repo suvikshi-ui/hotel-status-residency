@@ -7,6 +7,7 @@ import { useGate } from "@/components/security-gate";
 import { formatDay, formatDayShort } from "@/lib/format";
 import { addDaysIso, occupantsOnDate, stayDates, stayOnDate } from "@/lib/stay";
 import { useLedger } from "@/lib/store";
+import { isDayLocked } from "@/lib/register-lock";
 import { cn } from "@/lib/utils";
 import type { GuestEntry } from "@/lib/types";
 
@@ -15,6 +16,7 @@ export function YesterdayRoll() {
   const openingDate = useLedger((s) => s.openingDate);
   const guests = useLedger((s) => s.guests);
   const rollYesterday = useLedger((s) => s.rollYesterday);
+  const locked = isDayLocked(useLedger((s) => s.lockedDates), date);
   const { gate } = useGate();
   const yesterday = addDaysIso(date, -1);
   const rows = useMemo(
@@ -62,6 +64,10 @@ export function YesterdayRoll() {
   }
 
   function apply() {
+    if (locked) {
+      toast.error("This day's register is locked");
+      return;
+    }
     const namesIn = rows.filter((g) => ticked.has(g.id)).map((g) => g.name);
     const namesOut = rows.filter((g) => !ticked.has(g.id)).map((g) => g.name);
     const message =
@@ -125,7 +131,7 @@ export function YesterdayRoll() {
             {open ? "Minimize" : "Expand"}
           </Button>
           {open ? (
-            <Button type="button" size="sm" onClick={apply}>
+            <Button type="button" size="sm" onClick={apply} disabled={locked}>
               {continueN === 0
                 ? `Check out all ${outN}`
                 : `Continue ${continueN} · check out ${outN}`}
