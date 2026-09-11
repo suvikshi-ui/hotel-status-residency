@@ -15,12 +15,8 @@ describe("9 Sep day chart seed", () => {
     );
     assert.ok(guests.every((g) => g.mode === "BALANCE"));
     assert.ok(guests.some((g) => g.name === "PANKAJ" && g.roomNo === "105"));
-    assert.ok(
-      guests.some((g) => g.name === "ABDUL" && g.checkIn === "2026-09-06"),
-    );
-    assert.ok(
-      guests.some((g) => g.name === "PANKAJ" && g.checkIn === "2026-09-08"),
-    );
+    assert.ok(guests.every((g) => g.checkIn === DATE));
+    assert.ok(guests.some((g) => g.name === "DIGVIJAY" && g.amount === 2200));
     assert.equal(seedJson.balReceived.length, 0);
     assert.equal(
       seedJson.food.filter((r) => r.date === DATE).length,
