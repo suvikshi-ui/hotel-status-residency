@@ -171,8 +171,13 @@ function mergeSnapshot(
   );
   let selectedDate = persisted.selectedDate ?? current.selectedDate;
   const latest = SEEDED_DATES[SEEDED_DATES.length - 1];
-  const hadLatest = (persisted.guests ?? []).some((g) => g.date === latest);
-  if (!hadLatest && guests.some((g) => g.date === latest)) {
+  const persistLatest = (persisted.guests ?? []).filter((g) => g.date === latest);
+  const seedLatest = guests.filter((g) => g.date === latest);
+  if (
+    persistLatest.length !== seedLatest.length ||
+    !persisted.selectedDate ||
+    persisted.selectedDate === "2026-09-08"
+  ) {
     selectedDate = latest;
   }
   return {

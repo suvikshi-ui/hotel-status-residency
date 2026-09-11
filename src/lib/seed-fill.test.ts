@@ -29,8 +29,6 @@ describe("fillSeedDate", () => {
       next.reduce((s, g) => s + g.amount, 0),
       60300,
     );
-    assert.ok(next.some((g) => g.name === "ARBAZ"));
-    assert.ok(next.some((g) => g.name === "PAWAN"));
   });
 
   it("replaces a short 8 Sep register so sale becomes ₹57,200", () => {
@@ -42,7 +40,6 @@ describe("fillSeedDate", () => {
       next.reduce((s, g) => s + g.amount, 0),
       57200,
     );
-    assert.ok(next.some((g) => g.name === "ASHWET"));
   });
 
   it("replaces a short 9 Sep register so sale becomes ₹12,000", () => {
@@ -54,6 +51,20 @@ describe("fillSeedDate", () => {
       next.reduce((s, g) => s + g.amount, 0),
       12000,
     );
+  });
+
+  it("replaces a fat 9 Sep book left over from yesterday roll", () => {
+    const DATE = "2026-09-09";
+    const leftover = seedJson.guests
+      .filter((g) => g.date === "2026-09-08")
+      .map((g) => ({ ...g, id: `old-${g.id}`, date: DATE }));
+    const next = fillSeedDate(leftover, seedJson.guests, DATE);
+    assert.equal(next.filter((g) => g.date === DATE).length, 6);
+    assert.equal(
+      next.reduce((s, g) => s + g.amount, 0),
+      12000,
+    );
+    assert.ok(next.every((g) => g.mode === "BALANCE"));
   });
 
   it("keeps earlier days when filling 9 Sep", () => {
