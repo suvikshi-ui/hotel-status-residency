@@ -28,7 +28,7 @@ function rowOf(r: Record<string, unknown>): HotelUser {
   };
 }
 
-export async function fetchPublicUser(userId: string, username?: string | null) {
+export async function fetchPublicUser(userId: string) {
   if (!isSupabaseConfigured()) return null;
   const sb = getSupabase();
   const byId = await sb
@@ -41,23 +41,6 @@ export async function fetchPublicUser(userId: string, username?: string | null) 
     throw new Error(byId.error.message);
   }
   if (byId.data) return rowOf(byId.data as Record<string, unknown>);
-
-  const uname = username ? normalizeUsername(username) : "";
-  if (!uname) return null;
-
-  const byName = await sb
-    .from("users")
-    .select("id, owner_id, name, username, role")
-    .ilike("username", uname)
-    .maybeSingle();
-  if (byName.data) return rowOf(byName.data as Record<string, unknown>);
-
-  const hotel = await sb
-    .from("hotel_users")
-    .select("id, owner_id, name, username, role, created_at")
-    .ilike("username", uname)
-    .maybeSingle();
-  if (hotel.data) return rowOf(hotel.data as Record<string, unknown>);
   return null;
 }
 

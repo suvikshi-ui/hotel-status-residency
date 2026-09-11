@@ -8,7 +8,8 @@ import {
   type ReactNode,
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
-import { parseAppRole, type AppRole } from "./roles";
+import type { AppRole } from "./roles";
+import { roleFromUsersTable } from "./user-role";
 import { isSupabaseConfigured } from "./supabase-config";
 import { getSupabase } from "./supabase";
 import { setLedgerOwner } from "./store";
@@ -52,20 +53,14 @@ function toStaff(user: User | null): StaffUser | null {
     (typeof meta.name === "string" && meta.name) ||
     null;
   const username =
-    (typeof meta.username === "string" && meta.username) ||
-    (user.email && !user.email.endsWith("@status-residency.local")
-      ? null
-      : user.email?.split("@")[0]) ||
-    null;
-  const ownerId =
-    (typeof meta.owner_id === "string" && meta.owner_id) || user.id;
+    (typeof meta.username === "string" && meta.username) || null;
   return {
     id: user.id,
     email: user.email ?? null,
     name,
     username,
-    role: parseAppRole(meta.role),
-    ownerId,
+    role: "admin",
+    ownerId: user.id,
   };
 }
 
@@ -73,33 +68,31 @@ async function staffFromDb(user: User | null): Promise<StaffUser | null> {
   const base = toStaff(user);
   if (!base) return null;
   try {
-    const row = await fetchPublicUser(base.id, base.username);
+    const row = await fetchPublicUser(base.id);
     if (row) {
       return {
         ...base,
         name: row.name || base.name,
         username: row.username || base.username,
-        role: row.role,
-        ownerId: row.ownerId || base.ownerId,
+        role: roleFromUsersTable(row.role),
+        ownerId: row.ownerId || base.id,
       };
     }
   } catch {
-    /* keep metadata role if public.users is not ready */
+    /* no public.users row → admin panel, never JWT metadata */
   }
-  if (base.ownerId === base.id && base.role === "admin") {
-    try {
-      await ensurePublicUser({
-        id: base.id,
-        ownerId: base.id,
-        name: base.name ?? "",
-        username: base.username,
-        role: "admin",
-      });
-    } catch {
-      /* ignore */
-    }
+  try {
+    await ensurePublicUser({
+      id: base.id,
+      ownerId: base.id,
+      name: base.name ?? "",
+      username: base.username,
+      role: "admin",
+    });
+  } catch {
+    /* ignore */
   }
-  return base;
+  return { ...base, role: "admin" };
 }
 
 function friendlyAuthError(message: string) {

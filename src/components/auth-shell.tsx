@@ -3,7 +3,6 @@ import { Navigate, useRouterState } from "@tanstack/react-router";
 import { AppShell } from "@/components/app-shell";
 import { HotelLogo } from "@/components/hotel-logo";
 import { canOpenPath, homePath } from "@/lib/roles";
-import { useLedger } from "@/lib/store";
 import { useStaffSession } from "@/lib/supabase-auth";
 
 function SessionSkeleton() {
@@ -21,8 +20,7 @@ function SessionSkeleton() {
 export function AuthShell({ children }: { children: ReactNode }) {
   const { user, isPending, configured } = useStaffSession();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const storedRole = useLedger((s) => s.appRole);
-  const role = user?.role ?? storedRole;
+  const role = user?.role ?? "admin";
   const onLogin = pathname === "/login";
 
   if (!configured) {

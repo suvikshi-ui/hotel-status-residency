@@ -45,9 +45,8 @@ function NavLinks({
   variant: "side" | "bottom";
 }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const storedRole = useLedger((s) => s.appRole);
   const { user } = useStaffSession();
-  const role = user?.role ?? storedRole;
+  const role = user?.role ?? "admin";
   const items = NAV.filter((item) => canOpenPath(role, item.to));
   if (variant === "bottom") {
     const primary = items.filter((item) =>
@@ -108,8 +107,8 @@ function NavLinks({
 
 export function AppShell({ children }: { children: ReactNode }) {
   const hotel = useLedger((s) => s.hotel);
-  const role = useLedger((s) => s.appRole);
   const { user, signOut } = useStaffSession();
+  const role = user?.role ?? "admin";
   const cloud = useCloudSync();
   const [menu, setMenu] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });

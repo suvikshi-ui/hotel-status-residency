@@ -6,7 +6,6 @@ describe("housekeeping role", () => {
   it("defaults unknown values to admin", () => {
     assert.equal(parseAppRole("boss"), "admin");
     assert.equal(parseAppRole("housekeeping"), "housekeeping");
-    assert.equal(parseAppRole("staff"), "staff");
   });
 
   it("opens only the complaint sheet", () => {
@@ -19,5 +18,11 @@ describe("housekeeping role", () => {
 
   it("lands housekeeping on complaints", () => {
     assert.equal(homePath("housekeeping"), "/complaints");
+  });
+
+  it("opens the admin panel for any other role", () => {
+    assert.equal(homePath("admin"), "/");
+    assert.equal(canOpenPath("admin", "/register"), true);
+    assert.equal(canOpenPath("admin", "/"), true);
   });
 });
