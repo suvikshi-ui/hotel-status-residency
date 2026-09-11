@@ -36,7 +36,7 @@ const BASE_OPENING_DATE = seed.days[0]?.date ?? "2026-09-01";
 
 export const LAST_SEEDED = "2026-09-09";
 export const DEFAULT_DATE = "2026-09-09";
-export const LEDGER_STORAGE_KEY = "status-ledger-v5";
+export const LEDGER_STORAGE_KEY = "status-ledger-v6";
 
 export interface LedgerState {
   hotel: HotelInfo;
