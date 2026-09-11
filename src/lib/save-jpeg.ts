@@ -90,6 +90,19 @@ ${A4_PRINT_CSS}
   return { page, sheet, clone };
 }
 
+function canvasLooksEmpty(canvas: HTMLCanvasElement) {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return true;
+  const w = Math.min(48, canvas.width);
+  const h = Math.min(48, canvas.height);
+  const { data } = ctx.getImageData(0, 0, w, h);
+  let dark = 0;
+  for (let i = 0; i < data.length; i += 16) {
+    if (data[i] < 248 || data[i + 1] < 248 || data[i + 2] < 248) dark += 1;
+  }
+  return dark < 4;
+}
+
 async function rasterPrintPage(sheet: HTMLElement) {
   const html2canvas = (await import("html2canvas")).default;
   const opts = {
@@ -111,20 +124,7 @@ async function rasterPrintPage(sheet: HTMLElement) {
   return canvas;
 }
 
-function canvasLooksEmpty(canvas: HTMLCanvasElement) {
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return true;
-  const w = Math.min(48, canvas.width);
-  const h = Math.min(48, canvas.height);
-  const { data } = ctx.getImageData(0, 0, w, h);
-  let dark = 0;
-  for (let i = 0; i < data.length; i += 16) {
-    if (data[i] < 248 || data[i + 1] < 248 || data[i + 2] < 248) dark += 1;
-  }
-  return dark < 4;
-}
-
-/** Build the same A4 PDF the Print button produces. */
+/** One A4 PDF — Print and JPEG both use this file. */
 export async function pdfFromPrintElement(el: HTMLElement): Promise<Blob> {
   const { page, sheet, clone } = mountPrintPage(el);
   try {
@@ -135,14 +135,7 @@ export async function pdfFromPrintElement(el: HTMLElement): Promise<Blob> {
     const canvas = await rasterPrintPage(sheet);
     const { jsPDF } = await import("jspdf");
     const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
-    pdf.addImage(
-      canvas.toDataURL("image/jpeg", 0.95),
-      "JPEG",
-      0,
-      0,
-      210,
-      297,
-    );
+    pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, 210, 297);
     return pdf.output("blob");
   } finally {
     page.remove();
@@ -156,7 +149,9 @@ export async function jpegFromPdfBlob(pdfBlob: Blob): Promise<string> {
   const data = new Uint8Array(await pdfBlob.arrayBuffer());
   const doc = await pdfjs.getDocument({ data }).promise;
   const page = await doc.getPage(1);
-  const viewport = page.getViewport({ scale: 2 });
+  const base = page.getViewport({ scale: 1 });
+  const scale = (A4_PX.width * 2) / base.width;
+  const viewport = page.getViewport({ scale });
   const canvas = document.createElement("canvas");
   canvas.width = Math.floor(viewport.width);
   canvas.height = Math.floor(viewport.height);
@@ -166,7 +161,36 @@ export async function jpegFromPdfBlob(pdfBlob: Blob): Promise<string> {
   return canvas.toDataURL("image/jpeg", 0.95);
 }
 
-/** Print the A4 sheet to PDF, then convert that PDF page to JPEG. */
+export async function printPdfBlob(blob: Blob) {
+  const url = URL.createObjectURL(blob);
+  const iframe = document.createElement("iframe");
+  iframe.setAttribute("aria-hidden", "true");
+  iframe.style.cssText =
+    "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
+  iframe.src = url;
+  document.body.appendChild(iframe);
+  await new Promise<void>((resolve, reject) => {
+    iframe.onload = () => resolve();
+    iframe.onerror = () => reject(new Error("pdf print failed"));
+    setTimeout(() => resolve(), 2500);
+  });
+  try {
+    iframe.contentWindow?.focus();
+    iframe.contentWindow?.print();
+  } catch {
+    window.open(url, "_blank", "noopener");
+  }
+  setTimeout(() => {
+    iframe.remove();
+    URL.revokeObjectURL(url);
+  }, 60_000);
+}
+
+export async function printElementPdf(el: HTMLElement) {
+  await printPdfBlob(await pdfFromPrintElement(el));
+}
+
+/** JPEG is a photo of the same PDF Print uses. */
 export async function saveElementJpeg(el: HTMLElement, filename: string) {
   const pdf = await pdfFromPrintElement(el);
   const dataUrl = await jpegFromPdfBlob(pdf);

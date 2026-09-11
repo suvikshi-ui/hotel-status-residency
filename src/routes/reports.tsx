@@ -26,7 +26,7 @@ import {
 } from "@/lib/inventory";
 import { printHtmlDocument } from "@/lib/print-sheet";
 import { REPORT_TAB, parseReportView } from "@/lib/report-views";
-import { saveElementJpeg } from "@/lib/save-jpeg";
+import { printElementPdf, saveElementJpeg } from "@/lib/save-jpeg";
 import { staffPay } from "@/lib/staff-pay";
 import { useLedger, useDayBooks } from "@/lib/store";
 import { useGate } from "@/components/security-gate";
@@ -715,7 +715,7 @@ function DailyReportPanel() {
       toast.error("Report is not ready");
       return;
     }
-    toast.message("Saving JPEG…");
+    toast.message("Saving JPEG from the PDF…");
     try {
       await saveElementJpeg(el, `HSR-daily-${date}.jpg`);
       toast.success("JPEG saved");
@@ -746,8 +746,10 @@ function DailyReportPanel() {
                 window.print();
                 return;
               }
-              toast.message("Opening print…");
-              printHtmlDocument("Daily report", el.outerHTML);
+              toast.message("Opening the same PDF…");
+              void printElementPdf(el).catch(() =>
+                toast.error("Could not print PDF"),
+              );
             }}
           >
             <Printer className="size-4" />
