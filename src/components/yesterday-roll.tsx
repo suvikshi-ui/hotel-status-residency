@@ -33,14 +33,14 @@ export function YesterdayRoll() {
   }, [rows, guests, date]);
 
   const [ticked, setTicked] = useState<Set<string>>(() => new Set());
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     setTicked(new Set(alreadyIds ? alreadyIds.split(",") : []));
   }, [date, alreadyIds]);
 
   useEffect(() => {
-    setOpen(true);
+    setOpen(false);
   }, [date]);
 
   if (!rows.length) return null;
@@ -122,14 +122,16 @@ export function YesterdayRoll() {
           </span>
         </button>
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => setOpen((v) => !v)}
-          >
-            {open ? "Minimize" : "Expand"}
-          </Button>
+          {open ? null : (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setOpen(true)}
+            >
+              Expand
+            </Button>
+          )}
           {open ? (
             <Button type="button" size="sm" onClick={apply} disabled={locked}>
               {continueN === 0
