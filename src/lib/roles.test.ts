@@ -6,6 +6,7 @@ describe("housekeeping role", () => {
   it("defaults unknown values to admin", () => {
     assert.equal(parseAppRole("boss"), "admin");
     assert.equal(parseAppRole("housekeeping"), "housekeeping");
+    assert.equal(parseAppRole("staff"), "staff");
   });
 
   it("opens inventory and complaints only", () => {

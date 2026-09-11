@@ -137,8 +137,7 @@ function LoginPage() {
             {tab === "signup" ? "Create account" : "Sign in"}
           </h2>
           <p className="mt-1 text-sm text-muted">
-            Email and password. Each account keeps its own rooms, staff,
-            expenses and balance.
+            Username or email, and password.
           </p>
 
           {!configured ? (
@@ -171,11 +170,11 @@ function LoginPage() {
             <TabsContent value="signin" className="mt-5">
               <form className="grid gap-3" onSubmit={onSignIn}>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email">Username or email</Label>
                   <Input
                     id="email"
-                    type="email"
-                    autoComplete="email"
+                    type="text"
+                    autoComplete="username"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required

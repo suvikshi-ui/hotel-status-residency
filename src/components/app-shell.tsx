@@ -51,7 +51,9 @@ function NavLinks({
     const primary = items.filter((item) =>
       role === "housekeeping"
         ? ["/complaints", "/inventory", "/profile"].includes(item.to)
-        : ["/", "/register", "/balance", "/reports"].includes(item.to),
+        : role === "staff"
+          ? ["/", "/register", "/complaints", "/profile"].includes(item.to)
+          : ["/", "/register", "/balance", "/reports"].includes(item.to),
     );
     return (
       <>

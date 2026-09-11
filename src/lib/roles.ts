@@ -1,8 +1,10 @@
-export const APP_ROLES = ["admin", "housekeeping"] as const;
+export const APP_ROLES = ["admin", "supervisor", "staff", "housekeeping"] as const;
 export type AppRole = (typeof APP_ROLES)[number];
 
 export const ROLE_LABEL: Record<AppRole, string> = {
   admin: "Admin",
+  supervisor: "Supervisor",
+  staff: "Staff",
   housekeeping: "Housekeeping",
 };
 
@@ -12,18 +14,32 @@ const HOUSEKEEPING_PATHS = new Set([
   "/profile",
 ]);
 
+const STAFF_PATHS = new Set([
+  "/",
+  "/register",
+  "/rooms",
+  "/complaints",
+  "/profile",
+]);
+
 export function parseAppRole(value: unknown): AppRole {
-  return value === "housekeeping" ? "housekeeping" : "admin";
+  if (value === "housekeeping") return "housekeeping";
+  if (value === "supervisor") return "supervisor";
+  if (value === "staff") return "staff";
+  return "admin";
 }
 
 export function canOpenPath(role: AppRole, path: string) {
-  if (role === "admin") return true;
+  if (role === "admin" || role === "supervisor") return true;
   if (path === "/login") return true;
+  if (role === "staff") return STAFF_PATHS.has(path);
   return HOUSEKEEPING_PATHS.has(path);
 }
 
 export function homePath(role: AppRole) {
-  return role === "housekeeping" ? "/complaints" : "/";
+  if (role === "housekeeping") return "/complaints";
+  if (role === "staff") return "/register";
+  return "/";
 }
 
 export function navFor(role: AppRole, items: readonly { to: string }[]) {
@@ -31,13 +47,17 @@ export function navFor(role: AppRole, items: readonly { to: string }[]) {
 }
 
 export function canCountInventory(role: AppRole) {
-  return role === "admin" || role === "housekeeping";
+  return role === "admin" || role === "supervisor" || role === "housekeeping";
 }
 
 export function canEditComplaints(role: AppRole) {
-  return role === "admin" || role === "housekeeping";
+  return role === "admin" || role === "supervisor" || role === "housekeeping" || role === "staff";
 }
 
 export function canManageCatalog(role: AppRole) {
+  return role === "admin" || role === "supervisor";
+}
+
+export function canAddUsers(role: AppRole) {
   return role === "admin";
 }

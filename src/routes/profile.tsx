@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AddUserCard } from "@/components/add-user-form";
 import { useGate } from "@/components/security-gate";
 import { formatDay, money } from "@/lib/format";
-import { APP_ROLES, ROLE_LABEL, type AppRole } from "@/lib/roles";
+import { APP_ROLES, ROLE_LABEL, canAddUsers, type AppRole } from "@/lib/roles";
 import { codeOk, hashCode } from "@/lib/pin";
 import { useLedger } from "@/lib/store";
 import { HotelLogo } from "@/components/hotel-logo";
@@ -82,6 +83,8 @@ function ProfilePage() {
           ))}
         </CardContent>
       </Card>
+
+      {canAddUsers(role) ? <AddUserCard /> : null}
 
       {user ? (
         <Card>

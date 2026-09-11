@@ -8,15 +8,23 @@ import {
   type ReactNode,
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
+import { parseAppRole, type AppRole } from "./roles";
 import { isSupabaseConfigured } from "./supabase-config";
 import { getSupabase } from "./supabase";
 import { setLedgerOwner } from "./store";
 import { stopCloudSync } from "./supabase-sync";
+import {
+  loginHotelUser,
+} from "./hotel-users";
+import { loginIsEmail, usernameToEmail } from "./hotel-login";
 
 export type StaffUser = {
   id: string;
   email: string | null;
   name: string | null;
+  username: string | null;
+  role: AppRole;
+  ownerId: string;
 };
 
 type AuthCtx = {
@@ -41,7 +49,18 @@ function toStaff(user: User | null): StaffUser | null {
     (typeof meta.full_name === "string" && meta.full_name) ||
     (typeof meta.name === "string" && meta.name) ||
     null;
-  return { id: user.id, email: user.email ?? null, name };
+  const username =
+    (typeof meta.username === "string" && meta.username) || null;
+  const ownerId =
+    (typeof meta.owner_id === "string" && meta.owner_id) || user.id;
+  return {
+    id: user.id,
+    email: user.email ?? null,
+    name,
+    username,
+    role: parseAppRole(meta.role),
+    ownerId,
+  };
 }
 
 function friendlyAuthError(message: string) {
@@ -92,15 +111,25 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
     };
   }, [configured]);
 
-  const signIn = useCallback(async (email: string, password: string) => {
+  const signIn = useCallback(async (login: string, password: string) => {
     if (!isSupabaseConfigured()) {
       throw new Error(friendlyAuthError("not connected"));
     }
+    const raw = login.trim();
+    const email = loginIsEmail(raw) ? raw.toLowerCase() : usernameToEmail(raw);
     const { error } = await getSupabase().auth.signInWithPassword({
-      email: email.trim().toLowerCase(),
+      email,
       password,
     });
-    if (error) throw new Error(friendlyAuthError(error.message));
+    if (!error) return;
+    if (loginIsEmail(raw)) throw new Error(friendlyAuthError(error.message));
+    const row = await loginHotelUser(raw, password);
+    if (!row) throw new Error(friendlyAuthError(error.message));
+    const { error: again } = await getSupabase().auth.signInWithPassword({
+      email: usernameToEmail(row.username),
+      password,
+    });
+    if (again) throw new Error(friendlyAuthError(again.message));
   }, []);
 
   const signUp = useCallback(

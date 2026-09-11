@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { HotelLogo } from "@/components/hotel-logo";
-import { setLedgerOwner } from "@/lib/store";
+import { setLedgerOwner, useLedger } from "@/lib/store";
 import { useStaffSession } from "@/lib/supabase-auth";
 import {
   hydrateFromCloud,
@@ -31,10 +31,14 @@ export function HydrateLedger({ children }: { children: ReactNode }) {
     stopCloudSync();
 
     void (async () => {
-      await setLedgerOwner(user?.id ?? null);
-      if (user?.id) {
-        await hydrateFromCloud(user.id);
-        startCloudSync(user.id);
+      const ownerId = user?.ownerId || user?.id || null;
+      await setLedgerOwner(ownerId);
+      if (user && user.ownerId !== user.id) {
+        useLedger.getState().setAppRole(user.role);
+      }
+      if (ownerId && user) {
+        await hydrateFromCloud(ownerId);
+        startCloudSync(ownerId);
       }
       if (!cancelled) setReady(true);
     })();
@@ -42,7 +46,7 @@ export function HydrateLedger({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [user?.id, isPending]);
+  }, [user?.id, user?.ownerId, user?.role, isPending]);
 
   if (isPending) return <>{children}</>;
   if (user && !ready) return <CloudSkeleton />;
