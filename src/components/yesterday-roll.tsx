@@ -4,11 +4,11 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useGate } from "@/components/security-gate";
-import { ModeBadge } from "@/components/mode-badge";
-import { formatDay, formatDayShort, money } from "@/lib/format";
+import { formatDay, formatDayShort } from "@/lib/format";
 import { addDaysIso, occupantsOnDate, stayOnDate } from "@/lib/stay";
 import { useLedger } from "@/lib/store";
 import { cn } from "@/lib/utils";
+import type { GuestEntry } from "@/lib/types";
 
 export function YesterdayRoll() {
   const date = useLedger((s) => s.selectedDate);
@@ -41,6 +41,11 @@ export function YesterdayRoll() {
 
   const continueN = rows.filter((g) => ticked.has(g.id)).length;
   const outN = rows.length - continueN;
+  const colCount = rows.length > 24 ? 3 : 2;
+  const colSize = Math.ceil(rows.length / colCount);
+  const columns = Array.from({ length: colCount }, (_, i) =>
+    rows.slice(i * colSize, (i + 1) * colSize),
+  );
 
   function toggle(id: string) {
     setTicked((prev) => {
@@ -81,80 +86,94 @@ export function YesterdayRoll() {
 
   return (
     <Card className="overflow-hidden">
-      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-border bg-bg-warm/60 px-5 py-3">
-        <div>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-bg-warm/60 px-3 py-2 sm:px-4">
+        <div className="min-w-0">
           <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">
-            Yesterday
+            Continue · {formatDayShort(yesterday)}
           </p>
-          <h2 className="font-display text-xl font-semibold tracking-tight">
-            {formatDay(yesterday)}
-          </h2>
-          <p className="mt-1 text-sm text-muted">
-            Tick who continues today. Unticked guests check out at 11:00 AM.
-            Tick again if you checked out by mistake.
+          <p className="text-sm tabular text-muted">
+            <span className="font-medium text-fg">{continueN}</span> continue ·{" "}
+            <span className="font-medium text-fg">{outN}</span> check out
           </p>
         </div>
-        <p className="text-sm tabular text-muted">
-          <span className="font-medium text-fg">{continueN}</span> continue ·{" "}
-          <span className="font-medium text-fg">{outN}</span> check out
-        </p>
-      </div>
-      <CardContent className="flex flex-col gap-2 p-3 sm:p-4">
-        <ul className="flex flex-col gap-1.5">
-          {rows.map((g) => {
-            const on = ticked.has(g.id);
-            const posted = Boolean(alreadyIds) && alreadyIds.split(",").includes(g.id);
-            return (
-              <li key={g.id}>
-                <button
-                  type="button"
-                  onClick={() => toggle(g.id)}
-                  aria-pressed={on}
-                  className={cn(
-                    "flex w-full min-h-14 items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors",
-                    on ? "bg-ok/10" : "bg-card hover:bg-bg-warm/80",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "grid size-11 shrink-0 place-items-center rounded-md border",
-                      on
-                        ? "border-ok/40 bg-ok text-primary-fg"
-                        : "border-border bg-card text-transparent",
-                    )}
-                    aria-hidden
-                  >
-                    <Check className="size-5" strokeWidth={3} />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex flex-wrap items-baseline gap-x-2">
-                      <span className="font-medium">{g.name}</span>
-                      <span className="text-sm tabular text-muted">
-                        Room {g.roomNo}
-                      </span>
-                    </span>
-                    <span className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted">
-                      <ModeBadge mode={g.mode} />
-                      <span className="tabular">{money(g.amount)}</span>
-                      {g.source ? <span>{g.source}</span> : null}
-                      {posted ? (
-                        <span className="font-medium text-ok">On today</span>
-                      ) : g.stay === "out" ? (
-                        <span className="font-medium text-muted">Checked out</span>
-                      ) : null}
-                    </span>
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-        <Button type="button" className="mt-1 w-full sm:w-auto" onClick={apply}>
+        <Button type="button" size="sm" onClick={apply}>
           {continueN === 0
             ? `Check out all ${outN}`
             : `Continue ${continueN} · check out ${outN}`}
         </Button>
+      </div>
+      <CardContent className="p-2 sm:p-3">
+        <div
+          className={cn(
+            "grid gap-x-3 gap-y-0.5",
+            colCount === 3 ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" : "grid-cols-1 sm:grid-cols-2",
+          )}
+        >
+          {columns.map((col, i) => (
+            <ul key={i} className="flex min-w-0 flex-col gap-0.5">
+              {col.map((g) => (
+                <li key={g.id}>
+                  <RollRow
+                    guest={g}
+                    on={ticked.has(g.id)}
+                    posted={Boolean(alreadyIds) && alreadyIds.split(",").includes(g.id)}
+                    onToggle={() => toggle(g.id)}
+                  />
+                </li>
+              ))}
+            </ul>
+          ))}
+        </div>
       </CardContent>
     </Card>
+  );
+}
+
+function RollRow({
+  guest,
+  on,
+  posted,
+  onToggle,
+}: {
+  guest: GuestEntry;
+  on: boolean;
+  posted: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={on}
+      className={cn(
+        "flex w-full min-h-10 items-center gap-2 rounded-md px-2 py-1 text-left transition-colors",
+        on ? "bg-ok/10" : "hover:bg-bg-warm/80",
+      )}
+    >
+      <span
+        className={cn(
+          "grid size-8 shrink-0 place-items-center rounded-md border",
+          on
+            ? "border-ok/40 bg-ok text-primary-fg"
+            : "border-border bg-card text-transparent",
+        )}
+        aria-hidden
+      >
+        <Check className="size-4" strokeWidth={3} />
+      </span>
+      <span className="w-8 shrink-0 tabular text-sm font-medium">
+        {guest.roomNo}
+      </span>
+      <span className="min-w-0 flex-1 truncate text-sm">{guest.name}</span>
+      {posted ? (
+        <span className="shrink-0 text-xs font-medium uppercase tracking-wide text-ok">
+          Today
+        </span>
+      ) : guest.stay === "out" ? (
+        <span className="shrink-0 text-xs font-medium uppercase tracking-wide text-muted">
+          Out
+        </span>
+      ) : null}
+    </button>
   );
 }
