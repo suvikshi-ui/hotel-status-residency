@@ -20,7 +20,7 @@ import { sumByBucket } from "@/lib/expense-tally";
 import { formatDay, formatDayShort, money, moneyCompact } from "@/lib/format";
 import { printHtmlDocument } from "@/lib/print-sheet";
 import { saveElementJpeg } from "@/lib/save-jpeg";
-import { useLedger } from "@/lib/store";
+import { useLedger, useDayBooks } from "@/lib/store";
 import { useGate } from "@/components/security-gate";
 
 export const Route = createFileRoute("/reports")({ component: ReportsPage });
@@ -377,13 +377,12 @@ function DailyReportPanel() {
   const allWs = useLedger((s) => s.wholesale);
   const allExp = useLedger((s) => s.expenses);
   const allRecv = useLedger((s) => s.balReceived);
-  const days = useLedger((s) => s.days);
   const guests = allGuests.filter((g) => g.date === date);
   const food = allFood.filter((f) => f.date === date);
   const ws = allWs.filter((w) => w.date === date);
   const expenses = allExp.filter((e) => e.date === date);
   const receipts = allRecv.filter((r) => r.date === date);
-  const books = days.find((d) => d.date === date);
+  const books = useDayBooks(date);
   const take = buildDayTake(guests, food, ws);
 
   async function saveJpeg() {

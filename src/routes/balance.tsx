@@ -24,7 +24,7 @@ import {
 } from "@/lib/balance";
 import { DUE_PAY_MODES, formatDayShort, MODE_LABEL, money } from "@/lib/format";
 import { escapeHtml, printDocument } from "@/lib/print-sheet";
-import { useLedger } from "@/lib/store";
+import { useLedger, useDayBooks } from "@/lib/store";
 import { useGate } from "@/components/security-gate";
 import type { PayMode } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -93,7 +93,6 @@ function BalancePage() {
   const hotel = useLedger((s) => s.hotel);
   const guests = useLedger((s) => s.guests);
   const receipts = useLedger((s) => s.balReceived);
-  const days = useLedger((s) => s.days);
   const date = useLedger((s) => s.selectedDate);
   const addBalReceived = useLedger((s) => s.addBalReceived);
   const removeBalReceived = useLedger((s) => s.removeBalReceived);
@@ -106,7 +105,7 @@ function BalancePage() {
     () => buildDueAccounts(guests, receipts),
     [guests, receipts],
   );
-  const books = days.find((d) => d.date === date);
+  const books = useDayBooks(date);
   const filtered = useMemo(() => {
     const t = q.trim().toLowerCase();
     return accounts.filter((a) => {

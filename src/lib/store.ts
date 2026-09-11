@@ -19,23 +19,18 @@ import type {
 } from "./types";
 import { uid } from "./format";
 import { applyStay } from "./stay";
-import { closeAsPrev, computeBooks, openingAsPrev } from "./ledger";
+import { rebuildDayBooks } from "./ledger";
 
 function afterSave() {
   void import("./supabase-sync").then((m) => m.requestCloudSave());
 }
 
 const seed = seedJson as SeedData;
-const BASE_OPENING = seed.opening;
 const BASE_OPENING_DATE = seed.days[0]?.date ?? "2026-09-01";
 
 export const LAST_SEEDED = "2026-09-01";
 export const DEFAULT_DATE = LAST_SEEDED;
 export const LEDGER_STORAGE_KEY = "status-ledger-v5";
-
-function byDate<T extends { date: string }>(rows: T[], date: string) {
-  return rows.filter((r) => r.date === date);
-}
 
 export interface LedgerState {
   hotel: HotelInfo;
@@ -152,41 +147,25 @@ function rebuildFrom(
   state: LedgerState,
   fromDate: string,
 ): Pick<LedgerState, "days" | "dirty"> {
-  const dates = new Set<string>([
-    ...state.days.map((d) => d.date),
-    ...state.guests.map((g) => g.date),
-    fromDate,
-    state.openingDate,
-  ]);
-  const ordered = [...dates].sort();
-  const startIdx = ordered.indexOf(fromDate);
-  const kept = state.days.filter((d) => d.date < fromDate);
-  const epoch = state.openingDate || BASE_OPENING_DATE;
-  let prev =
-    kept.length > 0
-      ? closeAsPrev(kept[kept.length - 1]!)
-      : openingAsPrev(
-          fromDate >= epoch ? state.opening : BASE_OPENING,
-        );
-
-  const rebuilt: DayBooks[] = [...kept];
+  const days = rebuildDayBooks({
+    openingDate: state.openingDate || BASE_OPENING_DATE,
+    opening: state.opening,
+    guests: state.guests,
+    food: state.food,
+    wholesale: state.wholesale,
+    expenses: state.expenses,
+    balReceived: state.balReceived,
+    throughDates: [fromDate, state.selectedDate, state.openingDate],
+  });
   const dirty: Record<string, true> = { ...state.dirty };
-  for (const date of ordered.slice(Math.max(0, startIdx))) {
-    if (date === epoch) prev = openingAsPrev(state.opening);
-    const books = computeBooks({
-      date,
-      guests: byDate(state.guests, date),
-      food: byDate(state.food, date),
-      wholesale: byDate(state.wholesale, date),
-      expenses: byDate(state.expenses, date),
-      balReceived: byDate(state.balReceived, date),
-      prev,
-    });
-    rebuilt.push(books);
-    dirty[date] = true;
-    prev = closeAsPrev(books);
+  for (const d of days) {
+    if (d.date >= fromDate) dirty[d.date] = true;
   }
-  return { days: rebuilt, dirty };
+  return { days, dirty };
+}
+
+function withBooks(state: LedgerState): LedgerState {
+  return { ...state, ...rebuildFrom(state, state.openingDate || BASE_OPENING_DATE) };
 }
 
 export const useLedger = create<LedgerState>()(
@@ -198,7 +177,10 @@ export const useLedger = create<LedgerState>()(
       }) as typeof set;
       return {
       ...seedState(),
-      setDate: (date) => save({ selectedDate: date }),
+      setDate: (date) => {
+        const next = { ...get(), selectedDate: date };
+        save({ selectedDate: date, ...rebuildFrom(next, date) });
+      },
       setOpening: (date, opening) => {
         const next = { ...get(), opening, openingDate: date, selectedDate: date };
         save({
@@ -342,7 +324,7 @@ export const useLedger = create<LedgerState>()(
         securityCode: s.securityCode,
       }),
       merge: (persisted, current) =>
-        mergeSnapshot((persisted ?? {}) as Partial<LedgerState>, current),
+        withBooks(mergeSnapshot((persisted ?? {}) as Partial<LedgerState>, current)),
     },
   ),
 );
@@ -358,14 +340,25 @@ export async function setLedgerOwner(userId: string | null) {
   } catch {
     /* keep seed if saved ledger cannot restore */
   }
+  const s = useLedger.getState();
+  useLedger.setState(rebuildFrom(s, s.openingDate || BASE_OPENING_DATE));
+}
+
+export function pickDayBooks(state: LedgerState, date: string): DayBooks | undefined {
+  const hit = state.days.find((d) => d.date === date);
+  if (hit) return hit;
+  return rebuildDayBooks({
+    openingDate: state.openingDate || BASE_OPENING_DATE,
+    opening: state.opening,
+    guests: state.guests,
+    food: state.food,
+    wholesale: state.wholesale,
+    expenses: state.expenses,
+    balReceived: state.balReceived,
+    throughDates: [date, state.selectedDate],
+  }).find((d) => d.date === date);
 }
 
 export function useDayBooks(date: string): DayBooks | undefined {
-  const days = useLedger((s) => s.days);
-  return days.find((d) => d.date === date);
-}
-
-export function useDayGuests(date: string) {
-  const guests = useLedger((s) => s.guests);
-  return guests.filter((g) => g.date === date);
+  return useLedger((s) => pickDayBooks(s, date));
 }

@@ -16,7 +16,7 @@ import { buildDayTake } from "@/lib/day-report";
 import { formatDay, formatDayShort, money } from "@/lib/format";
 import { printHtmlDocument } from "@/lib/print-sheet";
 import { stayDates } from "@/lib/stay";
-import { useLedger } from "@/lib/store";
+import { useLedger, useDayBooks } from "@/lib/store";
 import type { DayBooks, GuestEntry, ModeAmount, NamedAmount } from "@/lib/types";
 
 export const Route = createFileRoute("/register")({ component: RegisterPage });
@@ -29,7 +29,7 @@ function RegisterPage() {
   const allExp = useLedger((s) => s.expenses);
   const allRecv = useLedger((s) => s.balReceived);
   const hotel = useLedger((s) => s.hotel);
-  const days = useLedger((s) => s.days);
+  const books = useDayBooks(date);
   const guests = allGuests.filter((g) => g.date === date);
   const food = allFood.filter((f) => f.date === date);
   const ws = allWs.filter((w) => w.date === date);
@@ -255,7 +255,7 @@ function RegisterPage() {
             ws={ws}
             expenses={expenses}
             receipts={receipts}
-            books={days.find((d) => d.date === date)}
+            books={books}
           />
         </TabsContent>
       </Tabs>

@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ModeBadge } from "@/components/mode-badge";
 import { Button } from "@/components/ui/button";
 import { formatDayShort, money, moneyCompact, normRoom } from "@/lib/format";
-import { useLedger } from "@/lib/store";
+import { useLedger, useDayBooks } from "@/lib/store";
 import { HotelLogo } from "@/components/hotel-logo";
 
 export const Route = createFileRoute("/")({ component: Overview });
@@ -51,7 +51,7 @@ function Overview() {
   const rooms = useLedger((s) => s.rooms);
   const hotel = useLedger((s) => s.hotel);
   const guests = allGuests.filter((g) => g.date === date);
-  const books = days.find((d) => d.date === date);
+  const books = useDayBooks(date);
   const occSet = new Set(guests.map((g) => normRoom(g.roomNo)));
   const occupied = rooms.filter((r) => occSet.has(normRoom(r.no))).length;
   const occPct = rooms.length ? Math.round((occupied / rooms.length) * 100) : 0;
