@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  applyStay,
   applyYesterdayRoll,
   findDuplicateOnDate,
   inHouseOnDate,
@@ -164,5 +165,28 @@ describe("duplicate posting key", () => {
       ),
       null,
     );
+  });
+});
+
+describe("undo checkout", () => {
+  it("puts a mistaken checkout back on continue and opens the next night", () => {
+    const guests = [
+      g({
+        id: "a",
+        date: "2026-09-09",
+        name: "PRASAD",
+        roomNo: "210",
+        mode: "BALANCE",
+        source: "MOT",
+        checkIn: "2026-09-01",
+        stay: "out",
+        checkOut: "2026-09-10",
+      }),
+    ];
+    const next = applyStay(guests, "a", "continue");
+    const row = next.find((x) => x.id === "a");
+    assert.equal(row?.stay, "continue");
+    assert.equal(row?.checkOut ?? null, null);
+    assert.ok(next.some((x) => x.date === "2026-09-10" && x.name === "PRASAD"));
   });
 });

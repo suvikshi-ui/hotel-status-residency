@@ -179,7 +179,31 @@ function RegisterPage() {
                   </td>
                   <td className="px-3 py-2">
                     {g.stay === "out" ? (
-                      <Badge variant="muted">Out</Badge>
+                      <div className="flex flex-wrap items-center gap-1">
+                        <Badge variant="muted">Out</Badge>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            gate(
+                              () => {
+                                setStay(g.id, "continue");
+                                toast.success(
+                                  `${g.name} is continue again · room ${g.roomNo}`,
+                                );
+                              },
+                              {
+                                title: "Keep as continue?",
+                                message: `${g.name} was checked out by mistake. Put them back as continue in room ${g.roomNo}? Checkout date will be cleared.`,
+                                confirmLabel: "Continue",
+                              },
+                            )
+                          }
+                        >
+                          Continue
+                        </Button>
+                      </div>
                     ) : (
                       <Button
                         type="button"
