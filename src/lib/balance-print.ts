@@ -19,7 +19,7 @@ function inr(n: number) {
 
 function checkoutLabel(stay: DueStay) {
   if (stay.checkOut) return stayStamp(stay.checkOut);
-  return "In house";
+  return "Continue";
 }
 
 function statusCell(stay: DueStay) {

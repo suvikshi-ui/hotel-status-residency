@@ -118,24 +118,29 @@ export function stayFromNights(nights: DueLine[], asOf?: string): DueStay {
     }, first) || first;
   const morning = checkoutFromLastNight(lastNight);
   const explicitOut = out?.checkOut || lastRow?.checkOut || null;
-  const checkOut =
-    explicitOut && explicitOut > lastNight ? explicitOut : morning;
+  const markedOut = lastRow?.stay === "out";
+  const nextChartExists = Boolean(asOf && asOf > lastNight);
+  const left = markedOut || nextChartExists;
+  const checkOut = left
+    ? explicitOut && explicitOut > lastNight
+      ? explicitOut
+      : morning
+    : null;
   const billed = nights.reduce((s, n) => s + n.amount, 0);
-  const days = nightsFromDates(checkIn, checkOut);
+  const days = nightsFromDates(checkIn, checkOut || morning);
   const same = nights.length > 0 && nights.every((n) => n.amount === nights[0]!.amount);
   const perDay = nights.length
     ? same
       ? nights[0]!.amount
       : Math.round(billed / nights.length)
     : 0;
-  const openNight = Boolean(asOf) && lastNight === asOf && lastRow?.stay !== "out";
   return {
     id: nights[0]?.id ?? `${checkIn}-${lastNight}`,
     name: nights[0]?.name ?? "",
     roomNo: nights[0]?.roomNo ?? "",
     checkIn,
     checkOut,
-    inHouse: openNight,
+    inHouse: !left,
     days,
     perDay,
     billed,

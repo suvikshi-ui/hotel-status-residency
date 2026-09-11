@@ -41,7 +41,7 @@ export const Route = createFileRoute("/balance")({ component: BalancePage });
 
 function checkoutLabel(stay: DueStay) {
   if (stay.checkOut) return stayStamp(stay.checkOut);
-  return "In house";
+  return "Continue";
 }
 
 function BalancePage() {
@@ -142,9 +142,9 @@ function BalancePage() {
           Balance
         </h1>
         <p className="mt-1 text-sm text-muted">
-          Hotel day is {HOTEL_CLOCK} to {HOTEL_CLOCK}. Nights = check-out date
-          minus check-in date. Stay the 9th, leave the 10th {HOTEL_CLOCK} — that
-          is 1 night. Grab the check-out morning, not the last night date.
+          Check-out stays Continue until the next day chart is made and the
+          guest is not ticked. Then the date is {HOTEL_CLOCK} the morning after
+          the last night.
         </p>
       </div>
 

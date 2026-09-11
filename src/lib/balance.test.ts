@@ -110,8 +110,8 @@ describe("stay grouping", () => {
     assert.equal(row.billed, 8000);
   });
 
-  it("auto checkouts at 11:00 AM the morning after the last night", () => {
-    const row = stayFromNights([
+  it("keeps Continue until the next chart is made without ticking them", () => {
+    const nights = [
       night({
         id: "1",
         date: "2026-09-08",
@@ -124,10 +124,15 @@ describe("stay grouping", () => {
         name: "PANKAJ",
         checkIn: "2026-09-08",
       }),
-    ]);
-    assert.equal(row.checkOut, "2026-09-10");
-    assert.equal(row.days, 2);
-    assert.equal(row.inHouse, false);
+    ];
+    const open = stayFromNights(nights, "2026-09-09");
+    assert.equal(open.checkOut, null);
+    assert.equal(open.inHouse, true);
+    assert.equal(open.days, 2);
+    const left = stayFromNights(nights, "2026-09-10");
+    assert.equal(left.checkOut, "2026-09-10");
+    assert.equal(left.inHouse, false);
+    assert.equal(left.days, 2);
   });
 
   it("splits a return visit after checkout", () => {
