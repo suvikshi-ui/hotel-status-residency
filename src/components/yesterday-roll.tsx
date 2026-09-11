@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useGate } from "@/components/security-gate";
 import { formatDay, formatDayShort } from "@/lib/format";
-import { addDaysIso, occupantsOnDate, stayOnDate } from "@/lib/stay";
+import { addDaysIso, occupantsOnDate, stayDates, stayOnDate } from "@/lib/stay";
 import { useLedger } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import type { GuestEntry } from "@/lib/types";
@@ -115,6 +115,7 @@ export function YesterdayRoll() {
                 <li key={g.id}>
                   <RollRow
                     guest={g}
+                    checkIn={stayDates(guests, g).checkIn}
                     on={ticked.has(g.id)}
                     posted={Boolean(alreadyIds) && alreadyIds.split(",").includes(g.id)}
                     onToggle={() => toggle(g.id)}
@@ -131,11 +132,13 @@ export function YesterdayRoll() {
 
 function RollRow({
   guest,
+  checkIn,
   on,
   posted,
   onToggle,
 }: {
   guest: GuestEntry;
+  checkIn: string;
   on: boolean;
   posted: boolean;
   onToggle: () => void;
@@ -165,6 +168,9 @@ function RollRow({
         {guest.roomNo}
       </span>
       <span className="min-w-0 flex-1 truncate text-sm">{guest.name}</span>
+      <span className="shrink-0 tabular text-xs text-muted">
+        {formatDayShort(checkIn)}
+      </span>
       {posted ? (
         <span className="shrink-0 text-xs font-medium uppercase tracking-wide text-ok">
           Today
