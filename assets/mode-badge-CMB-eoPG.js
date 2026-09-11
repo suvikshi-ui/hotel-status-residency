@@ -1,0 +1,1 @@
+import{P as e}from"./store-CNeBubbo.js";import{Z as t}from"./index-B5oZ3w0Z.js";import{t as n}from"./badge-CmvbosSp.js";var r=t(),i={CASH:`cash`,QRS:`qr`,QRPK:`pk`,ONLINE:`online`,BALANCE:`balance`};function a({mode:t}){return(0,r.jsx)(n,{variant:i[t],children:e[t]})}export{a as t};

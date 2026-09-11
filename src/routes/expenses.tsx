@@ -7,6 +7,7 @@ import { ModeBadge } from "@/components/mode-badge";
 import { sumByDay, sumByHead, sumByMode } from "@/lib/expense-tally";
 import { formatDayShort, money } from "@/lib/format";
 import { useLedger } from "@/lib/store";
+import { ReportsLink } from "@/components/reports-link";
 
 export const Route = createFileRoute("/expenses")({ component: ExpensesPage });
 
@@ -45,10 +46,13 @@ function ExpensesPage() {
             {monthRows.length} entries · {byHead.length} heads · post from Register
           </p>
         </div>
-        <Button variant="outline" className="print:hidden" onClick={() => window.print()}>
+        <div className="flex flex-wrap gap-2 print:hidden">
+          <ReportsLink view="month" />
+          <Button variant="outline" className="print:hidden" onClick={() => window.print()}>
           <Printer className="size-4" />
           Print
         </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

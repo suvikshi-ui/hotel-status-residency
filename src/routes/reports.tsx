@@ -12,20 +12,36 @@ import {
 import { Printer } from "lucide-react";
 import { toast } from "sonner";
 import { DailyA4 } from "@/components/daily-a4";
+import { DayChart } from "@/components/day-chart";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { buildDayTake } from "@/lib/day-report";
 import { sumByBucket } from "@/lib/expense-tally";
 import { formatDay, formatDayShort, money, moneyCompact } from "@/lib/format";
+import {
+  inventoryDifference,
+  signedCount,
+} from "@/lib/inventory";
 import { printHtmlDocument } from "@/lib/print-sheet";
+import { REPORT_TAB, parseReportView } from "@/lib/report-views";
 import { saveElementJpeg } from "@/lib/save-jpeg";
+import { staffPay } from "@/lib/staff-pay";
 import { useLedger, useDayBooks } from "@/lib/store";
 import { useGate } from "@/components/security-gate";
+import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/reports")({ component: ReportsPage });
+export const Route = createFileRoute("/reports")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    view: parseReportView(search.view),
+  }),
+  component: ReportsPage,
+});
 
 function ReportsPage() {
+  const { view } = Route.useSearch();
+  const navigate = Route.useNavigate();
   const days = useLedger((s) => s.days);
   const guests = useLedger((s) => s.guests);
   const food = useLedger((s) => s.food);
@@ -115,7 +131,13 @@ function ReportsPage() {
   }));
 
   return (
-    <Tabs defaultValue="daily" className="flex flex-col gap-5">
+    <Tabs
+      value={view}
+      onValueChange={(next) =>
+        void navigate({ search: { view: parseReportView(next) } })
+      }
+      className="flex flex-col gap-5"
+    >
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">
@@ -125,14 +147,21 @@ function ReportsPage() {
             Reports
           </h1>
         </div>
-        <TabsList>
-          <TabsTrigger value="daily">Daily report</TabsTrigger>
-          <TabsTrigger value="month">Month</TabsTrigger>
+        <TabsList className="flex h-auto min-h-11 w-full flex-wrap justify-start sm:w-auto">
+          {REPORT_TAB.map((tab) => (
+            <TabsTrigger key={tab.id} value={tab.id}>
+              {tab.label}
+            </TabsTrigger>
+          ))}
         </TabsList>
       </div>
 
       <TabsContent value="daily" className="flex flex-col gap-5">
         <DailyReportPanel />
+      </TabsContent>
+
+      <TabsContent value="detail" className="flex flex-col gap-5">
+        <DetailDailyPanel />
       </TabsContent>
 
       <TabsContent value="month" className="flex flex-col gap-5">
@@ -142,7 +171,7 @@ function ReportsPage() {
             Month close
           </p>
           <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight">
-            September report
+            Monthly report
           </h1>
           <p className="mt-1 text-sm text-muted">
             {daysHit} of {rows.length} days hit the ₹60,000 target
@@ -365,7 +394,302 @@ function ReportsPage() {
         </CardContent>
       </Card>
       </TabsContent>
+
+      <TabsContent value="inventory" className="flex flex-col gap-5">
+        <InventoryReportPanel />
+      </TabsContent>
+      <TabsContent value="salary" className="flex flex-col gap-5">
+        <SalaryReportPanel />
+      </TabsContent>
+      <TabsContent value="advance" className="flex flex-col gap-5">
+        <AdvanceReportPanel />
+      </TabsContent>
     </Tabs>
+  );
+}
+
+function DetailDailyPanel() {
+  const date = useLedger((s) => s.selectedDate);
+  const hotel = useLedger((s) => s.hotel);
+  const allGuests = useLedger((s) => s.guests);
+  const guests = allGuests.filter((g) => g.date === date);
+  const food = useLedger((s) => s.food).filter((f) => f.date === date);
+  const ws = useLedger((s) => s.wholesale).filter((w) => w.date === date);
+  const expenses = useLedger((s) => s.expenses).filter((e) => e.date === date);
+  const receipts = useLedger((s) => s.balReceived).filter((r) => r.date === date);
+  const books = useDayBooks(date);
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
+        <p className="text-sm text-muted">
+          {formatDay(date)} · detailed daily chart
+        </p>
+        <Button
+          type="button"
+          onClick={() => {
+            const el = document.getElementById("day-chart");
+            if (!el) {
+              toast.error("Report is not ready");
+              return;
+            }
+            toast.message("Opening print…");
+            printHtmlDocument("Day chart", el.outerHTML);
+          }}
+        >
+          <Printer className="size-4" />
+          Print
+        </Button>
+      </div>
+      <DayChart
+        hotel={hotel.name}
+        blessing={hotel.blessing}
+        date={date}
+        guests={guests}
+        allGuests={allGuests}
+        food={food}
+        ws={ws}
+        expenses={expenses}
+        receipts={receipts}
+        books={books}
+      />
+    </div>
+  );
+}
+
+function InventoryReportPanel() {
+  const hotel = useLedger((s) => s.hotel);
+  const inventory = useLedger((s) => s.inventory);
+  const lastTotal = inventory.reduce((s, r) => s + r.lastMonth, 0);
+  const thisTotal = inventory.reduce((s, r) => s + r.thisMonth, 0);
+  const diffTotal = thisTotal - lastTotal;
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">
+            {hotel.name}
+          </p>
+          <h2 className="mt-1 font-display text-2xl font-semibold tracking-tight">
+            Inventory report
+          </h2>
+          <p className="mt-1 text-sm text-muted">
+            Last month vs this month. Counts are entered on Inventory.
+          </p>
+        </div>
+        <Button type="button" onClick={() => window.print()}>
+          <Printer className="size-4" />
+          Print
+        </Button>
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        <Stat label="Last month" value={String(lastTotal)} />
+        <Stat label="This month" value={String(thisTotal)} />
+        <Stat label="Difference" value={signedCount(diffTotal)} />
+      </div>
+      <Card>
+        <CardContent className="overflow-x-auto p-0">
+          <table className="w-full min-w-[36rem] text-left text-sm">
+            <thead className="text-xs uppercase tracking-wide text-muted">
+              <tr className="border-y border-border">
+                <th className="px-5 py-2 font-medium">Item</th>
+                <th className="px-3 py-2 text-right font-medium">Last month</th>
+                <th className="px-3 py-2 text-right font-medium">This month</th>
+                <th className="px-3 py-2 text-right font-medium">Difference</th>
+                <th className="px-5 py-2 font-medium">Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {inventory.map((r) => {
+                const diff = inventoryDifference(r);
+                return (
+                  <tr key={r.id} className="border-b border-border/70">
+                    <td className="px-5 py-2.5 font-medium">{r.name}</td>
+                    <td className="px-3 py-2.5 text-right tabular">{r.lastMonth}</td>
+                    <td className="px-3 py-2.5 text-right tabular">{r.thisMonth}</td>
+                    <td
+                      className={cn(
+                        "px-3 py-2.5 text-right tabular font-medium",
+                        diff < 0 && "text-danger",
+                      )}
+                    >
+                      {signedCount(diff)}
+                    </td>
+                    <td className="px-5 py-2.5 text-muted">{r.notes || "—"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function SalaryReportPanel() {
+  const hotel = useLedger((s) => s.hotel);
+  const staff = useLedger((s) => s.staff);
+  const monthDays = 30;
+  const rows = staff.map((r) => {
+    const { earned, payable } = staffPay(
+      r.salary,
+      r.working,
+      r.extra ?? 0,
+      r.advance,
+      monthDays,
+    );
+    return { ...r, extra: r.extra ?? 0, earned, payable };
+  });
+  const payroll = rows.reduce((s, r) => s + r.payable, 0);
+  const earnedTotal = rows.reduce((s, r) => s + r.earned, 0);
+  const extraTotal = rows.reduce((s, r) => s + (r.extra ?? 0), 0);
+  const salaryAdv = rows.reduce((s, r) => s + r.advance, 0);
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">
+            {hotel.name}
+          </p>
+          <h2 className="mt-1 font-display text-2xl font-semibold tracking-tight">
+            Staff salary report
+          </h2>
+          <p className="mt-1 text-sm text-muted">
+            Basic ÷ {monthDays} × (working + extra) − advance. Edit names on Staff.
+          </p>
+        </div>
+        <Button type="button" onClick={() => window.print()}>
+          <Printer className="size-4" />
+          Print
+        </Button>
+      </div>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <Stat label="Earned" value={money(earnedTotal)} />
+        <Stat label="Advance minus" value={money(salaryAdv)} />
+        <Stat label="To pay" value={money(payroll)} />
+      </div>
+      <Card>
+        <CardContent className="overflow-x-auto p-0">
+          <table className="w-full min-w-[48rem] text-left text-sm">
+            <thead className="text-xs uppercase tracking-wide text-muted">
+              <tr className="border-y border-border">
+                <th className="px-5 py-2 font-medium">Name</th>
+                <th className="px-3 py-2 text-right font-medium">Basic</th>
+                <th className="px-3 py-2 text-right font-medium">Working</th>
+                <th className="px-3 py-2 text-right font-medium">Extra</th>
+                <th className="px-3 py-2 text-right font-medium">Earned</th>
+                <th className="px-3 py-2 text-right font-medium">Advance</th>
+                <th className="px-3 py-2 text-right font-medium">To pay</th>
+                <th className="px-5 py-2 font-medium">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id} className="border-b border-border/70">
+                  <td className="px-5 py-2.5 font-medium">{r.name}</td>
+                  <td className="px-3 py-2.5 text-right tabular">{money(r.salary)}</td>
+                  <td className="px-3 py-2.5 text-right tabular">{r.working}</td>
+                  <td className="px-3 py-2.5 text-right tabular">{r.extra}</td>
+                  <td className="px-3 py-2.5 text-right tabular">{money(r.earned)}</td>
+                  <td className="px-3 py-2.5 text-right tabular">{money(r.advance)}</td>
+                  <td
+                    className={`px-3 py-2.5 text-right tabular font-medium ${r.payable < 0 ? "text-due" : ""}`}
+                  >
+                    {money(r.payable)}
+                  </td>
+                  <td className="px-5 py-2.5">
+                    <Badge variant={r.status === "HOLD" ? "warn" : "ok"}>
+                      {r.status || "PAID"}
+                    </Badge>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t border-border bg-bg-warm/50 font-semibold">
+                <td className="px-5 py-2.5">Total</td>
+                <td />
+                <td />
+                <td className="px-3 py-2.5 text-right tabular">{extraTotal}</td>
+                <td className="px-3 py-2.5 text-right tabular">{money(earnedTotal)}</td>
+                <td className="px-3 py-2.5 text-right tabular">{money(salaryAdv)}</td>
+                <td className="px-3 py-2.5 text-right tabular">{money(payroll)}</td>
+                <td />
+              </tr>
+            </tfoot>
+          </table>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function AdvanceReportPanel() {
+  const hotel = useLedger((s) => s.hotel);
+  const advances = useLedger((s) => s.advances);
+  const advCash = advances.reduce((s, r) => s + r.cash, 0);
+  const advQr = advances.reduce((s, r) => s + r.qrs, 0);
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">
+            {hotel.name}
+          </p>
+          <h2 className="mt-1 font-display text-2xl font-semibold tracking-tight">
+            Staff advance report
+          </h2>
+          <p className="mt-1 text-sm text-muted">
+            Cash and QR advances. Enter figures on Staff.
+          </p>
+        </div>
+        <Button type="button" onClick={() => window.print()}>
+          <Printer className="size-4" />
+          Print
+        </Button>
+      </div>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <Stat label="Cash" value={money(advCash)} />
+        <Stat label="Santosh QR" value={money(advQr)} />
+        <Stat label="Advance total" value={money(advCash + advQr)} />
+      </div>
+      <Card>
+        <CardContent className="overflow-x-auto p-0">
+          <table className="w-full min-w-[28rem] text-left text-sm">
+            <thead className="text-xs uppercase tracking-wide text-muted">
+              <tr className="border-y border-border">
+                <th className="px-5 py-2 font-medium">Name</th>
+                <th className="px-3 py-2 text-right font-medium">Cash</th>
+                <th className="px-3 py-2 text-right font-medium">QR</th>
+                <th className="px-5 py-2 text-right font-medium">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {advances.map((r) => (
+                <tr key={r.id} className="border-b border-border/70">
+                  <td className="px-5 py-2.5 font-medium">{r.name || "—"}</td>
+                  <td className="px-3 py-2.5 text-right tabular">{money(r.cash)}</td>
+                  <td className="px-3 py-2.5 text-right tabular">{money(r.qrs)}</td>
+                  <td className="px-5 py-2.5 text-right tabular font-medium">
+                    {money(r.cash + r.qrs)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t border-border bg-bg-warm/50 font-semibold">
+                <td className="px-5 py-2.5">Total</td>
+                <td className="px-3 py-2.5 text-right tabular">{money(advCash)}</td>
+                <td className="px-3 py-2.5 text-right tabular">{money(advQr)}</td>
+                <td className="px-5 py-2.5 text-right tabular">
+                  {money(advCash + advQr)}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 

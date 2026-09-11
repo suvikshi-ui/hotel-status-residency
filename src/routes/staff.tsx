@@ -14,6 +14,7 @@ import { escapeHtml, printDocument } from "@/lib/print-sheet";
 import { staffPay } from "@/lib/staff-pay";
 import { useLedger } from "@/lib/store";
 import { HotelLogo } from "@/components/hotel-logo";
+import { ReportsLink } from "@/components/reports-link";
 import type { AdvanceRow, StaffRow } from "@/lib/types";
 
 export const Route = createFileRoute("/staff")({ component: StaffPage });
@@ -176,16 +177,19 @@ function StaffPage() {
         </div>
       </div>
 
-      <div className="print:hidden">
-        <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">
-          Payroll
-        </p>
-        <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight">
-          Staff
-        </h1>
-        <p className="mt-1 text-sm text-muted">
-          Salary sheet and advance sheet are separate
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-3 print:hidden">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">
+            Payroll
+          </p>
+          <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight">
+            Staff
+          </h1>
+          <p className="mt-1 text-sm text-muted">
+            Salary sheet and advance sheet are separate
+          </p>
+        </div>
+        <ReportsLink view={sheet === "advance" ? "advance" : "salary"} />
       </div>
 
       <Tabs value={sheet} onValueChange={(v) => setSheet(v as Sheet)}>

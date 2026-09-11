@@ -20,6 +20,7 @@ import {
 import { canManageCatalog } from "@/lib/roles";
 import { escapeHtml, printDocument } from "@/lib/print-sheet";
 import { useLedger } from "@/lib/store";
+import { ReportsLink } from "@/components/reports-link";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/inventory")({ component: InventoryPage });
@@ -154,6 +155,7 @@ function InventoryPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2 print:hidden">
+          <ReportsLink view="inventory" />
           <Button variant="outline" onClick={printSheet}>
             <Printer className="size-4" />
             Print

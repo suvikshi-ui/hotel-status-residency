@@ -1,0 +1,1 @@
+function e(e,t,n,r,i){let a=i>0?i:30,o=Math.round(Math.max(0,e)*(Math.max(0,t)+Math.max(0,n))/a);return{earned:o,payable:o-(r||0)}}export{e as t};

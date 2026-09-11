@@ -1,25 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { Pencil, Printer, Search, Trash2, Lock, LockOpen } from "lucide-react";
+import { createFileRoute } from "@tanstack/react-router";
+import { Pencil, Search, Trash2, Lock, LockOpen } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { DayChart } from "@/components/day-chart";
 import { GuestForm } from "@/components/guest-form";
 import { RegisterLines } from "@/components/register-lines";
 import { ModeBadge } from "@/components/mode-badge";
 import { YesterdayRoll } from "@/components/yesterday-roll";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ReportsLink } from "@/components/reports-link";
 import { useGate } from "@/components/security-gate";
 import { buildDayTake } from "@/lib/day-report";
 import { formatDay, formatDayShort, money } from "@/lib/format";
-import { printHtmlDocument } from "@/lib/print-sheet";
 import { stayDates } from "@/lib/stay";
-import { useLedger, useDayBooks } from "@/lib/store";
+import { useLedger } from "@/lib/store";
 import { isDayLocked } from "@/lib/register-lock";
-import type { DayBooks, GuestEntry, ModeAmount, NamedAmount } from "@/lib/types";
 
 export const Route = createFileRoute("/register")({ component: RegisterPage });
 
@@ -28,15 +25,9 @@ function RegisterPage() {
   const allGuests = useLedger((s) => s.guests);
   const allFood = useLedger((s) => s.food);
   const allWs = useLedger((s) => s.wholesale);
-  const allExp = useLedger((s) => s.expenses);
-  const allRecv = useLedger((s) => s.balReceived);
-  const hotel = useLedger((s) => s.hotel);
-  const books = useDayBooks(date);
   const guests = allGuests.filter((g) => g.date === date);
   const food = allFood.filter((f) => f.date === date);
   const ws = allWs.filter((w) => w.date === date);
-  const expenses = allExp.filter((e) => e.date === date);
-  const receipts = allRecv.filter((r) => r.date === date);
   const take = buildDayTake(guests, food, ws);
   const removeGuest = useLedger((s) => s.removeGuest);
   const setStay = useLedger((s) => s.setStay);
@@ -133,19 +124,10 @@ function RegisterPage() {
               Lock
             </Button>
           )}
-          <Button asChild variant="outline">
-            <Link to="/reports">Daily report</Link>
-          </Button>
+          <ReportsLink view="daily" label="Reports" />
         </div>
         </div>
 
-      <Tabs defaultValue="register" className="flex flex-col gap-5">
-        <TabsList className="w-full justify-start sm:w-auto">
-          <TabsTrigger value="register">Register</TabsTrigger>
-          <TabsTrigger value="detail">Detail report</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="register" className="mt-0 flex flex-col gap-5">
       {locked ? (
         <p className="rounded-lg bg-bg-warm px-4 py-3 text-sm">
           This day's register is locked. Unlock with the digit code to add or
@@ -316,81 +298,6 @@ function RegisterPage() {
       </Card>
 
       <RegisterLines />
-        </TabsContent>
-
-        <TabsContent value="detail" className="mt-0">
-          <DetailReport
-            date={date}
-            hotel={hotel.name}
-            blessing={hotel.blessing}
-            guests={guests}
-            allGuests={allGuests}
-            food={food}
-            ws={ws}
-            expenses={expenses}
-            receipts={receipts}
-            books={books}
-          />
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
-}
-
-function DetailReport({
-  date,
-  hotel,
-  blessing,
-  guests,
-  allGuests,
-  food,
-  ws,
-  expenses,
-  receipts,
-  books,
-}: {
-  date: string;
-  hotel: string;
-  blessing: string;
-  guests: GuestEntry[];
-  allGuests: GuestEntry[];
-  food: ModeAmount[];
-  ws: ModeAmount[];
-  expenses: NamedAmount[];
-  receipts: NamedAmount[];
-  books?: DayBooks;
-}) {
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="flex justify-end print:hidden">
-        <Button
-          type="button"
-          onClick={() => {
-            const el = document.getElementById("day-chart");
-            if (!el) {
-              toast.error("Report is not ready");
-              return;
-            }
-            toast.message("Opening print…");
-            printHtmlDocument("Day chart", el.outerHTML);
-          }}
-        >
-          <Printer className="size-4" />
-          Print
-        </Button>
-      </div>
-      <DayChart
-        hotel={hotel}
-        blessing={blessing}
-        date={date}
-        guests={guests}
-        allGuests={allGuests}
-        food={food}
-        ws={ws}
-        expenses={expenses}
-        receipts={receipts}
-        books={books}
-      />
     </div>
   );
 }

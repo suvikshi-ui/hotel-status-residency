@@ -128,6 +128,7 @@ function Overview() {
           </div>
           <Link
             to="/reports"
+            search={{ view: "month" }}
             className="hidden items-center gap-1 text-sm text-primary md:inline-flex"
           >
             Full report <ArrowUpRight className="size-4" />
