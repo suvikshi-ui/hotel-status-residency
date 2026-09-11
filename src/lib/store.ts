@@ -20,6 +20,11 @@ import type {
 import { uid } from "./format";
 import { applyStay, applyYesterdayRoll } from "./stay";
 import { rebuildDayBooks } from "./ledger";
+import {
+  normalizeInventory,
+  seedInventory,
+  type InventoryItem,
+} from "./inventory";
 
 function afterSave() {
   void import("./supabase-sync").then((m) => m.requestCloudSave());
@@ -48,6 +53,7 @@ export interface LedgerState {
   janSales: JanSale[];
   janFood: JanFood[];
   creditGuests: CreditGuest[];
+  inventory: InventoryItem[];
   selectedDate: string;
   dirty: Record<string, true>;
   openingDate: string;
@@ -71,6 +77,7 @@ export interface LedgerState {
   restoreSeed: () => void;
   setStaff: (staff: StaffRow[]) => void;
   setAdvances: (advances: AdvanceRow[]) => void;
+  setInventory: (inventory: InventoryItem[]) => void;
   applySnapshot: (p: Partial<LedgerState>) => void;
 }
 
@@ -95,6 +102,7 @@ function seedState(): Omit<
   | "restoreSeed"
   | "setStaff"
   | "setAdvances"
+  | "setInventory"
   | "applySnapshot"
 > {
   return {
@@ -113,6 +121,7 @@ function seedState(): Omit<
     janSales: seed.janSales,
     janFood: seed.janFood,
     creditGuests: seed.creditGuests,
+    inventory: seedInventory(),
     selectedDate: DEFAULT_DATE,
     dirty: {},
     openingDate: BASE_OPENING_DATE,
@@ -142,7 +151,8 @@ function mergeSnapshot(
   const staff = normalizeStaff(persisted.staff ?? current.staff);
   const advances = normalizeAdvances(persisted.advances ?? current.advances);
   const rooms = (persisted.rooms?.length ? persisted.rooms : current.rooms) as RoomDef[];
-  return { ...current, ...persisted, staff, advances, rooms };
+  const inventory = normalizeInventory(persisted.inventory ?? current.inventory);
+  return { ...current, ...persisted, staff, advances, rooms, inventory };
 }
 
 function rebuildFrom(
@@ -302,6 +312,7 @@ export const useLedger = create<LedgerState>()(
       },
       setStaff: (staff) => save({ staff: normalizeStaff(staff) }),
       setAdvances: (advances) => save({ advances: normalizeAdvances(advances) }),
+      setInventory: (inventory) => save({ inventory: normalizeInventory(inventory) }),
       applySnapshot: (p) => {
         const merged = mergeSnapshot(p, get());
         save({
@@ -329,6 +340,7 @@ export const useLedger = create<LedgerState>()(
         opening: s.opening,
         openingDate: s.openingDate,
         securityCode: s.securityCode,
+        inventory: s.inventory,
       }),
       merge: (persisted, current) =>
         withBooks(mergeSnapshot((persisted ?? {}) as Partial<LedgerState>, current)),

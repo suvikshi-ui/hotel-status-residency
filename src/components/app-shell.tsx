@@ -5,6 +5,7 @@ import {
   Building2,
   CircleUser,
   LayoutDashboard,
+  Layers,
   LogOut,
   Menu,
   Receipt,
@@ -28,6 +29,7 @@ const NAV = [
   { to: "/rooms", label: "Rooms", icon: Building2 },
   { to: "/expenses", label: "Expenses", icon: Receipt },
   { to: "/staff", label: "Staff", icon: Users },
+  { to: "/inventory", label: "Inventory", icon: Layers },
   { to: "/reports", label: "Reports", icon: BarChart3 },
   { to: "/profile", label: "Profile", icon: CircleUser },
 ] as const;

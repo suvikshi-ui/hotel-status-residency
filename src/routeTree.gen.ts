@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as BalanceRouteImport } from './routes/balance'
 import { Route as DaySheetRouteImport } from './routes/day-sheet'
 import { Route as ExpensesRouteImport } from './routes/expenses'
+import { Route as InventoryRouteImport } from './routes/inventory'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as RegisterRouteImport } from './routes/register'
@@ -38,6 +39,11 @@ const DaySheetRoute = DaySheetRouteImport.update({
 const ExpensesRoute = ExpensesRouteImport.update({
   id: '/expenses',
   path: '/expenses',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InventoryRoute = InventoryRouteImport.update({
+  id: '/inventory',
+  path: '/inventory',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -76,6 +82,7 @@ export interface FileRoutesByFullPath {
   '/balance': typeof BalanceRoute
   '/day-sheet': typeof DaySheetRoute
   '/expenses': typeof ExpensesRoute
+  '/inventory': typeof InventoryRoute
   '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
@@ -88,6 +95,7 @@ export interface FileRoutesByTo {
   '/balance': typeof BalanceRoute
   '/day-sheet': typeof DaySheetRoute
   '/expenses': typeof ExpensesRoute
+  '/inventory': typeof InventoryRoute
   '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
@@ -101,6 +109,7 @@ export interface FileRoutesById {
   '/balance': typeof BalanceRoute
   '/day-sheet': typeof DaySheetRoute
   '/expenses': typeof ExpensesRoute
+  '/inventory': typeof InventoryRoute
   '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
@@ -115,6 +124,7 @@ export interface FileRouteTypes {
     | '/balance'
     | '/day-sheet'
     | '/expenses'
+    | '/inventory'
     | '/login'
     | '/profile'
     | '/register'
@@ -127,6 +137,7 @@ export interface FileRouteTypes {
     | '/balance'
     | '/day-sheet'
     | '/expenses'
+    | '/inventory'
     | '/login'
     | '/profile'
     | '/register'
@@ -139,6 +150,7 @@ export interface FileRouteTypes {
     | '/balance'
     | '/day-sheet'
     | '/expenses'
+    | '/inventory'
     | '/login'
     | '/profile'
     | '/register'
@@ -152,6 +164,7 @@ export interface RootRouteChildren {
   BalanceRoute: typeof BalanceRoute
   DaySheetRoute: typeof DaySheetRoute
   ExpensesRoute: typeof ExpensesRoute
+  InventoryRoute: typeof InventoryRoute
   LoginRoute: typeof LoginRoute
   ProfileRoute: typeof ProfileRoute
   RegisterRoute: typeof RegisterRoute
@@ -188,6 +201,13 @@ declare module '@tanstack/react-router' {
       path: '/expenses'
       fullPath: '/expenses'
       preLoaderRoute: typeof ExpensesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/inventory': {
+      id: '/inventory'
+      path: '/inventory'
+      fullPath: '/inventory'
+      preLoaderRoute: typeof InventoryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -240,6 +260,7 @@ const rootRouteChildren: RootRouteChildren = {
   BalanceRoute: BalanceRoute,
   DaySheetRoute: DaySheetRoute,
   ExpensesRoute: ExpensesRoute,
+  InventoryRoute: InventoryRoute,
   LoginRoute: LoginRoute,
   ProfileRoute: ProfileRoute,
   RegisterRoute: RegisterRoute,
