@@ -715,12 +715,12 @@ function DailyReportPanel() {
       toast.error("Report is not ready");
       return;
     }
-    toast.message("Saving JPEG from the PDF…");
+    toast.message("Saving JPEG…");
     try {
       await saveElementJpeg(el, `HSR-daily-${date}.jpg`);
       toast.success("JPEG saved");
-    } catch {
-      toast.error("Could not save JPEG");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not save JPEG");
     }
   }
 
