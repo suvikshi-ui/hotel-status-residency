@@ -50,7 +50,9 @@ function roomsFor(
 
 const SIZE = { fs: 12.5, pad: "5px 8px", head: 13, title: 24 };
 
-const B = "1px solid #1a1a1a";
+const B = "2px solid #000";
+const FRAME = "4px solid #000";
+const SPLIT = "3px solid #000";
 const BODY = '"Cinzel", "Times New Roman", Times, Georgia, serif';
 const DISPLAY = '"Cinzel Decorative", Algerian, "Times New Roman", serif';
 
@@ -157,6 +159,7 @@ function MiniTable({ children }: { children: ReactNode }) {
       style={{
         width: "100%",
         borderCollapse: "collapse",
+        border: B,
         fontFamily: BODY,
       }}
     >
@@ -170,7 +173,7 @@ function Block({ children, last }: { children: ReactNode; last?: boolean }) {
     <div
       style={{
         padding: "8px 6px",
-        borderBottom: last ? undefined : "1px solid #d8d0c0",
+        borderBottom: last ? undefined : SPLIT,
         background: "#fff",
       }}
     >
@@ -230,7 +233,7 @@ export function DailyA4({
       style={{
         background: "#fff",
         color: "#111",
-        border: "2.5px solid #1a1a1a",
+        border: FRAME,
         borderRadius: 16,
         overflow: "hidden",
         fontFamily: BODY,
@@ -318,7 +321,7 @@ export function DailyA4({
           style={{
             display: "flex",
             flexDirection: "column",
-            borderRight: "2.5px solid #1a1a1a",
+            borderRight: SPLIT,
           }}
         >
           <Block>
