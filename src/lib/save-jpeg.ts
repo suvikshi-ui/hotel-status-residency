@@ -1,36 +1,15 @@
-import { A4_PRINT_CSS, A4_PX, CINZEL_FONT_HREF } from "./print-sheet";
+import { A4_PX } from "./print-sheet";
 
 function waitImages(root: HTMLElement) {
   return Promise.all(
-    [...root.querySelectorAll("img")].map((img) => {
-      img.src = img.src;
-      return img.complete
+    [...root.querySelectorAll("img")].map((img) =>
+      img.complete
         ? Promise.resolve()
         : new Promise<void>((res) => {
             img.onload = () => res();
             img.onerror = () => res();
-          });
-    }),
-  );
-}
-
-async function inlineImages(root: HTMLElement) {
-  await Promise.all(
-    [...root.querySelectorAll("img")].map(async (img) => {
-      try {
-        const res = await fetch(img.currentSrc || img.src);
-        if (!res.ok) return;
-        const blob = await res.blob();
-        img.src = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(String(reader.result));
-          reader.onerror = () => reject(reader.error);
-          reader.readAsDataURL(blob);
-        });
-      } catch {
-        /* keep original src */
-      }
-    }),
+          }),
+    ),
   );
 }
 
@@ -45,120 +24,82 @@ function downloadDataUrl(dataUrl: string, filename: string) {
   a.remove();
 }
 
-function mountPrintPage(el: HTMLElement) {
-  const page = document.createElement("div");
-  page.setAttribute("aria-hidden", "true");
-  page.style.cssText = [
-    "position:fixed",
-    "left:-10000px",
-    "top:0",
-    `width:${A4_PX.width}px`,
-    `height:${A4_PX.height}px`,
-    "margin:0",
-    "padding:0",
-    "background:#fff",
-    "z-index:-1",
-    "pointer-events:none",
-  ].join(";");
-
-  const style = document.createElement("style");
-  style.textContent = `@import url("${CINZEL_FONT_HREF}");
-${A4_PRINT_CSS}
-.a4-page {
-  width: ${A4_PX.width}px;
-  height: ${A4_PX.height}px;
-  padding: ${A4_PX.marginMm}mm;
-  background: #fff;
-  box-sizing: border-box;
-}`;
-
-  const sheet = document.createElement("div");
-  sheet.className = "a4-page";
-  const clone = el.cloneNode(true) as HTMLElement;
-  clone.removeAttribute("id");
-  clone.style.width = "100%";
-  clone.style.height = "100%";
-  clone.style.minHeight = "0";
-  clone.style.maxHeight = "none";
-  clone.style.maxWidth = "none";
-  clone.style.margin = "0";
-  clone.style.transform = "none";
-  sheet.appendChild(clone);
-  page.appendChild(style);
-  page.appendChild(sheet);
-  document.body.appendChild(page);
-  return { page, sheet, clone };
-}
-
 function canvasLooksEmpty(canvas: HTMLCanvasElement) {
   const ctx = canvas.getContext("2d");
-  if (!ctx) return true;
-  const w = Math.min(48, canvas.width);
-  const h = Math.min(48, canvas.height);
+  if (!ctx || canvas.width < 10 || canvas.height < 10) return true;
+  const w = Math.min(80, canvas.width);
+  const h = Math.min(80, canvas.height);
   const { data } = ctx.getImageData(0, 0, w, h);
   let dark = 0;
-  for (let i = 0; i < data.length; i += 16) {
+  for (let i = 0; i < data.length; i += 20) {
     if (data[i] < 248 || data[i + 1] < 248 || data[i + 2] < 248) dark += 1;
   }
-  return dark < 4;
+  return dark < 6;
 }
 
-async function rasterPrintPage(sheet: HTMLElement) {
+async function captureVisible(el: HTMLElement): Promise<HTMLCanvasElement> {
+  await document.fonts?.ready.catch(() => undefined);
+  await waitImages(el);
+  el.scrollIntoView({ block: "nearest" });
+  await new Promise((r) => requestAnimationFrame(() => r(null)));
+
+  try {
+    const { toCanvas } = await import("html-to-image");
+    const canvas = await toCanvas(el, {
+      pixelRatio: 2,
+      backgroundColor: "#ffffff",
+      cacheBust: true,
+      skipAutoScale: true,
+    });
+    if (!canvasLooksEmpty(canvas)) return canvas;
+  } catch {
+    /* fall through */
+  }
+
   const html2canvas = (await import("html2canvas")).default;
-  const opts = {
+  const canvas = await html2canvas(el, {
     scale: 2,
     useCORS: true,
     allowTaint: true,
     backgroundColor: "#ffffff",
-    width: A4_PX.width,
-    height: A4_PX.height,
-    windowWidth: A4_PX.width,
-    windowHeight: A4_PX.height,
-    imageTimeout: 4000,
+    foreignObjectRendering: false,
     logging: false,
-  };
-  let canvas = await html2canvas(sheet, { ...opts, foreignObjectRendering: true });
-  if (canvasLooksEmpty(canvas)) {
-    canvas = await html2canvas(sheet, { ...opts, foreignObjectRendering: false });
-  }
+    imageTimeout: 4000,
+  });
+  if (canvasLooksEmpty(canvas)) throw new Error("report capture was blank");
   return canvas;
 }
 
-/** One A4 PDF — Print and JPEG both use this file. */
-export async function pdfFromPrintElement(el: HTMLElement): Promise<Blob> {
-  const { page, sheet, clone } = mountPrintPage(el);
-  try {
-    await document.fonts?.ready.catch(() => undefined);
-    await inlineImages(clone);
-    await waitImages(clone);
-    await new Promise((r) => requestAnimationFrame(() => r(null)));
-    const canvas = await rasterPrintPage(sheet);
-    const { jsPDF } = await import("jspdf");
-    const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
-    pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, 210, 297);
-    return pdf.output("blob");
-  } finally {
-    page.remove();
-  }
+function composeA4(sheet: HTMLCanvasElement): HTMLCanvasElement {
+  const scale = 2;
+  const a4 = document.createElement("canvas");
+  a4.width = A4_PX.width * scale;
+  a4.height = A4_PX.height * scale;
+  const ctx = a4.getContext("2d");
+  if (!ctx) throw new Error("a4 canvas missing");
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, a4.width, a4.height);
+  const margin = (A4_PX.marginMm / 25.4) * 96 * scale;
+  const boxW = a4.width - margin * 2;
+  const boxH = a4.height - margin * 2;
+  const ratio = Math.min(boxW / sheet.width, boxH / sheet.height);
+  const w = sheet.width * ratio;
+  const h = sheet.height * ratio;
+  ctx.drawImage(sheet, margin + (boxW - w) / 2, margin + (boxH - h) / 2, w, h);
+  return a4;
 }
 
-export async function jpegFromPdfBlob(pdfBlob: Blob): Promise<string> {
-  const pdfjs = await import("pdfjs-dist");
-  const worker = await import("pdfjs-dist/build/pdf.worker.min.mjs?url");
-  pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
-  const data = new Uint8Array(await pdfBlob.arrayBuffer());
-  const doc = await pdfjs.getDocument({ data }).promise;
-  const page = await doc.getPage(1);
-  const base = page.getViewport({ scale: 1 });
-  const scale = (A4_PX.width * 2) / base.width;
-  const viewport = page.getViewport({ scale });
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.floor(viewport.width);
-  canvas.height = Math.floor(viewport.height);
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("jpeg canvas missing");
-  await page.render({ canvasContext: ctx, viewport, canvas }).promise;
-  return canvas.toDataURL("image/jpeg", 0.95);
+async function a4PageFromElement(el: HTMLElement): Promise<HTMLCanvasElement> {
+  return composeA4(await captureVisible(el));
+}
+
+/** One A4 PDF — Print and JPEG both use this page. */
+export async function pdfFromPrintElement(el: HTMLElement): Promise<Blob> {
+  const page = await a4PageFromElement(el);
+  const { jsPDF } = await import("jspdf");
+  const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
+  pdf.addImage(page.toDataURL("image/png"), "PNG", 0, 0, 210, 297);
+  return pdf.output("blob");
 }
 
 export async function printPdfBlob(blob: Blob) {
@@ -169,9 +110,8 @@ export async function printPdfBlob(blob: Blob) {
     "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
   iframe.src = url;
   document.body.appendChild(iframe);
-  await new Promise<void>((resolve, reject) => {
+  await new Promise<void>((resolve) => {
     iframe.onload = () => resolve();
-    iframe.onerror = () => reject(new Error("pdf print failed"));
     setTimeout(() => resolve(), 2500);
   });
   try {
@@ -190,18 +130,9 @@ export async function printElementPdf(el: HTMLElement) {
   await printPdfBlob(await pdfFromPrintElement(el));
 }
 
-/** JPEG is a photo of the same PDF Print uses. */
+/** JPEG is the same A4 page that goes into the PDF. */
 export async function saveElementJpeg(el: HTMLElement, filename: string) {
-  const pdf = await pdfFromPrintElement(el);
-  const dataUrl = await jpegFromPdfBlob(pdf);
-  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-    const i = new Image();
-    i.onload = () => resolve(i);
-    i.onerror = () => reject(new Error("jpeg load failed"));
-    i.src = dataUrl;
-  });
-  if (img.width < 400 || img.height < 400) {
-    throw new Error("jpeg was cropped");
-  }
-  downloadDataUrl(dataUrl, filename);
+  const page = await a4PageFromElement(el);
+  if (canvasLooksEmpty(page)) throw new Error("jpeg was blank");
+  downloadDataUrl(page.toDataURL("image/jpeg", 0.95), filename);
 }
