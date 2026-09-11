@@ -26,7 +26,7 @@ import {
 } from "@/lib/inventory";
 import { printHtmlDocument } from "@/lib/print-sheet";
 import { REPORT_TAB, parseReportView } from "@/lib/report-views";
-import { printElementPdf, saveElementJpeg } from "@/lib/save-jpeg";
+import { printDailyPdf, saveDailyJpeg } from "@/lib/daily-pdf";
 import { staffPay } from "@/lib/staff-pay";
 import { useLedger, useDayBooks } from "@/lib/store";
 import { useGate } from "@/components/security-gate";
@@ -710,14 +710,21 @@ function DailyReportPanel() {
   const take = buildDayTake(guests, food, ws);
 
   async function saveJpeg() {
-    const el = document.getElementById("daily-a4");
-    if (!el) {
-      toast.error("Report is not ready");
-      return;
-    }
-    toast.message("Saving JPEG…");
+    toast.message("Saving JPEG from the PDF…");
     try {
-      await saveElementJpeg(el, `HSR-daily-${date}.jpg`);
+      await saveDailyJpeg(
+        {
+          hotel: hotel.name,
+          blessing: hotel.blessing,
+          date,
+          books,
+          take,
+          expenses,
+          receipts,
+          guests,
+        },
+        `HSR-daily-${date}.jpg`,
+      );
       toast.success("JPEG saved");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not save JPEG");
@@ -741,15 +748,17 @@ function DailyReportPanel() {
           <Button
             type="button"
             onClick={() => {
-              const el = document.getElementById("daily-a4");
-              if (!el) {
-                window.print();
-                return;
-              }
-              toast.message("Opening the same PDF…");
-              void printElementPdf(el).catch(() =>
-                toast.error("Could not print PDF"),
-              );
+              toast.message("Opening PDF…");
+              void printDailyPdf({
+                hotel: hotel.name,
+                blessing: hotel.blessing,
+                date,
+                books,
+                take,
+                expenses,
+                receipts,
+                guests,
+              }).catch(() => toast.error("Could not print PDF"));
             }}
           >
             <Printer className="size-4" />
