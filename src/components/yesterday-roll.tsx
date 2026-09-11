@@ -202,7 +202,7 @@ function RollRow({
       </span>
       <span className="min-w-0 flex-1 truncate text-sm">{guest.name}</span>
       <span className="shrink-0 tabular text-xs text-muted">
-        {formatDayShort(checkIn)}
+        Continue from {formatDayShort(checkIn)}
       </span>
       {posted ? (
         <span className="shrink-0 text-xs font-medium uppercase tracking-wide text-ok">
