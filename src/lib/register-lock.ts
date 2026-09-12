@@ -67,6 +67,16 @@ export function pickLockedDates(
   return current ?? {};
 }
 
+export function locksEqual(
+  a: Record<string, true> | undefined,
+  b: Record<string, true> | undefined,
+) {
+  const left = Object.keys(a ?? {}).sort();
+  const right = Object.keys(b ?? {}).sort();
+  if (left.length !== right.length) return false;
+  return left.every((key, i) => key === right[i]);
+}
+
 export function readStoredLocks(ownerId: string): Record<string, true> | null {
   if (typeof localStorage === "undefined") return null;
   try {
