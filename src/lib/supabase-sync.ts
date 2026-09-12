@@ -6,13 +6,14 @@ import {
   claimAnonymousLedger,
   ledgerActivityScore,
   pullLedger,
+  pullLockedDates,
   pushLedger,
   readLocalLedger,
   type LedgerSnapshot,
 } from "./supabase-db";
-import { LEDGER_STORAGE_KEY, useLedger } from "./store";
+import { LEDGER_STORAGE_KEY, ledgerOwnerKey, useLedger } from "./store";
 import { isSupabaseConfigured } from "./supabase-config";
-import { hotelForCloud } from "./register-lock";
+import { hotelForCloud, locksEqual, parseLockedDates, writeStoredLocks } from "./register-lock";
 
 export type CloudPhase =
   | "off"
@@ -39,6 +40,8 @@ let hideFlush: (() => void) | null = null;
 let hideVis: (() => void) | null = null;
 let inFlight: Promise<void> | null = null;
 let queued = false;
+let locksDirty = false;
+let lockTimer: ReturnType<typeof setInterval> | null = null;
 
 function emit() {
   const snap = { phase, message };
@@ -100,6 +103,10 @@ function withMissingDates(primary: LedgerSnapshot, filler: LedgerSnapshot): Ledg
     balReceived: mergeRowsByDate(primary.balReceived, filler.balReceived),
     openingDate:
       earlierDate(primary.openingDate, filler.openingDate) || primary.openingDate,
+    lockedDates:
+      primary.lockedDates !== undefined
+        ? parseLockedDates(primary.lockedDates)
+        : parseLockedDates(filler.lockedDates),
   };
 }
 
@@ -145,6 +152,7 @@ async function doFlush(userId: string) {
   disarmRetry();
   lastHash = hashOf(snapshotFromStore());
   setPhase("synced");
+  locksDirty = false;
 }
 
 async function flush(userId: string) {
@@ -168,7 +176,34 @@ async function flush(userId: string) {
   return inFlight;
 }
 
-/** Call from every ledger mutation. Coalesces in-flight writes. */
+export function markLocksDirty() {
+  locksDirty = true;
+}
+
+export function requestCloudSaveNow() {
+  const userId = lastUserId;
+  if (!userId || hydrating) return;
+  if (timer) {
+    clearTimeout(timer);
+    timer = null;
+  }
+  void flush(userId);
+}
+
+async function syncLocksFromCloud(userId: string) {
+  if (locksDirty || hydrating || lastUserId !== userId) return;
+  try {
+    const locks = await pullLockedDates(userId);
+    if (locks == null || locksDirty) return;
+    const current = useLedger.getState().lockedDates ?? {};
+    if (locksEqual(current, locks)) return;
+    useLedger.setState({ lockedDates: locks });
+    writeStoredLocks(ledgerOwnerKey(), locks);
+  } catch {
+    /* keep local locks if the pull fails */
+  }
+}
+
 export function requestCloudSave() {
   const userId = lastUserId;
   if (!userId || hydrating) return;
@@ -184,11 +219,16 @@ export function stopCloudSync() {
     clearTimeout(timer);
     timer = null;
   }
+  if (lockTimer) {
+    clearInterval(lockTimer);
+    lockTimer = null;
+  }
   disarmRetry();
   lastUserId = null;
   lastHash = "";
   hydrating = false;
   queued = false;
+  locksDirty = false;
   if (typeof window !== "undefined" && hideFlush) {
     window.removeEventListener("pagehide", hideFlush);
     hideFlush = null;
@@ -214,12 +254,20 @@ export function startCloudSync(userId: string) {
     };
     hideVis = () => {
       if (document.visibilityState === "hidden") hideFlush?.();
-      if (document.visibilityState === "visible") requestCloudSave();
+      if (document.visibilityState === "visible") {
+        void syncLocksFromCloud(userId);
+        requestCloudSave();
+      }
     };
     window.addEventListener("pagehide", hideFlush);
     document.addEventListener("visibilitychange", hideVis);
   }
+  if (lockTimer) clearInterval(lockTimer);
+  lockTimer = setInterval(() => {
+    void syncLocksFromCloud(userId);
+  }, 4000);
   requestCloudSave();
+  void syncLocksFromCloud(userId);
 }
 
 export async function hydrateFromCloud(userId: string): Promise<CloudPhase> {
@@ -278,6 +326,9 @@ export async function hydrateFromCloud(userId: string): Promise<CloudPhase> {
       const chosen = useLocal ? local : cloud;
       const other = useLocal ? cloud : local;
       const merged = withMissingDates(chosen, other);
+      if (cloud.lockedDates !== undefined) {
+        merged.lockedDates = parseLockedDates(cloud.lockedDates);
+      }
       if (!merged.rooms.length) merged.rooms = current.rooms;
       if (!merged.staff.length) merged.staff = current.staff;
       if (!merged.hotel?.name) merged.hotel = current.hotel;
