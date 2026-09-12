@@ -20,7 +20,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { DateNav } from "@/components/date-nav";
 import { HotelLogo } from "@/components/hotel-logo";
 import { useLedger } from "@/lib/store";
-import { canOpenPath, ROLE_LABEL } from "@/lib/roles";
+import { bottomNavPaths, canOpenPath, ROLE_LABEL } from "@/lib/roles";
 import { useStaffSession } from "@/lib/supabase-auth";
 import { useCloudSync } from "@/lib/supabase-sync";
 
@@ -49,13 +49,8 @@ function NavLinks({
   const role = user?.role ?? "admin";
   const items = NAV.filter((item) => canOpenPath(role, item.to));
   if (variant === "bottom") {
-    const primary = items.filter((item) =>
-      role === "housekeeping"
-        ? item.to === "/complaints"
-        : role === "staff"
-          ? ["/", "/register", "/complaints", "/profile"].includes(item.to)
-          : ["/", "/register", "/balance", "/reports"].includes(item.to),
-    );
+    const allowed = new Set(bottomNavPaths(role));
+    const primary = items.filter((item) => allowed.has(item.to));
     return (
       <>
         {primary.map((item) => {
@@ -158,14 +153,14 @@ export function AppShell({ children }: { children: ReactNode }) {
               ) : null}
               <div className="mt-1 text-[10px] uppercase tracking-[0.12em] text-sidebar-muted">
                 {cloud.phase === "saving"
-                  ? "Saving to account…"
+                  ? "Sending to other desks…"
                   : cloud.phase === "missing-schema"
                     ? "Not in account yet"
                     : cloud.phase === "error"
                       ? "Account save failed"
                       : cloud.phase === "loading"
                         ? "Loading books…"
-                        : "Saved to account"}
+                        : "Live with other desks"}
               </div>
               <button
                 type="button"
@@ -275,17 +270,6 @@ export function AppShell({ children }: { children: ReactNode }) {
               </div>
             </div>
             <NavLinks variant="side" />
-            {user ? (
-              <button
-                type="button"
-                onClick={onSignOut}
-                disabled={leaving}
-                className="mt-6 flex min-h-11 w-full items-center gap-2 rounded-lg px-5 text-sm text-muted hover:bg-bg-warm"
-              >
-                <LogOut className="size-4" />
-                {leaving ? "Signing out…" : "Sign out"}
-              </button>
-            ) : null}
           </SheetContent>
         </Sheet>
         )}

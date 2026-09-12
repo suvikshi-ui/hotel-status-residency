@@ -18,6 +18,8 @@ import {
   type InventoryItem,
 } from "@/lib/inventory";
 import { canManageCatalog } from "@/lib/roles";
+import { isSealed, sealKey } from "@/lib/sheet-seal";
+import { SaveCube } from "@/components/save-cube";
 import { escapeHtml, printDocument } from "@/lib/print-sheet";
 import { useLedger } from "@/lib/store";
 import { ReportsLink } from "@/components/reports-link";
@@ -38,6 +40,8 @@ function InventoryPage() {
   const date = useLedger((s) => s.selectedDate);
   const inventory = useLedger((s) => s.inventory);
   const setInventory = useLedger((s) => s.setInventory);
+  const sealedIds = useLedger((s) => s.sealedIds);
+  const sealEntries = useLedger((s) => s.sealEntries);
   const role = useLedger((s) => s.appRole);
   const { gate } = useGate();
   const manage = canManageCatalog(role);
@@ -50,11 +54,15 @@ function InventoryPage() {
 
   const rows = useMemo(() => normalizeInventory(draft), [draft]);
   const dirty = JSON.stringify(rows) !== JSON.stringify(inventory);
+  const monthKey = date.slice(0, 7);
+  const frozen = isSealed(sealedIds, sealKey.inventoryMonth(monthKey));
+  const pendingSave = !frozen && (dirty || rows.length > 0);
   const lastTotal = rows.reduce((s, r) => s + r.lastMonth, 0);
   const thisTotal = rows.reduce((s, r) => s + r.thisMonth, 0);
   const diffTotal = thisTotal - lastTotal;
 
   function patch(id: string, field: keyof InventoryItem, value: string) {
+    if (frozen) return;
     setDraft((prev) =>
       prev.map((r) => {
         if (r.id !== id) return r;
@@ -85,9 +93,11 @@ function InventoryPage() {
   }
 
   function save() {
+    if (frozen) return;
     const go = () => {
       setInventory(rows);
-      toast.success("Monthly inventory saved");
+      sealEntries([sealKey.inventoryMonth(monthKey)]);
+      toast.success("Saved — this month's inventory will not change");
     };
     if (!manage) {
       go();
@@ -155,13 +165,15 @@ function InventoryPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2 print:hidden">
+          <SaveCube
+            hasEntries={rows.length > 0}
+            pending={pendingSave}
+            onSave={save}
+          />
           <ReportsLink view="inventory" />
           <Button variant="outline" onClick={printSheet}>
             <Printer className="size-4" />
             Print
-          </Button>
-          <Button onClick={save} disabled={!dirty}>
-            Save sheet
           </Button>
         </div>
       </div>
@@ -224,6 +236,7 @@ function InventoryPage() {
                           inputMode="numeric"
                           min={0}
                           value={r[field]}
+                          disabled={frozen}
                           onChange={(e) => patch(r.id, field, e.target.value)}
                           aria-label={`${r.name} ${field === "lastMonth" ? "last month" : "this month"}`}
                         />
@@ -241,6 +254,7 @@ function InventoryPage() {
                       <Input
                         className="h-11 min-h-11"
                         value={r.notes}
+                        disabled={frozen}
                         onChange={(e) => patch(r.id, "notes", e.target.value)}
                         placeholder="Remark…"
                         aria-label={`${r.name} notes`}
@@ -248,7 +262,7 @@ function InventoryPage() {
                       />
                     </td>
                     <td className="px-3 py-2.5 text-right">
-                      {manage && !CATALOG_IDS.has(r.id) ? (
+                      {manage && !frozen && !CATALOG_IDS.has(r.id) ? (
                         <Button
                           variant="ghost"
                           size="icon"
@@ -285,7 +299,7 @@ function InventoryPage() {
         </CardContent>
       </Card>
 
-      {manage ? (
+      {manage && !frozen ? (
       <Card>
         <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-end">
           <div className="grid min-w-0 flex-1 gap-1.5">

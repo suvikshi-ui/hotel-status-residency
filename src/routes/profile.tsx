@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Download, Upload } from "lucide-react";
+import { Download, Loader2, Upload } from "lucide-react";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import { useLedger } from "@/lib/store";
 import { HotelLogo } from "@/components/hotel-logo";
 import { CloudSchemaSetup } from "@/components/cloud-schema-setup";
 import { useStaffSession } from "@/lib/supabase-auth";
-import { useCloudSync } from "@/lib/supabase-sync";
+import { useCloudSync, importBackupAndRefresh } from "@/lib/supabase-sync";
 import {
   backupCounts,
   backupFilename,
@@ -31,7 +31,12 @@ export const Route = createFileRoute("/profile")({ component: ProfilePage });
 function snapshotNow(): LedgerSnapshot {
   const s = useLedger.getState();
   return {
-    hotel: hotelForCloud(s.hotel, s.lockedDates ?? {}),
+    hotel: hotelForCloud(
+      s.hotel,
+      s.lockedDates ?? {},
+      s.lockRev ?? {},
+      s.sealedIds ?? {},
+    ),
     opening: s.opening,
     rooms: s.rooms,
     guests: s.guests,
@@ -49,6 +54,8 @@ function snapshotNow(): LedgerSnapshot {
     openingDate: s.openingDate,
     securityCode: s.securityCode,
     lockedDates: s.lockedDates ?? {},
+    lockRev: s.lockRev ?? {},
+    sealedIds: s.sealedIds ?? {},
     inventory: s.inventory,
     complaints: s.complaints,
     savedAt: s.savedAt,
@@ -59,7 +66,9 @@ function BackupCard() {
   const fileRef = useRef<HTMLInputElement>(null);
   const { gate } = useGate();
   const guests = useLedger((s) => s.guests.length);
-  const replaceSnapshot = useLedger((s) => s.replaceSnapshot);
+  const { user } = useStaffSession();
+  const [busy, setBusy] = useState(false);
+  const ownerId = user?.ownerId || user?.id || null;
 
   function download() {
     const snap = snapshotNow();
@@ -71,6 +80,10 @@ function BackupCard() {
   }
 
   function onFile(file: File) {
+    if (!ownerId) {
+      toast.error("Sign in to import into the hotel books.");
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
       try {
@@ -79,17 +92,25 @@ function BackupCard() {
         const n = backupCounts(tables);
         gate(
           () => {
-            replaceSnapshot({
-              ...tables,
-              lockedDates: tables.lockedDates ?? {},
-            });
-            toast.success(
-              `Books restored · ${n.guests} guests · ${n.dates[0] ?? "—"} to ${n.dates.at(-1) ?? "—"}`,
-            );
+            setBusy(true);
+            void importBackupAndRefresh(ownerId, tables)
+              .then((result) => {
+                if (!result.ok) {
+                  toast.error(result.message || "Could not import backup");
+                  return;
+                }
+                toast.success(
+                  `Imported to the account · ${n.guests} guests · ${n.dates[0] ?? "—"} to ${n.dates.at(-1) ?? "—"}. Every desk now matches.`,
+                );
+              })
+              .catch((err) => {
+                toast.error(err instanceof Error ? err.message : "Could not import backup");
+              })
+              .finally(() => setBusy(false));
           },
           {
-            title: "Restore this backup?",
-            message: `This replaces the live books with the file (${n.guests} guests, ${n.food} food, ${n.expenses} expenses).`,
+            title: "Import this backup into the hotel account?",
+            message: `Rows in the file are added or updated in Supabase (${n.guests} guests, ${n.food} food, ${n.expenses} expenses). Existing rows keep their id — no duplicates. Then this computer reloads the account copy.`,
             confirmLabel: "Import",
           },
         );
@@ -106,24 +127,31 @@ function BackupCard() {
       <CardHeader>
         <CardTitle>Backup</CardTitle>
         <p className="text-sm text-muted">
-          Download every table as a JSON file. Import that file to put the books
-          back — including 1–5 Sep if they were in the file.
+          Download every table as a JSON file. Import puts each table into the
+          hotel account — existing rows update, new rows add, nothing is
+          duplicated — then all desks refresh from that copy.
         </p>
       </CardHeader>
       <CardContent className="flex flex-wrap items-center gap-3">
-        <Button type="button" onClick={download}>
+        <Button type="button" onClick={download} disabled={busy}>
           <Download className="size-4" />
           Download backup
         </Button>
-        <Button type="button" variant="outline" onClick={() => fileRef.current?.click()}>
-          <Upload className="size-4" />
-          Import backup
+        <Button
+          type="button"
+          variant="outline"
+          disabled={busy}
+          onClick={() => fileRef.current?.click()}
+        >
+          {busy ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+          {busy ? "Importing…" : "Import backup"}
         </Button>
         <input
           ref={fileRef}
           type="file"
           accept="application/json,.json"
           className="hidden"
+          disabled={busy}
           onChange={(e) => {
             const file = e.target.files?.[0];
             e.target.value = "";
@@ -192,8 +220,8 @@ function ProfilePage() {
                   : cloud.phase === "migrated"
                     ? "This device's older books were copied into your account."
                     : cloud.phase === "saving"
-                      ? "Saving the latest entries to your account…"
-                      : "Rooms, staff, expenses and balance are saved to your account, per sign-in."}
+                      ? "Sending the latest entries to every desk…"
+                      : "On sign-in this computer drops its old copy and loads the hotel books from the account, so every desk matches."}
             </p>
           </CardHeader>
           <CardContent>
@@ -201,8 +229,9 @@ function ProfilePage() {
               <CloudSchemaSetup userId={user.id} />
             ) : (
               <p className="text-xs text-muted">
-                Each staff login only sees its own rooms, expenses, staff and
-                balance rows.
+                Sign in again on a desk to refresh it from the account. Lock,
+                guests, food and expenses then stay in step across every
+                computer. Press Refresh on the register if a desk was offline.
               </p>
             )}
           </CardContent>
@@ -215,8 +244,8 @@ function ProfilePage() {
         <CardHeader>
           <CardTitle>Opening balance</CardTitle>
           <p className="text-sm text-muted">
-            Now from {formatDay(openingDate)}. Books from this date start with
-            these figures.
+            Now from {formatDay(openingDate)}. Saved on the hotel account, not
+            this computer. Books from this date start with these figures.
           </p>
         </CardHeader>
         <CardContent>

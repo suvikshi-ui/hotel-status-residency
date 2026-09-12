@@ -20,6 +20,7 @@ export type BackupTables = {
   openingDate?: string;
   securityCode?: string;
   lockedDates?: unknown;
+  lockRev?: unknown;
   inventory?: unknown[];
   complaints?: unknown[];
   savedAt?: number;

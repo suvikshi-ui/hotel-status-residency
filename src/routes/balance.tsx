@@ -31,9 +31,11 @@ import {
   type DueStay,
 } from "@/lib/balance";
 import { printSourceGuests, printSourceSummary } from "@/lib/balance-print";
-import { DUE_PAY_MODES, formatDayShort, HOTEL_CLOCK, MODE_LABEL, money, stayStamp } from "@/lib/format";
+import { DUE_PAY_MODES, formatDayShort, MODE_LABEL, money, stayStamp } from "@/lib/format";
 import { useLedger, useDayBooks } from "@/lib/store";
 import { useGate } from "@/components/security-gate";
+import { SaveCube } from "@/components/save-cube";
+import { isSealed, sealKey, unsealedKeys } from "@/lib/sheet-seal";
 import type { PayMode } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -51,6 +53,8 @@ function BalancePage() {
   const date = useLedger((s) => s.selectedDate);
   const addBalReceived = useLedger((s) => s.addBalReceived);
   const removeBalReceived = useLedger((s) => s.removeBalReceived);
+  const sealedIds = useLedger((s) => s.sealedIds);
+  const sealEntries = useLedger((s) => s.sealEntries);
   const { gate } = useGate();
   const [q, setQ] = useState("");
   const [onlyOpen, setOnlyOpen] = useState(true);
@@ -97,6 +101,9 @@ function BalancePage() {
     .filter((r) => r.date === date)
     .reduce((s, r) => s + r.amount, 0);
   const otherTotal = otherRows.reduce((s, r) => s + r.amount, 0);
+  const todayReceipts = receipts.filter((r) => r.date === date);
+  const balanceKeys = todayReceipts.map((r) => sealKey.balance(r.id));
+  const pendingSave = unsealedKeys(balanceKeys, sealedIds).length > 0;
 
   function collectFrom(account: DueAccount, mode: PayMode, amount: number) {
     gate(
@@ -118,6 +125,10 @@ function BalancePage() {
   }
 
   function removeReceipt(id: string) {
+    if (isSealed(sealedIds, sealKey.balance(id))) {
+      toast.message("Saved — this collection will not change");
+      return;
+    }
     gate(
       () => {
         removeBalReceived(id);
@@ -134,6 +145,7 @@ function BalancePage() {
 
   return (
     <div className="flex flex-col gap-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
       <div>
         <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">
           Outstanding
@@ -142,10 +154,18 @@ function BalancePage() {
           Balance
         </h1>
         <p className="mt-1 text-sm text-muted">
-          Check-out stays Continue until the next day chart is made and the
-          guest is not ticked. Then the date is {HOTEL_CLOCK} the morning after
-          the last night.
+          Collect, then press Save at the top. After save that collection will
+          not change.
         </p>
+      </div>
+      <SaveCube
+        hasEntries={todayReceipts.length > 0}
+        pending={pendingSave}
+        onSave={() => {
+          sealEntries(balanceKeys);
+          toast.success("Saved — today's collections will not change");
+        }}
+      />
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

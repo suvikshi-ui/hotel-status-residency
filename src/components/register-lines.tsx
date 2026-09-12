@@ -24,6 +24,7 @@ import {
 } from "@/lib/format";
 import { useLedger } from "@/lib/store";
 import { isDayLocked } from "@/lib/register-lock";
+import { isSealed, sealKey } from "@/lib/sheet-seal";
 import { cn } from "@/lib/utils";
 import type { ModeAmount, NamedAmount, PayMode } from "@/lib/types";
 
@@ -33,12 +34,14 @@ function ModeLineCard({
   empty,
   onAdd,
   onRemove,
+  frozenIds,
 }: {
   title: string;
   rows: ModeAmount[];
   empty: string;
   onAdd: (mode: PayMode, amount: number) => void;
   onRemove: (id: string) => void;
+  frozenIds?: Record<string, true>;
 }) {
   const [mode, setMode] = useState<PayMode>("CASH");
   const [amount, setAmount] = useState("");
@@ -102,6 +105,7 @@ function ModeLineCard({
               <ModeBadge mode={r.mode} />
               <div className="flex items-center gap-1">
                 <span className="tabular text-sm font-medium">{money(r.amount)}</span>
+                {frozenIds?.[r.id] ? null : (
                 <Button
                   variant="ghost"
                   size="icon"
@@ -111,6 +115,7 @@ function ModeLineCard({
                 >
                   <Trash2 className="size-4" />
                 </Button>
+                )}
               </div>
             </li>
           ))}
@@ -128,11 +133,13 @@ function ExpenseLineCard({
   heads,
   onAdd,
   onRemove,
+  frozenIds,
 }: {
   rows: NamedAmount[];
   heads: string[];
   onAdd: (particular: string, mode: PayMode, amount: number) => void;
   onRemove: (id: string) => void;
+  frozenIds?: Record<string, true>;
 }) {
   const [particular, setParticular] = useState("");
   const [mode, setMode] = useState<PayMode>("CASH");
@@ -221,6 +228,7 @@ function ExpenseLineCard({
               </div>
               <div className="flex items-center gap-1">
                 <span className="tabular text-sm font-medium">{money(r.amount)}</span>
+                {frozenIds?.[r.id] ? null : (
                 <Button
                   variant="ghost"
                   size="icon"
@@ -230,6 +238,7 @@ function ExpenseLineCard({
                 >
                   <Trash2 className="size-4" />
                 </Button>
+                )}
               </div>
             </li>
           ))}
@@ -247,9 +256,11 @@ function ExpenseLineCard({
 function ReceiptList({
   rows,
   onRemove,
+  frozenIds,
 }: {
   rows: NamedAmount[];
   onRemove: (id: string) => void;
+  frozenIds?: Record<string, true>;
 }) {
   if (rows.length === 0) {
     return <p className="text-sm text-muted">No collections today.</p>;
@@ -266,6 +277,7 @@ function ReceiptList({
           </div>
           <div className="flex items-center gap-1">
             <span className="tabular text-sm font-medium">{money(r.amount)}</span>
+            {frozenIds?.[r.id] ? null : (
             <Button
               variant="ghost"
               size="icon"
@@ -275,6 +287,7 @@ function ReceiptList({
             >
               <Trash2 className="size-4" />
             </Button>
+            )}
           </div>
         </li>
       ))}
@@ -302,6 +315,15 @@ export function RegisterLines() {
   const addExpense = useLedger((s) => s.addExpense);
   const removeExpense = useLedger((s) => s.removeExpense);
   const locked = isDayLocked(useLedger((s) => s.lockedDates), date);
+  const sealedIds = useLedger((s) => s.sealedIds);
+  const foodFrozen: Record<string, true> = {};
+  for (const r of food) if (isSealed(sealedIds, sealKey.food(r.id))) foodFrozen[r.id] = true;
+  const wsFrozen: Record<string, true> = {};
+  for (const r of ws) if (isSealed(sealedIds, sealKey.wholesale(r.id))) wsFrozen[r.id] = true;
+  const expFrozen: Record<string, true> = {};
+  for (const r of expenses) if (isSealed(sealedIds, sealKey.expense(r.id))) expFrozen[r.id] = true;
+  const balFrozen: Record<string, true> = {};
+  for (const r of receipts) if (isSealed(sealedIds, sealKey.balance(r.id))) balFrozen[r.id] = true;
   const { gate } = useGate();
   const sources = useMemo(() => uniqueSources(guests), [guests]);
   const accounts = useMemo(
@@ -334,6 +356,7 @@ export function RegisterLines() {
           title="Food"
           rows={food}
           empty="No food posted today."
+          frozenIds={foodFrozen}
           onAdd={(mode, amount) => addFood({ mode, amount })}
           onRemove={(id) =>
             gate(() => removeFood(id), {
@@ -348,6 +371,7 @@ export function RegisterLines() {
           title="WS"
           rows={ws}
           empty="No WS posted today."
+          frozenIds={wsFrozen}
           onAdd={(mode, amount) => addWs({ mode, amount })}
           onRemove={(id) =>
             gate(() => removeWs(id), {
@@ -363,6 +387,7 @@ export function RegisterLines() {
       <ExpenseLineCard
         rows={expenses}
         heads={heads}
+        frozenIds={expFrozen}
         onAdd={(particular, mode, amount) =>
           addExpense({ particular, mode, amount })
         }
@@ -494,6 +519,7 @@ export function RegisterLines() {
             <Button type="submit">Collect from source</Button>
             <ReceiptList
               rows={dueRows}
+              frozenIds={balFrozen}
               onRemove={(id) =>
                 gate(() => removeBal(id), {
                   title: "Are you sure?",
@@ -570,6 +596,7 @@ export function RegisterLines() {
             <Button type="submit">Collect online</Button>
             <ReceiptList
               rows={otaRows}
+              frozenIds={balFrozen}
               onRemove={(id) =>
                 gate(() => removeBal(id), {
                   title: "Are you sure?",

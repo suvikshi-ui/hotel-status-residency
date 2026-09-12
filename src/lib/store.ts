@@ -23,7 +23,16 @@ import { rebuildDayBooks } from "./ledger";
 import { fillAllSeedDates } from "./seed-fill";
 import { earlierDate, mergeRowsByDate } from "./cloud-save";
 import { parseAppRole, type AppRole } from "./roles";
-import { isDayLocked, withLocked, withoutLocked, pickLockedDates, parseLockedDates, readStoredLocks, writeStoredLocks, hotelFromCloud } from "./register-lock";
+import { isDayLocked, withLocked, withoutLocked, pickLockedDates, parseLockedDates, parseLockRev, hotelFromCloud, bumpLockRev } from "./register-lock";
+import {
+  freezeIfSealed,
+  isSealed,
+  mergeSealed,
+  parseSealedIds,
+  sealKey,
+  withSealed,
+  type SealedIds,
+} from "./sheet-seal";
 import {
   normalizeInventory,
   seedInventory,
@@ -33,6 +42,17 @@ import { demoComplaints, normalizeComplaints, type RoomComplaint } from "./compl
 
 function afterSave() {
   void import("./supabase-sync").then((m) => m.requestCloudSave());
+}
+
+function afterLockChange() {
+  void import("./supabase-sync").then((m) => {
+    m.markLocksDirty();
+    m.requestCloudSaveNow();
+  });
+}
+
+function afterOpeningChange() {
+  void import("./supabase-sync").then((m) => m.requestCloudSaveNow());
 }
 
 const seed = seedJson as SeedData;
@@ -67,6 +87,8 @@ export interface LedgerState {
   securityCode: string;
   appRole: AppRole;
   lockedDates: Record<string, true>;
+  lockRev: Record<string, number>;
+  sealedIds: SealedIds;
   savedAt: number;
   setDate: (date: string) => void;
   setOpening: (date: string, opening: OpeningBalances) => void;
@@ -74,6 +96,7 @@ export interface LedgerState {
   setAppRole: (role: AppRole) => void;
   lockRegister: (date: string) => void;
   unlockRegister: (date: string) => void;
+  sealEntries: (keys: string[]) => void;
   addGuest: (g: Omit<GuestEntry, "id" | "slNo" | "date"> & { date?: string }) => void;
   updateGuest: (id: string, patch: Partial<GuestEntry>) => void;
   setStay: (id: string, stay: "continue" | "out") => void;
@@ -94,6 +117,8 @@ export interface LedgerState {
   setComplaints: (complaints: RoomComplaint[]) => void;
   applySnapshot: (p: Partial<LedgerState>) => void;
   replaceSnapshot: (p: Partial<LedgerState>) => void;
+  adoptLiveSnapshot: (p: Partial<LedgerState>) => void;
+  applyCloudBooks: (p: Partial<LedgerState>) => void;
 }
 
 function seedState(): Omit<
@@ -104,6 +129,7 @@ function seedState(): Omit<
   | "setAppRole"
   | "lockRegister"
   | "unlockRegister"
+  | "sealEntries"
   | "addGuest"
   | "updateGuest"
   | "setStay"
@@ -124,6 +150,8 @@ function seedState(): Omit<
   | "setComplaints"
   | "applySnapshot"
   | "replaceSnapshot"
+  | "adoptLiveSnapshot"
+  | "applyCloudBooks"
 > {
   return {
     hotel: seed.hotel,
@@ -149,6 +177,8 @@ function seedState(): Omit<
     securityCode: "",
     appRole: "admin",
     lockedDates: {},
+    lockRev: {},
+    sealedIds: {},
     savedAt: 0,
   };
 }
@@ -186,6 +216,13 @@ function mergeSnapshot(
       : undefined,
     current.lockedDates,
   );
+  const lockRev =
+    persisted.lockRev !== undefined
+      ? parseLockRev(persisted.lockRev)
+      : (current.lockRev ?? {});
+  const sealedIds = opts?.replace
+    ? parseSealedIds(persisted.sealedIds)
+    : mergeSealed(current.sealedIds, persisted.sealedIds);
   const guests = opts?.replace
     ? (persisted.guests ?? [])
     : opts?.skipSeedFill
@@ -243,6 +280,8 @@ function mergeSnapshot(
     openingDate,
     appRole,
     lockedDates,
+    lockRev,
+    sealedIds,
     hotel: fromHotel.name ? fromHotel : current.hotel,
   };
 }
@@ -298,18 +337,26 @@ export const useLedger = create<LedgerState>()(
           selectedDate: date,
           ...rebuildFrom(next, date),
         });
+        afterOpeningChange();
       },
       setSecurityCode: (hash) => save({ securityCode: hash }),
       setAppRole: (role) => save({ appRole: parseAppRole(role) }),
       lockRegister: (date) => {
         const lockedDates = withLocked(get().lockedDates ?? {}, date);
-        writeStoredLocks(ledgerOwnerKey(), lockedDates);
-        save({ lockedDates });
+        const lockRev = bumpLockRev(get().lockRev, date);
+        afterLockChange();
+        save({ lockedDates, lockRev });
       },
       unlockRegister: (date) => {
         const lockedDates = withoutLocked(get().lockedDates ?? {}, date);
-        writeStoredLocks(ledgerOwnerKey(), lockedDates);
-        save({ lockedDates });
+        const lockRev = bumpLockRev(get().lockRev, date);
+        afterLockChange();
+        save({ lockedDates, lockRev });
+      },
+      sealEntries: (keys) => {
+        const sealedIds = withSealed(get().sealedIds, keys);
+        afterOpeningChange();
+        save({ sealedIds });
       },
       addGuest: (g) => {
         const date = g.date ?? get().selectedDate;
@@ -333,6 +380,7 @@ export const useLedger = create<LedgerState>()(
       updateGuest: (id, patch) => {
         const current = get().guests.find((g) => g.id === id);
         if (current && dayIsLocked(get(), current.date)) return;
+        if (isSealed(get().sealedIds, sealKey.guest(id))) return;
         const guests = applyGuestPatch(get().guests, id, patch);
         const row = guests.find((g) => g.id === id);
         const next = { ...get(), guests };
@@ -341,6 +389,7 @@ export const useLedger = create<LedgerState>()(
       setStay: (id, stay) => {
         const row = get().guests.find((g) => g.id === id);
         if (row && dayIsLocked(get(), row.date)) return;
+        if (isSealed(get().sealedIds, sealKey.guest(id))) return;
         const guests = applyStay(get().guests, id, stay);
         const next = { ...get(), guests };
         save({ guests, ...rebuildFrom(next, row?.date ?? get().selectedDate) });
@@ -355,6 +404,7 @@ export const useLedger = create<LedgerState>()(
       removeGuest: (id) => {
         const row = get().guests.find((g) => g.id === id);
         if (row && dayIsLocked(get(), row.date)) return;
+        if (isSealed(get().sealedIds, sealKey.guest(id))) return;
         const guests = get().guests.filter((g) => g.id !== id);
         const next = { ...get(), guests };
         save({ guests, ...rebuildFrom(next, row?.date ?? get().selectedDate) });
@@ -369,6 +419,7 @@ export const useLedger = create<LedgerState>()(
       removeFood: (id) => {
         const row = get().food.find((x) => x.id === id);
         if (row && dayIsLocked(get(), row.date)) return;
+        if (isSealed(get().sealedIds, sealKey.food(id))) return;
         const food = get().food.filter((x) => x.id !== id);
         const next = { ...get(), food };
         save({ food, ...rebuildFrom(next, row?.date ?? get().selectedDate) });
@@ -383,6 +434,7 @@ export const useLedger = create<LedgerState>()(
       removeWholesale: (id) => {
         const row = get().wholesale.find((x) => x.id === id);
         if (row && dayIsLocked(get(), row.date)) return;
+        if (isSealed(get().sealedIds, sealKey.wholesale(id))) return;
         const wholesale = get().wholesale.filter((x) => x.id !== id);
         const next = { ...get(), wholesale };
         save({
@@ -400,6 +452,7 @@ export const useLedger = create<LedgerState>()(
       removeExpense: (id) => {
         const row = get().expenses.find((x) => x.id === id);
         if (row && dayIsLocked(get(), row.date)) return;
+        if (isSealed(get().sealedIds, sealKey.expense(id))) return;
         const expenses = get().expenses.filter((x) => x.id !== id);
         const next = { ...get(), expenses };
         save({
@@ -420,6 +473,7 @@ export const useLedger = create<LedgerState>()(
       removeBalReceived: (id) => {
         const row = get().balReceived.find((x) => x.id === id);
         if (row && dayIsLocked(get(), row.date)) return;
+        if (isSealed(get().sealedIds, sealKey.balance(id))) return;
         const balReceived = get().balReceived.filter((x) => x.id !== id);
         const next = { ...get(), balReceived };
         save({
@@ -431,14 +485,34 @@ export const useLedger = create<LedgerState>()(
         const s = seedState();
         save(s);
       },
-      setStaff: (staff) => save({ staff: normalizeStaff(staff) }),
-      setAdvances: (advances) => save({ advances: normalizeAdvances(advances) }),
-      setInventory: (inventory) => save({ inventory: normalizeInventory(inventory) }),
+      setStaff: (staff) => {
+        const month = get().selectedDate.slice(0, 7);
+        if (isSealed(get().sealedIds, sealKey.staffMonth(month))) return;
+        save({ staff: normalizeStaff(staff) });
+      },
+      setAdvances: (advances) => {
+        const month = get().selectedDate.slice(0, 7);
+        if (isSealed(get().sealedIds, sealKey.advanceMonth(month))) return;
+        save({ advances: normalizeAdvances(advances) });
+      },
+      setInventory: (inventory) => {
+        const month = get().selectedDate.slice(0, 7);
+        if (isSealed(get().sealedIds, sealKey.inventoryMonth(month))) return;
+        save({ inventory: normalizeInventory(inventory) });
+      },
       setComplaints: (complaints) =>
-        save({ complaints: normalizeComplaints(complaints) }),
+        save({
+          complaints: normalizeComplaints(
+            freezeIfSealed(
+              get().complaints,
+              complaints,
+              get().sealedIds,
+              sealKey.complaint,
+            ),
+          ),
+        }),
       applySnapshot: (p) => {
         const merged = mergeSnapshot(p, get(), { skipSeedFill: true });
-        writeStoredLocks(ledgerOwnerKey(), merged.lockedDates ?? {});
         set({
           ...merged,
           ...rebuildFrom(merged, merged.openingDate || BASE_OPENING_DATE),
@@ -451,13 +525,44 @@ export const useLedger = create<LedgerState>()(
           get(),
           { skipSeedFill: true, replace: true },
         );
-        writeStoredLocks(ledgerOwnerKey(), merged.lockedDates ?? {});
         set({
           ...merged,
           ...rebuildFrom(merged, merged.openingDate || BASE_OPENING_DATE),
           savedAt: Date.now(),
         });
         afterSave();
+      },
+      adoptLiveSnapshot: (p) => {
+        const cur = get();
+        const next = {
+          ...cur,
+          ...p,
+          selectedDate: cur.selectedDate,
+          appRole: cur.appRole,
+          lockedDates: parseLockedDates(p.lockedDates ?? cur.lockedDates),
+          lockRev: parseLockRev(p.lockRev ?? cur.lockRev),
+          sealedIds: mergeSealed(cur.sealedIds, p.sealedIds),
+        };
+        set({
+          ...next,
+          ...rebuildFrom(next, next.openingDate || BASE_OPENING_DATE),
+          savedAt: p.savedAt ?? cur.savedAt,
+        });
+      },
+      applyCloudBooks: (p) => {
+        const role = get().appRole;
+        const blank = { ...get(), ...seedState(), appRole: role };
+        const merged = mergeSnapshot(
+          { ...p, appRole: role },
+          blank,
+          { skipSeedFill: true, replace: true },
+        );
+        set({
+          ...merged,
+          appRole: role,
+          ...rebuildFrom(merged, merged.openingDate || BASE_OPENING_DATE),
+          savedAt: p.savedAt ?? merged.savedAt ?? Date.now(),
+        });
       },
     };
     },
@@ -476,17 +581,21 @@ export const useLedger = create<LedgerState>()(
         advances: s.advances,
         staff: s.staff,
         rooms: s.rooms,
-        opening: s.opening,
-        openingDate: s.openingDate,
         securityCode: s.securityCode,
         inventory: s.inventory,
         complaints: s.complaints,
         appRole: s.appRole,
-        lockedDates: s.lockedDates,
         savedAt: s.savedAt,
       }),
-      merge: (persisted, current) =>
-        withBooks(mergeSnapshot((persisted ?? {}) as Partial<LedgerState>, current)),
+      merge: (persisted, current) => {
+        const disk = { ...((persisted ?? {}) as Partial<LedgerState>) };
+        delete disk.opening;
+        delete disk.openingDate;
+        delete disk.lockedDates;
+        delete disk.lockRev;
+        delete disk.sealedIds;
+        return withBooks(mergeSnapshot(disk, current));
+      },
     },
   ),
 );
@@ -585,38 +694,24 @@ export function ledgerOwnerKey() {
   return "anon";
 }
 
-function restoreStoredLocks(userId: string | null) {
-  const disk = readStoredLocks(userId ?? "anon");
-  if (!disk) return;
-  useLedger.setState({ lockedDates: disk });
-}
-
 export async function setLedgerOwner(userId: string | null) {
   const name = userId
     ? `${LEDGER_STORAGE_KEY}:${userId}`
     : LEDGER_STORAGE_KEY;
-  const adopted = adoptLegacyLedger(userId) || (userId ? adoptLegacyLedger(null) : false);
-  if (persistName === name && useLedger.persist.hasHydrated()) {
-    if (adopted) {
-      try {
-        await useLedger.persist.rehydrate();
-      } catch {
-        /* keep current */
-      }
-      const s = useLedger.getState();
-      useLedger.setState(rebuildFrom(s, s.openingDate || BASE_OPENING_DATE));
-    }
-    restoreStoredLocks(userId);
-    return;
-  }
   persistName = name;
   useLedger.persist.setOptions({ name });
-  try {
-    await useLedger.persist.rehydrate();
-  } catch {
-    useLedger.setState(seedState());
+  if (userId) {
+    // Sign-in always loads opening + locks from the account, not this desk.
+    return;
   }
-  restoreStoredLocks(userId);
+  const adopted = adoptLegacyLedger(null);
+  if (adopted || !useLedger.persist.hasHydrated()) {
+    try {
+      await useLedger.persist.rehydrate();
+    } catch {
+      useLedger.setState(seedState());
+    }
+  }
   const s = useLedger.getState();
   useLedger.setState(rebuildFrom(s, s.openingDate || BASE_OPENING_DATE));
 }

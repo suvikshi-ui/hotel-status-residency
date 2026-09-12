@@ -1,31 +1,28 @@
-import { parseAppRole, type AppRole } from "./roles";
+import { type AppRole } from "./roles";
 import {
   hashPassword,
   normalizeUsername,
   usernameToEmail,
 } from "./hotel-login";
+import {
+  hotelUserFromRow,
+  mergeHotelUserLists,
+  type HotelUserRow,
+} from "./hotel-user-table";
 import { isSupabaseConfigured } from "./supabase-config";
 import { getSupabase } from "./supabase";
 import { isMissingSchema } from "./supabase-db";
 
-export interface HotelUser {
-  id: string;
-  ownerId: string;
-  name: string;
-  username: string;
-  role: AppRole;
-  createdAt: string;
-}
+export type HotelUser = HotelUserRow;
+export {
+  HOUSE_STAFF_PRESETS,
+  mergeHotelUserLists,
+  missingHouseStaff,
+  accessForUser,
+} from "./hotel-user-table";
 
 function rowOf(r: Record<string, unknown>): HotelUser {
-  return {
-    id: String(r.id ?? ""),
-    ownerId: String(r.owner_id ?? r.ownerId ?? ""),
-    name: String(r.name ?? "").trim(),
-    username: normalizeUsername(String(r.username ?? "")),
-    role: parseAppRole(r.role),
-    createdAt: String(r.created_at ?? r.createdAt ?? "").slice(0, 10),
-  };
+  return hotelUserFromRow(r);
 }
 
 export async function fetchPublicUser(userId: string) {
@@ -65,25 +62,52 @@ export async function ensurePublicUser(input: {
   if (error && !isMissingSchema(error)) throw new Error(error.message);
 }
 
-export async function listHotelUsers(): Promise<HotelUser[]> {
-  if (!isSupabaseConfigured()) return [];
+export type HotelUsersLoad = {
+  users: HotelUser[];
+  usersTableOn: boolean;
+  hotelUsersTableOn: boolean;
+};
+
+export async function loadHotelUsers(): Promise<HotelUsersLoad> {
+  if (!isSupabaseConfigured()) {
+    return { users: [], usersTableOn: false, hotelUsersTableOn: false };
+  }
   const sb = getSupabase();
   const fromUsers = await sb
     .from("users")
-    .select("id, owner_id, name, username, role")
+    .select("id, owner_id, name, username, role, created_at")
     .order("name");
-  if (!fromUsers.error && fromUsers.data?.length) {
-    return fromUsers.data.map((r) => rowOf(r as Record<string, unknown>));
-  }
-  const { data, error } = await sb
+  const fromHotel = await sb
     .from("hotel_users")
     .select("id, owner_id, name, username, role, created_at")
     .order("name");
-  if (error) {
-    if (isMissingSchema(error)) return [];
-    throw new Error(error.message);
-  }
-  return (data ?? []).map((r) => rowOf(r as Record<string, unknown>));
+
+  const usersMissing = Boolean(fromUsers.error && isMissingSchema(fromUsers.error));
+  const hotelMissing = Boolean(fromHotel.error && isMissingSchema(fromHotel.error));
+  if (fromUsers.error && !usersMissing) throw new Error(fromUsers.error.message);
+  if (fromHotel.error && !hotelMissing) throw new Error(fromHotel.error.message);
+
+  const a = !fromUsers.error && fromUsers.data
+    ? fromUsers.data.map((r) => rowOf(r as Record<string, unknown>))
+    : [];
+  const b = !fromHotel.error && fromHotel.data
+    ? fromHotel.data.map((r) => rowOf(r as Record<string, unknown>))
+    : [];
+
+  return {
+    users: mergeHotelUserLists(a, b),
+    usersTableOn: !usersMissing,
+    hotelUsersTableOn: !hotelMissing,
+  };
+}
+
+export async function listHotelUsers(): Promise<HotelUser[]> {
+  return (await loadHotelUsers()).users;
+}
+
+function isDuplicateName(message: string) {
+  const msg = message.toLowerCase();
+  return msg.includes("duplicate") || msg.includes("unique");
 }
 
 export async function createHotelUser(input: {
@@ -109,7 +133,8 @@ export async function createHotelUser(input: {
   const ownerId = adminSession?.user.id;
   if (!ownerId || !adminSession) throw new Error("Sign in as Admin first");
 
-  const { data: inserted, error: insertErr } = await sb
+  let hotelRow: HotelUser | null = null;
+  const inserted = await sb
     .from("hotel_users")
     .insert({
       owner_id: ownerId,
@@ -121,15 +146,12 @@ export async function createHotelUser(input: {
     .select("id, owner_id, name, username, role, created_at")
     .single();
 
-  if (insertErr) {
-    if (isMissingSchema(insertErr)) {
-      throw new Error("User table is missing. Run the latest SQL in Supabase, then retry.");
+  if (inserted.error) {
+    if (!isMissingSchema(inserted.error) && !isDuplicateName(inserted.error.message)) {
+      throw new Error(inserted.error.message);
     }
-    const msg = insertErr.message.toLowerCase();
-    if (msg.includes("duplicate") || msg.includes("unique")) {
-      throw new Error("That username is already taken");
-    }
-    throw new Error(insertErr.message);
+  } else if (inserted.data) {
+    hotelRow = rowOf(inserted.data as Record<string, unknown>);
   }
 
   const { data: signed, error: signErr } = await sb.auth.signUp({
@@ -144,15 +166,22 @@ export async function createHotelUser(input: {
       },
     },
   });
-  await sb.auth.setSession(adminSession);
+
+  let authId = signed?.user?.id ?? null;
   if (signErr) {
     const msg = signErr.message.toLowerCase();
     if (!msg.includes("already")) {
+      await sb.auth.setSession(adminSession);
       throw new Error(signErr.message);
     }
+    const { data: existing } = await sb.auth.signInWithPassword({
+      email: usernameToEmail(username),
+      password: input.password,
+    });
+    authId = existing.user?.id ?? authId;
   }
+  await sb.auth.setSession(adminSession);
 
-  const authId = signed?.user?.id;
   if (authId) {
     const { error: usersErr } = await sb.from("users").upsert(
       {
@@ -164,7 +193,15 @@ export async function createHotelUser(input: {
       },
       { onConflict: "id" },
     );
-    if (usersErr && !isMissingSchema(usersErr)) {
+    if (usersErr) {
+      if (isMissingSchema(usersErr)) {
+        throw new Error(
+          "Users table is off. Copy the SQL, run it in Supabase, then add the user again.",
+        );
+      }
+      if (isDuplicateName(usersErr.message)) {
+        throw new Error("That username is already taken");
+      }
       throw new Error(usersErr.message);
     }
     return {
@@ -177,7 +214,8 @@ export async function createHotelUser(input: {
     };
   }
 
-  return rowOf((inserted ?? {}) as Record<string, unknown>);
+  if (hotelRow) return hotelRow;
+  throw new Error("Could not create the login. Try a different username.");
 }
 
 export async function loginHotelUser(

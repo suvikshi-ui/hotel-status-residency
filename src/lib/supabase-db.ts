@@ -1,14 +1,25 @@
 import type { PostgrestError } from "@supabase/supabase-js";
 import { normalizeComplaints, type RoomComplaint } from "./complaints";
 import { normalizeInventory, type InventoryItem } from "./inventory";
-import { MODES } from "./format";
+import { MODES, uid } from "./format";
 import { getSupabase } from "./supabase";
 import {
   hotelForCloud,
   hotelFromCloud,
+  lockRevFromHotel,
+  lockRevFromMeta,
   locksFromHotel,
+  locksFromMeta,
+  mergeLockState,
   parseLockedDates,
+  parseLockRev,
 } from "./register-lock";
+import {
+  mergeSealed,
+  parseSealedIds,
+  sealedFromHotel,
+  type SealedIds,
+} from "./sheet-seal";
 import type {
   AdvanceRow,
   CreditGuest,
@@ -60,9 +71,12 @@ export type LedgerSnapshot = {
   openingDate: string;
   securityCode: string;
   lockedDates?: Record<string, true>;
+  lockRev?: Record<string, number>;
+  sealedIds?: SealedIds;
   inventory?: InventoryItem[];
   complaints?: RoomComplaint[];
   savedAt?: number;
+  cloudUpdatedAt?: string;
 };
 
 export type CloudPull =
@@ -117,6 +131,19 @@ export function isMissingSchema(error: {
   );
 }
 
+function isMissingColumn(
+  error: { code?: string; message?: string } | null,
+  column: string,
+): boolean {
+  if (!error) return false;
+  const m = (error.message ?? "").toLowerCase();
+  return (
+    error.code === "PGRST204" ||
+    (m.includes(column.toLowerCase()) &&
+      (m.includes("column") || m.includes("schema cache") || m.includes("could not find")))
+  );
+}
+
 function asError(error: PostgrestError | null): CloudPull {
   if (!error) return { ok: false, missingSchema: false, message: "Unknown error" };
   if (isMissingSchema(error)) {
@@ -158,6 +185,10 @@ export function snapshotFromUnknown(
     p.lockedDates !== undefined
       ? parseLockedDates(p.lockedDates)
       : locksFromHotel(p.hotel);
+  const lockRev =
+    p.lockRev !== undefined
+      ? parseLockRev(p.lockRev)
+      : lockRevFromHotel(p.hotel) ?? {};
   return {
     hotel,
     opening: {
@@ -186,6 +217,8 @@ export function snapshotFromUnknown(
     openingDate: dateStr(p.openingDate, fallback.openingDate),
     securityCode: str(p.securityCode ?? fallback.securityCode),
     lockedDates,
+    lockRev,
+    sealedIds: mergeSealed(sealedFromHotel(p.hotel), parseSealedIds(p.sealedIds)),
     inventory: normalizeInventory(
       (p as { inventory?: InventoryItem[] }).inventory ?? fallback.inventory,
     ),
@@ -278,13 +311,23 @@ function modeFromDb(row: Record<string, unknown>): ModeAmount {
   };
 }
 
+export async function pullLedgerStamp(userId: string): Promise<string | null> {
+  const sb = getSupabase();
+  const { data, error } = await sb
+    .from("ledger_meta")
+    .select("updated_at")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error || !data) return null;
+  const stamp = str((data as { updated_at?: unknown }).updated_at);
+  return stamp || null;
+}
+
 export async function pullLedger(userId: string): Promise<CloudPull> {
   const sb = getSupabase();
   const meta = await sb
     .from("ledger_meta")
-    .select(
-      "hotel, opening, opening_date, selected_date, security_code, ota, jan_sales, jan_food, credit_guests, migrated_from, updated_at",
-    )
+    .select("*")
     .eq("user_id", userId)
     .maybeSingle();
 
@@ -302,6 +345,7 @@ export async function pullLedger(userId: string): Promise<CloudPull> {
     advances,
     complaints,
     inventory,
+    seals,
   ] = await Promise.all([
     sb.from("rooms").select("no, floor, sort_index").eq("user_id", userId).order("sort_index"),
     sb.from("staff").select("*").eq("user_id", userId),
@@ -313,6 +357,7 @@ export async function pullLedger(userId: string): Promise<CloudPull> {
     sb.from("advances").select("*").eq("user_id", userId),
     sb.from("complaints").select("*").eq("user_id", userId),
     sb.from("inventory").select("*").eq("user_id", userId),
+    sb.from("sheet_seals").select("id").eq("user_id", userId),
   ]);
 
   const firstErr =
@@ -329,6 +374,9 @@ export async function pullLedger(userId: string): Promise<CloudPull> {
   }
   if (inventory.error && !isMissingSchema(inventory.error)) {
     return asError(inventory.error);
+  }
+  if (seals.error && !isMissingSchema(seals.error)) {
+    return asError(seals.error);
   }
   if (firstErr) return asError(firstErr);
 
@@ -407,7 +455,15 @@ export async function pullLedger(userId: string): Promise<CloudPull> {
     selectedDate: dateStr(row.selected_date),
     openingDate: dateStr(row.opening_date),
     securityCode: str(row.security_code),
-    lockedDates: locksFromHotel(hotelRaw),
+    lockedDates: locksFromMeta(row),
+    lockRev: lockRevFromMeta(row),
+    sealedIds: mergeSealed(
+      sealedFromHotel(hotelRaw),
+      isMissingSchema(seals.error)
+        ? {}
+        : parseSealedIds((seals.data ?? []).map((r) => str((r as { id?: unknown }).id))),
+    ),
+    cloudUpdatedAt: str(row.updated_at),
     complaints: isMissingSchema(complaints.error)
       ? []
       : normalizeComplaints(
@@ -447,6 +503,7 @@ async function replaceRows(
   userId: string,
   idField: string,
   rows: Record<string, unknown>[],
+  prune?: string[],
 ) {
   const sb = getSupabase();
   const { data: existing, error: selErr } = await sb
@@ -456,9 +513,12 @@ async function replaceRows(
   if (selErr) return selErr;
 
   const keep = new Set(rows.map((r) => str(r[idField])));
-  const extra = (existing ?? [])
-    .map((r) => str((r as unknown as Record<string, unknown>)[idField]))
-    .filter((id) => id && !keep.has(id));
+  const extra =
+    prune === undefined
+      ? (existing ?? [])
+          .map((r) => str((r as unknown as Record<string, unknown>)[idField]))
+          .filter((id) => id && !keep.has(id))
+      : prune.filter((id) => id && !keep.has(id));
 
   if (extra.length) {
     const { error } = await sb
@@ -470,7 +530,7 @@ async function replaceRows(
   }
 
   if (!rows.length) {
-    if ((existing ?? []).length) {
+    if (prune === undefined && (existing ?? []).length) {
       const { error } = await sb.from(table).delete().eq("user_id", userId);
       if (error) return error;
     }
@@ -488,11 +548,94 @@ async function replaceRows(
   return null;
 }
 
+function goneIds(previous: string[] | undefined, next: string[]) {
+  if (!previous) return undefined;
+  const keep = new Set(next);
+  return previous.filter((id) => id && !keep.has(id));
+}
+
+export type LedgerPrune = {
+  rooms?: string[];
+  staff?: string[];
+  expenses?: string[];
+  balance?: string[];
+  guests?: string[];
+  food?: string[];
+  wholesale?: string[];
+  advances?: string[];
+  complaints?: string[];
+  inventory?: string[];
+};
+
+export function pruneFromBase(
+  base: LedgerSnapshot | null | undefined,
+  snap: LedgerSnapshot,
+): LedgerPrune | undefined {
+  if (!base) return undefined;
+  return {
+    rooms: goneIds(
+      base.rooms.map((r) => r.no),
+      snap.rooms.map((r) => r.no),
+    ),
+    staff: goneIds(
+      base.staff.map((r) => r.id),
+      snap.staff.map((r) => r.id),
+    ),
+    expenses: goneIds(
+      base.expenses.map((r) => r.id),
+      snap.expenses.map((r) => r.id),
+    ),
+    balance: goneIds(
+      base.balReceived.map((r) => r.id),
+      snap.balReceived.map((r) => r.id),
+    ),
+    guests: goneIds(
+      base.guests.map((r) => r.id),
+      snap.guests.map((r) => r.id),
+    ),
+    food: goneIds(
+      base.food.map((r) => r.id),
+      snap.food.map((r) => r.id),
+    ),
+    wholesale: goneIds(
+      base.wholesale.map((r) => r.id),
+      snap.wholesale.map((r) => r.id),
+    ),
+    advances: goneIds(
+      base.advances.map((r) => r.id),
+      snap.advances.map((r) => r.id),
+    ),
+    complaints: goneIds(
+      (base.complaints ?? []).map((r) => r.id),
+      (snap.complaints ?? []).map((r) => r.id),
+    ),
+    inventory: goneIds(
+      (base.inventory ?? []).map((r) => r.id),
+      (snap.inventory ?? []).map((r) => r.id),
+    ),
+  };
+}
+
+async function pushSheetSeals(
+  userId: string,
+  sealed: SealedIds | undefined,
+): Promise<PostgrestError | null> {
+  const ids = Object.keys(sealed ?? {});
+  if (!ids.length) return null;
+  const { error } = await getSupabase().from("sheet_seals").upsert(
+    ids.map((id) => ({ user_id: userId, id })),
+    { onConflict: "user_id,id" },
+  );
+  if (error && !isMissingSchema(error)) return error;
+  return null;
+}
+
 export async function pushLedger(
   userId: string,
   snap: LedgerSnapshot,
   migratedFrom?: string,
   role?: string,
+  prune?: LedgerPrune,
 ): Promise<{ ok: true } | { ok: false; missingSchema: boolean; message: string }> {
   const rooms = snap.rooms.map((r, i) => ({
     no: r.no,
@@ -585,20 +728,20 @@ export async function pushLedger(
   const hkOnly = role === "housekeeping";
   const writes: Array<Promise<PostgrestError | null>> = hkOnly
     ? [
-        replaceRows("complaints", userId, "id", complaints),
-        replaceRows("inventory", userId, "id", inventory),
+        replaceRows("complaints", userId, "id", complaints, prune?.complaints),
+        replaceRows("inventory", userId, "id", inventory, prune?.inventory),
       ]
     : [
-        replaceRows("rooms", userId, "no", rooms),
-        replaceRows("staff", userId, "id", staff),
-        replaceRows("expenses", userId, "id", expenses),
-        replaceRows("balance_received", userId, "id", balance),
-        replaceRows("guests", userId, "id", guests),
-        replaceRows("food", userId, "id", food),
-        replaceRows("wholesale", userId, "id", wholesale),
-        replaceRows("advances", userId, "id", advances),
-        replaceRows("complaints", userId, "id", complaints),
-        replaceRows("inventory", userId, "id", inventory),
+        replaceRows("rooms", userId, "no", rooms, prune?.rooms),
+        replaceRows("staff", userId, "id", staff, prune?.staff),
+        replaceRows("expenses", userId, "id", expenses, prune?.expenses),
+        replaceRows("balance_received", userId, "id", balance, prune?.balance),
+        replaceRows("guests", userId, "id", guests, prune?.guests),
+        replaceRows("food", userId, "id", food, prune?.food),
+        replaceRows("wholesale", userId, "id", wholesale, prune?.wholesale),
+        replaceRows("advances", userId, "id", advances, prune?.advances),
+        replaceRows("complaints", userId, "id", complaints, prune?.complaints),
+        replaceRows("inventory", userId, "id", inventory, prune?.inventory),
       ];
   const results = await Promise.all(writes);
   const err = results.find((e) => e && !isMissingSchema(e));
@@ -614,26 +757,42 @@ export async function pushLedger(
     };
   }
 
-  if (hkOnly) return { ok: true };
+  if (hkOnly) {
+    await pushSheetSeals(userId, snap.sealedIds);
+    return { ok: true };
+  }
 
   const sb = getSupabase();
-  const { error: metaErr } = await sb.from("ledger_meta").upsert(
-    {
-      user_id: userId,
-      hotel: hotelForCloud(snap.hotel, snap.lockedDates ?? {}),
-      opening: snap.opening,
-      opening_date: snap.openingDate,
-      selected_date: snap.selectedDate,
-      security_code: snap.securityCode,
-      ota: snap.ota,
-      jan_sales: snap.janSales,
-      jan_food: snap.janFood,
-      credit_guests: snap.creditGuests,
-      migrated_from: migratedFrom ?? "app",
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "user_id" },
-  );
+  const metaRow = {
+    user_id: userId,
+    hotel: hotelForCloud(
+      snap.hotel,
+      snap.lockedDates ?? {},
+      snap.lockRev ?? {},
+      snap.sealedIds ?? {},
+    ),
+    opening: snap.opening,
+    opening_date: snap.openingDate,
+    selected_date: snap.selectedDate,
+    security_code: snap.securityCode,
+    ota: snap.ota,
+    jan_sales: snap.janSales,
+    jan_food: snap.janFood,
+    credit_guests: snap.creditGuests,
+    locked_dates: snap.lockedDates ?? {},
+    lock_rev: snap.lockRev ?? {},
+    migrated_from: migratedFrom ?? "app",
+    updated_at: new Date().toISOString(),
+  };
+  let metaErr = (
+    await sb.from("ledger_meta").upsert(metaRow, { onConflict: "user_id" })
+  ).error;
+  if (metaErr && isMissingColumn(metaErr, "locked_dates")) {
+    const { locked_dates: _d, lock_rev: _r, ...legacy } = metaRow;
+    metaErr = (
+      await sb.from("ledger_meta").upsert(legacy, { onConflict: "user_id" })
+    ).error;
+  }
   if (metaErr) {
     const mapped = asError(metaErr);
     if (mapped.ok) {
@@ -645,5 +804,69 @@ export async function pushLedger(
       message: mapped.message,
     };
   }
+  await pushSheetSeals(userId, snap.sealedIds);
   return { ok: true };
+}
+
+function withRowId<T extends { id: string }>(row: T, prefix: string, i: number): T {
+  return { ...row, id: row.id || uid(prefix) + String(i) };
+}
+
+/** Insert or update backup rows. Never deletes rows that are not in the file. */
+export async function upsertLedgerFromBackup(
+  userId: string,
+  snap: LedgerSnapshot,
+  role?: string,
+): Promise<{ ok: true } | { ok: false; missingSchema: boolean; message: string }> {
+  const sb = getSupabase();
+  const meta = await sb
+    .from("ledger_meta")
+    .select("hotel")
+    .eq("user_id", userId)
+    .maybeSingle();
+  const hotelRaw = meta.data
+    ? (meta.data as { hotel?: unknown }).hotel
+    : undefined;
+  const locks = mergeLockState(
+    {
+      locked: parseLockedDates(snap.lockedDates),
+      rev: parseLockRev(snap.lockRev),
+    },
+    {
+      locked: locksFromHotel(hotelRaw) ?? {},
+      rev: lockRevFromHotel(hotelRaw) ?? {},
+    },
+  );
+  const keep: LedgerPrune = {
+    rooms: [],
+    staff: [],
+    expenses: [],
+    balance: [],
+    guests: [],
+    food: [],
+    wholesale: [],
+    advances: [],
+    complaints: [],
+    inventory: [],
+  };
+  return pushLedger(
+    userId,
+    {
+      ...snap,
+      guests: snap.guests.map((row, i) => withRowId(row, "g", i)),
+      food: snap.food.map((row, i) => withRowId(row, "f", i)),
+      wholesale: snap.wholesale.map((row, i) => withRowId(row, "w", i)),
+      expenses: snap.expenses.map((row, i) => withRowId(row, "e", i)),
+      balReceived: snap.balReceived.map((row, i) => withRowId(row, "b", i)),
+      staff: snap.staff.map((row, i) => withRowId(row, "st", i)),
+      advances: snap.advances.map((row, i) => withRowId(row, "adv", i)),
+      complaints: (snap.complaints ?? []).map((row, i) => withRowId(row, "c", i)),
+      inventory: (snap.inventory ?? []).map((row, i) => withRowId(row, "inv", i)),
+      lockedDates: locks.locked,
+      lockRev: locks.rev,
+    },
+    "backup-import",
+    role,
+    keep,
+  );
 }

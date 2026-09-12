@@ -15,6 +15,8 @@ import { staffPay } from "@/lib/staff-pay";
 import { useLedger } from "@/lib/store";
 import { HotelLogo } from "@/components/hotel-logo";
 import { ReportsLink } from "@/components/reports-link";
+import { SaveCube } from "@/components/save-cube";
+import { isSealed, sealKey } from "@/lib/sheet-seal";
 import type { AdvanceRow, StaffRow } from "@/lib/types";
 
 export const Route = createFileRoute("/staff")({ component: StaffPage });
@@ -28,6 +30,8 @@ function StaffPage() {
   const advances = useLedger((s) => s.advances);
   const setStaff = useLedger((s) => s.setStaff);
   const setAdvances = useLedger((s) => s.setAdvances);
+  const sealedIds = useLedger((s) => s.sealedIds);
+  const sealEntries = useLedger((s) => s.sealEntries);
   const { gate } = useGate();
   const [sheet, setSheet] = useState<Sheet>("salary");
   const [monthDays, setMonthDays] = useState(30);
@@ -64,8 +68,13 @@ function StaffPage() {
   const advQr = advDraft.reduce((s, r) => s + r.qrs, 0);
   const staffDirty = JSON.stringify(draft) !== JSON.stringify(staff);
   const advDirty = JSON.stringify(advDraft) !== JSON.stringify(advances);
+  const monthKey = date.slice(0, 7);
+  const salaryFrozen = isSealed(sealedIds, sealKey.staffMonth(monthKey));
+  const advFrozen = isSealed(sealedIds, sealKey.advanceMonth(monthKey));
+  const frozen = sheet === "salary" ? salaryFrozen : advFrozen;
 
   function patchStaff(id: string, field: keyof StaffRow, value: string) {
+    if (salaryFrozen) return;
     setDraft((prev) =>
       prev.map((r) => {
         if (r.id !== id) return r;
@@ -79,6 +88,7 @@ function StaffPage() {
   }
 
   function patchAdv(id: string, field: keyof AdvanceRow, value: string) {
+    if (advFrozen) return;
     setAdvDraft((prev) =>
       prev.map((r) => {
         if (r.id !== id) return r;
@@ -189,7 +199,46 @@ function StaffPage() {
             Salary sheet and advance sheet are separate
           </p>
         </div>
-        <ReportsLink view={sheet === "advance" ? "advance" : "salary"} />
+        <div className="flex flex-wrap gap-2">
+          <SaveCube
+            hasEntries={sheet === "salary" ? draft.length > 0 : advDraft.length > 0}
+            pending={!frozen}
+            onSave={() => {
+              if (sheet === "salary") {
+                gate(
+                  () => {
+                    const next = rows.map(({ earned, payable, ...r }) => ({
+                      ...r,
+                      total: payable,
+                    }));
+                    setStaff(next);
+                    sealEntries([sealKey.staffMonth(monthKey)]);
+                    toast.success("Saved — salary sheet will not change");
+                  },
+                  {
+                    title: "Are you sure?",
+                    message: "Save salary sheet? After this it will not change.",
+                    confirmLabel: "Save",
+                  },
+                );
+              } else {
+                gate(
+                  () => {
+                    setAdvances(advDraft);
+                    sealEntries([sealKey.advanceMonth(monthKey)]);
+                    toast.success("Saved — advance sheet will not change");
+                  },
+                  {
+                    title: "Are you sure?",
+                    message: "Save advances? After this they will not change.",
+                    confirmLabel: "Save",
+                  },
+                );
+              }
+            }}
+          />
+          <ReportsLink view={sheet === "advance" ? "advance" : "salary"} />
+        </div>
       </div>
 
       <Tabs value={sheet} onValueChange={(v) => setSheet(v as Sheet)}>
@@ -203,6 +252,10 @@ function StaffPage() {
         </TabsList>
 
         <TabsContent value="salary" className="flex flex-col gap-5">
+          <fieldset
+            disabled={salaryFrozen}
+            className="flex min-w-0 flex-col gap-5 border-0 p-0"
+          >
           <div className="flex flex-wrap items-end justify-between gap-3 print:hidden">
             <div className="grid gap-1.5">
               <Label htmlFor="month-days">Days in month</Label>
@@ -220,29 +273,6 @@ function StaffPage() {
               <Button type="button" variant="outline" onClick={printSalary}>
                 <Printer className="size-4" />
                 Print
-              </Button>
-              <Button
-                type="button"
-                disabled={!staffDirty}
-                onClick={() =>
-                  gate(
-                    () => {
-                    const next = rows.map(({ earned, payable, ...r }) => ({
-                      ...r,
-                      total: payable,
-                    }));
-                    setStaff(next);
-                    toast.success("Salary sheet saved");
-                    },
-                    {
-                      title: "Are you sure?",
-                      message: "Save salary sheet changes?",
-                      confirmLabel: "Save",
-                    },
-                  )
-                }
-              >
-                Save salary
               </Button>
             </div>
           </div>
@@ -376,9 +406,14 @@ function StaffPage() {
               </table>
             </CardContent>
           </Card>
+          </fieldset>
         </TabsContent>
 
         <TabsContent value="advance" className="flex flex-col gap-5">
+          <fieldset
+            disabled={advFrozen}
+            className="flex min-w-0 flex-col gap-5 border-0 p-0"
+          >
           <div className="flex flex-wrap items-end justify-end gap-2 print:hidden">
             <Button
               type="button"
@@ -401,25 +436,6 @@ function StaffPage() {
             <Button type="button" variant="outline" onClick={printAdvance}>
               <Printer className="size-4" />
               Print
-            </Button>
-            <Button
-              type="button"
-              disabled={!advDirty}
-              onClick={() =>
-                gate(
-                  () => {
-                  setAdvances(advDraft.filter((r) => r.name.trim()));
-                  toast.success("Advance sheet saved");
-                  },
-                  {
-                    title: "Are you sure?",
-                    message: "Save advance sheet changes?",
-                    confirmLabel: "Save",
-                  },
-                )
-              }
-            >
-              Save advances
             </Button>
           </div>
 
@@ -512,6 +528,7 @@ function StaffPage() {
               </table>
             </CardContent>
           </Card>
+          </fieldset>
         </TabsContent>
       </Tabs>
     </div>

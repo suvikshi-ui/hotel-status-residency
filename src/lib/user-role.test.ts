@@ -3,10 +3,11 @@ import assert from "node:assert/strict";
 import { roleFromUsersTable } from "./user-role.ts";
 
 describe("public.users role", () => {
-  it("treats only housekeeping as housekeeping", () => {
+  it("reads housekeeping, staff and admin from the users table", () => {
     assert.equal(roleFromUsersTable("housekeeping"), "housekeeping");
     assert.equal(roleFromUsersTable("admin"), "admin");
-    assert.equal(roleFromUsersTable("supervisor"), "admin");
+    assert.equal(roleFromUsersTable("supervisor"), "supervisor");
+    assert.equal(roleFromUsersTable("staff"), "staff");
     assert.equal(roleFromUsersTable(undefined), "admin");
   });
 });

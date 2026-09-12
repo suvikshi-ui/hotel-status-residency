@@ -1,4 +1,4 @@
-import { hashCode } from "./pin";
+import { hashCode } from "./pin.ts";
 
 export const USER_EMAIL_DOMAIN = "status-residency.local";
 

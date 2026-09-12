@@ -1,19 +1,27 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { earlierDate, mergeRowsByDate, preferLocalOverCloud } from "./cloud-save";
+import { mergeLiveSnapshot } from "./live-merge";
+import { clearLocalLedgerCache } from "./ledger-cache";
+import { pullLockState } from "./pull-locks";
 import {
-  anonymousLedgerUnclaimed,
   claimAnonymousLedger,
-  ledgerActivityScore,
   pullLedger,
-  pullLockedDates,
+  pullLedgerStamp,
+  pruneFromBase,
   pushLedger,
-  readLocalLedger,
+  upsertLedgerFromBackup,
   type LedgerSnapshot,
 } from "./supabase-db";
-import { LEDGER_STORAGE_KEY, ledgerOwnerKey, useLedger } from "./store";
+import { ledgerOwnerKey, useLedger } from "./store";
 import { isSupabaseConfigured } from "./supabase-config";
-import { hotelForCloud, locksEqual, parseLockedDates, writeStoredLocks } from "./register-lock";
+import {
+  isDayLocked,
+  locksEqual,
+  mergeLockState,
+  parseLockRev,
+  parseLockedDates,
+  writeStoredLocks,
+} from "./register-lock";
 
 export type CloudPhase =
   | "off"
@@ -42,6 +50,8 @@ let inFlight: Promise<void> | null = null;
 let queued = false;
 let locksDirty = false;
 let lockTimer: ReturnType<typeof setInterval> | null = null;
+let lastPulled: LedgerSnapshot | null = null;
+let lastCloudStamp = "";
 
 function emit() {
   const snap = { phase, message };
@@ -69,7 +79,7 @@ export function subscribeCloud(fn: (s: CloudState) => void) {
 function snapshotFromStore(): LedgerSnapshot {
   const s = useLedger.getState();
   return {
-    hotel: hotelForCloud(s.hotel, s.lockedDates ?? {}),
+    hotel: s.hotel,
     opening: s.opening,
     rooms: s.rooms,
     guests: s.guests,
@@ -87,31 +97,17 @@ function snapshotFromStore(): LedgerSnapshot {
     openingDate: s.openingDate,
     securityCode: s.securityCode,
     lockedDates: s.lockedDates ?? {},
+    lockRev: s.lockRev ?? {},
+    sealedIds: s.sealedIds ?? {},
     inventory: s.inventory,
     complaints: s.complaints,
     savedAt: s.savedAt,
   };
 }
 
-function withMissingDates(primary: LedgerSnapshot, filler: LedgerSnapshot): LedgerSnapshot {
-  return {
-    ...primary,
-    guests: mergeRowsByDate(primary.guests, filler.guests),
-    food: mergeRowsByDate(primary.food, filler.food),
-    wholesale: mergeRowsByDate(primary.wholesale, filler.wholesale),
-    expenses: mergeRowsByDate(primary.expenses, filler.expenses),
-    balReceived: mergeRowsByDate(primary.balReceived, filler.balReceived),
-    openingDate:
-      earlierDate(primary.openingDate, filler.openingDate) || primary.openingDate,
-    lockedDates:
-      primary.lockedDates !== undefined
-        ? parseLockedDates(primary.lockedDates)
-        : parseLockedDates(filler.lockedDates),
-  };
-}
-
 function hashOf(s: LedgerSnapshot) {
-  return JSON.stringify(s);
+  const { selectedDate: _d, savedAt: _t, cloudUpdatedAt: _c, ...rest } = s;
+  return JSON.stringify(rest);
 }
 
 function disarmRetry() {
@@ -129,18 +125,135 @@ function armRetry(userId: string) {
   }, 8000);
 }
 
+function rememberPulled(snap: LedgerSnapshot, stamp?: string) {
+  lastPulled = snap;
+  if (stamp) lastCloudStamp = stamp;
+  else if (snap.cloudUpdatedAt) lastCloudStamp = snap.cloudUpdatedAt;
+}
+
+function applyMerged(merged: LedgerSnapshot, previous: LedgerSnapshot) {
+  const selected = useLedger.getState().selectedDate;
+  const wasLocked = isDayLocked(previous.lockedDates, selected);
+  const nowLocked = isDayLocked(merged.lockedDates, selected);
+  useLedger.getState().adoptLiveSnapshot({
+    hotel: merged.hotel,
+    opening: merged.opening,
+    rooms: merged.rooms,
+    guests: merged.guests,
+    food: merged.food,
+    wholesale: merged.wholesale,
+    expenses: merged.expenses,
+    balReceived: merged.balReceived,
+    staff: merged.staff,
+    advances: merged.advances,
+    ota: merged.ota,
+    janSales: merged.janSales,
+    janFood: merged.janFood,
+    creditGuests: merged.creditGuests,
+    openingDate: merged.openingDate,
+    securityCode: merged.securityCode,
+    lockedDates: merged.lockedDates ?? {},
+    lockRev: merged.lockRev ?? {},
+    sealedIds: merged.sealedIds ?? {},
+    inventory: merged.inventory,
+    complaints: merged.complaints,
+    savedAt: merged.savedAt,
+  });
+  writeStoredLocks(ledgerOwnerKey(), merged.lockedDates ?? {});
+  if (!wasLocked && nowLocked) {
+    toast.message(`Register locked for ${selected} on the other desk.`);
+  } else if (wasLocked && !nowLocked) {
+    toast.message(`Register unlocked for ${selected} on the other desk.`);
+  }
+}
+
+function applyRemoteLocks(next: {
+  locked: Record<string, true>;
+  rev: Record<string, number>;
+}) {
+  const selected = useLedger.getState().selectedDate;
+  const previous = useLedger.getState().lockedDates ?? {};
+  const wasLocked = isDayLocked(previous, selected);
+  const nowLocked = isDayLocked(next.locked, selected);
+  useLedger.setState({ lockedDates: next.locked, lockRev: next.rev });
+  writeStoredLocks(ledgerOwnerKey(), next.locked);
+  if (lastPulled) {
+    lastPulled = { ...lastPulled, lockedDates: next.locked, lockRev: next.rev };
+  }
+  if (!wasLocked && nowLocked) {
+    toast.message(`Register locked for ${selected} on the other desk.`);
+  } else if (wasLocked && !nowLocked) {
+    toast.message(`Register unlocked for ${selected} on the other desk.`);
+  }
+}
+
+async function syncLocksFromHotel(userId: string) {
+  if (locksDirty || hydrating || lastUserId !== userId) return;
+  try {
+    const remote = await pullLockState(userId);
+    if (remote == null || locksDirty) return;
+    const current = useLedger.getState().lockedDates ?? {};
+    const currentRev = useLedger.getState().lockRev ?? {};
+    const merged = mergeLockState({ locked: current, rev: currentRev }, remote);
+    if (
+      locksEqual(current, merged.locked) &&
+      JSON.stringify(currentRev) === JSON.stringify(merged.rev)
+    ) {
+      return;
+    }
+    applyRemoteLocks(merged);
+  } catch {
+    /* keep local lock if hotel json cannot be read */
+  }
+}
+
 async function doFlush(userId: string) {
-  const snap = snapshotFromStore();
-  const hash = hashOf(snap);
-  if (hash === lastHash && (phase === "synced" || phase === "migrated")) return;
+  const local = snapshotFromStore();
+  const localChanged = hashOf(local) !== lastHash || locksDirty;
+  if (!localChanged && (phase === "synced" || phase === "migrated")) return;
+
   setPhase("saving");
-  const result = await pushLedger(userId, snap, undefined, useLedger.getState().appRole);
+  const pulled = await pullLedger(userId);
+  if (!pulled.ok) {
+    if (pulled.missingSchema) {
+      setPhase("missing-schema", pulled.message);
+      if (!warnedMissing) {
+        warnedMissing = true;
+        toast.error(
+          "Could not save to your account yet. Entries stay on this phone until cloud tables exist.",
+        );
+      }
+      armRetry(userId);
+      return;
+    }
+    setPhase("error", pulled.message);
+    armRetry(userId);
+    return;
+  }
+
+  let toPush = local;
+  const base = lastPulled;
+  if (pulled.kind === "data") {
+    const merged = mergeLiveSnapshot(base, snapshotFromStore(), pulled.snapshot);
+    if (hashOf(merged) !== hashOf(local)) applyMerged(merged, local);
+    toPush = merged;
+  }
+
+  const result = await pushLedger(
+    userId,
+    toPush,
+    undefined,
+    useLedger.getState().appRole,
+    pruneFromBase(base, toPush),
+  );
   if (!result.ok) {
     if (result.missingSchema) {
       setPhase("missing-schema", result.message);
       if (!warnedMissing) {
         warnedMissing = true;
-        toast.error("Could not save to your account yet. Entries stay on this phone until cloud tables exist.");
+        toast.error(
+          "Could not save to your account yet. Entries stay on this phone until cloud tables exist.",
+        );
       }
       armRetry(userId);
       return;
@@ -150,6 +263,7 @@ async function doFlush(userId: string) {
     return;
   }
   disarmRetry();
+  rememberPulled(snapshotFromStore(), new Date().toISOString());
   lastHash = hashOf(snapshotFromStore());
   setPhase("synced");
   locksDirty = false;
@@ -190,17 +304,37 @@ export function requestCloudSaveNow() {
   void flush(userId);
 }
 
-async function syncLocksFromCloud(userId: string) {
-  if (locksDirty || hydrating || lastUserId !== userId) return;
+export function requestCloudPullNow() {
+  const userId = lastUserId;
+  if (!userId || hydrating) return;
+  lastCloudStamp = "";
+  void syncLocksFromHotel(userId);
+  void pollCloud(userId);
+}
+
+async function pollCloud(userId: string) {
+  if (hydrating || lastUserId !== userId || inFlight) return;
   try {
-    const locks = await pullLockedDates(userId);
-    if (locks == null || locksDirty) return;
-    const current = useLedger.getState().lockedDates ?? {};
-    if (locksEqual(current, locks)) return;
-    useLedger.setState({ lockedDates: locks });
-    writeStoredLocks(ledgerOwnerKey(), locks);
+    if (locksDirty) {
+      void flush(userId);
+      return;
+    }
+    await syncLocksFromHotel(userId);
+    const stamp = await pullLedgerStamp(userId);
+    if (stamp && stamp === lastCloudStamp) return;
+    const pulled = await pullLedger(userId);
+    if (!pulled.ok || pulled.kind !== "data") return;
+    if (locksDirty || hydrating || lastUserId !== userId) return;
+    const local = snapshotFromStore();
+    const localChanged = hashOf(local) !== lastHash;
+    const merged = mergeLiveSnapshot(lastPulled, local, pulled.snapshot);
+    if (hashOf(merged) !== hashOf(local)) applyMerged(merged, local);
+    rememberPulled(merged, pulled.snapshot.cloudUpdatedAt);
+    lastHash = hashOf(snapshotFromStore());
+    if (localChanged || locksDirty) void flush(userId);
+    else if (phase === "loading" || phase === "error") setPhase("synced");
   } catch {
-    /* keep local locks if the pull fails */
+    /* keep local books if the pull fails */
   }
 }
 
@@ -226,6 +360,8 @@ export function stopCloudSync() {
   disarmRetry();
   lastUserId = null;
   lastHash = "";
+  lastPulled = null;
+  lastCloudStamp = "";
   hydrating = false;
   queued = false;
   locksDirty = false;
@@ -255,8 +391,8 @@ export function startCloudSync(userId: string) {
     hideVis = () => {
       if (document.visibilityState === "hidden") hideFlush?.();
       if (document.visibilityState === "visible") {
-        void syncLocksFromCloud(userId);
-        requestCloudSave();
+        void syncLocksFromHotel(userId);
+        void pollCloud(userId);
       }
     };
     window.addEventListener("pagehide", hideFlush);
@@ -264,10 +400,11 @@ export function startCloudSync(userId: string) {
   }
   if (lockTimer) clearInterval(lockTimer);
   lockTimer = setInterval(() => {
-    void syncLocksFromCloud(userId);
-  }, 4000);
-  requestCloudSave();
-  void syncLocksFromCloud(userId);
+    void syncLocksFromHotel(userId);
+    void pollCloud(userId);
+  }, 2000);
+  void syncLocksFromHotel(userId);
+  void pollCloud(userId);
 }
 
 export async function hydrateFromCloud(userId: string): Promise<CloudPhase> {
@@ -280,6 +417,11 @@ export async function hydrateFromCloud(userId: string): Promise<CloudPhase> {
   try {
     const pulled = await pullLedger(userId);
     if (!pulled.ok) {
+      try {
+        await useLedger.persist.rehydrate();
+      } catch {
+        /* keep whatever is in memory */
+      }
       if (pulled.missingSchema) {
         setPhase("missing-schema", pulled.message);
         if (!warnedMissing) {
@@ -293,114 +435,37 @@ export async function hydrateFromCloud(userId: string): Promise<CloudPhase> {
       return "error";
     }
 
-    const current = snapshotFromStore();
-    const localRicher = (): LedgerSnapshot => {
-      let local = current;
-      const keys = [
-        LEDGER_STORAGE_KEY,
-        `${LEDGER_STORAGE_KEY}:${userId}`,
-        "status-ledger-v5",
-        `status-ledger-v5:${userId}`,
-      ];
-      for (const key of keys) {
-        const snap = readLocalLedger(key, current);
-        if (!snap) continue;
-        local = withMissingDates(local, snap);
-      }
-      if (anonymousLedgerUnclaimed()) {
-        const anon = readLocalLedger("status-ledger-v5", current);
-        if (anon) local = withMissingDates(local, anon);
-      }
-      return local;
-    };
+    clearLocalLedgerCache();
 
     if (pulled.kind === "data") {
       const cloud = pulled.snapshot;
-      const local = localRicher();
-      const useLocal = preferLocalOverCloud({
-        localSavedAt: local.savedAt ?? 0,
-        cloudUpdatedAt: cloud.savedAt ?? 0,
-        localScore: ledgerActivityScore(local),
-        cloudScore: ledgerActivityScore(cloud),
+      useLedger.getState().applyCloudBooks({
+        ...cloud,
+        lockedDates: parseLockedDates(cloud.lockedDates),
+        lockRev: parseLockRev(cloud.lockRev),
+        savedAt: cloud.savedAt ?? Date.now(),
       });
-      const chosen = useLocal ? local : cloud;
-      const other = useLocal ? cloud : local;
-      const merged = withMissingDates(chosen, other);
-      if (cloud.lockedDates !== undefined) {
-        merged.lockedDates = parseLockedDates(cloud.lockedDates);
-      }
-      if (!merged.rooms.length) merged.rooms = current.rooms;
-      if (!merged.staff.length) merged.staff = current.staff;
-      if (!merged.hotel?.name) merged.hotel = current.hotel;
-      if (!merged.inventory?.length) merged.inventory = current.inventory;
-      if (!merged.complaints?.length) merged.complaints = current.complaints;
-      useLedger.getState().applySnapshot({
-        ...merged,
-        savedAt: merged.savedAt ?? Date.now(),
-      });
-      const recovered =
-        merged.guests.length > (cloud.guests?.length ?? 0) ||
-        (merged.openingDate || "") < (cloud.openingDate || "9999");
-      if (useLocal || recovered) {
-        const pushed = await pushLedger(
-          userId,
-          snapshotFromStore(),
-          useLocal ? "localStorage" : "merge",
-          useLedger.getState().appRole,
-        );
-        if (!pushed.ok) {
-          if (pushed.missingSchema) {
-            setPhase("missing-schema", pushed.message);
-            if (!warnedMissing) {
-              warnedMissing = true;
-              toast.error("Cloud tables are missing. Books stay on this device.");
-            }
-            return "missing-schema";
-          }
-          setPhase("error", pushed.message);
-          return "error";
-        }
-        claimAnonymousLedger(userId);
-        lastHash = hashOf(snapshotFromStore());
-        setPhase("migrated");
-        if (recovered) toast.success("Earlier days were put back in the books.");
-        else toast.success("This device's books were copied to your account.");
-        return "migrated";
-      }
-      lastHash = hashOf(snapshotFromStore());
+      writeStoredLocks(ledgerOwnerKey(), parseLockedDates(cloud.lockedDates));
       claimAnonymousLedger(userId);
+      rememberPulled(snapshotFromStore(), cloud.cloudUpdatedAt);
+      lastHash = hashOf(snapshotFromStore());
       setPhase("synced");
       return "synced";
     }
 
-    const source = localRicher();
-    const migratedFrom = "localStorage";
-
-    useLedger.getState().applySnapshot(source);
-    const pushed = await pushLedger(
-      userId,
-      source,
-      migratedFrom,
-      useLedger.getState().appRole,
-    );
-    if (!pushed.ok) {
-      if (pushed.missingSchema) {
-        setPhase("missing-schema", pushed.message);
-        if (!warnedMissing) {
-          warnedMissing = true;
-          toast.error("Cloud tables are missing. Books stay on this device.");
-        }
-        return "missing-schema";
-      }
-      setPhase("error", pushed.message);
-      return "error";
-    }
-    claimAnonymousLedger(userId);
+    const role = useLedger.getState().appRole;
+    useLedger.getState().restoreSeed();
+    useLedger.getState().setAppRole(role);
+    rememberPulled(snapshotFromStore(), "");
     lastHash = hashOf(snapshotFromStore());
-    setPhase("migrated");
-    toast.success("This device's books were copied to your account.");
-    return "migrated";
+    setPhase("synced");
+    return "synced";
   } catch (err) {
+    try {
+      await useLedger.persist.rehydrate();
+    } catch {
+      /* keep whatever is in memory */
+    }
     const text = err instanceof Error ? err.message : "Could not reach cloud books.";
     setPhase("error", text);
     return "error";
@@ -418,7 +483,62 @@ export function useCloudSync() {
 export async function retryCloudHydrate(userId: string) {
   warnedMissing = false;
   lastHash = "";
+  lastPulled = null;
+  lastCloudStamp = "";
   const phaseNow = await hydrateFromCloud(userId);
   startCloudSync(userId);
   return phaseNow;
+}
+
+export async function importBackupAndRefresh(
+  userId: string,
+  snap: LedgerSnapshot,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, message: "Sign in to import into the hotel account." };
+  }
+  hydrating = true;
+  setPhase("saving");
+  try {
+    const role = useLedger.getState().appRole;
+    const pushed = await upsertLedgerFromBackup(userId, snap, role);
+    if (!pushed.ok) {
+      setPhase(pushed.missingSchema ? "missing-schema" : "error", pushed.message);
+      return { ok: false, message: pushed.message };
+    }
+    lastCloudStamp = "";
+    lastPulled = null;
+    const pulled = await pullLedger(userId);
+    if (pulled.ok && pulled.kind === "data") {
+      clearLocalLedgerCache();
+      const cloud = pulled.snapshot;
+      useLedger.getState().applyCloudBooks({
+        ...cloud,
+        lockedDates: parseLockedDates(cloud.lockedDates),
+        lockRev: parseLockRev(cloud.lockRev),
+        savedAt: cloud.savedAt ?? Date.now(),
+      });
+      writeStoredLocks(ledgerOwnerKey(), parseLockedDates(cloud.lockedDates));
+      claimAnonymousLedger(userId);
+      rememberPulled(snapshotFromStore(), cloud.cloudUpdatedAt);
+    } else {
+      useLedger.getState().applyCloudBooks({
+        ...snap,
+        lockedDates: parseLockedDates(snap.lockedDates),
+        lockRev: parseLockRev(snap.lockRev),
+        savedAt: Date.now(),
+      });
+      writeStoredLocks(ledgerOwnerKey(), parseLockedDates(snap.lockedDates));
+      rememberPulled(snapshotFromStore(), new Date().toISOString());
+    }
+    lastHash = hashOf(snapshotFromStore());
+    setPhase("synced");
+    return { ok: true };
+  } catch (err) {
+    const text = err instanceof Error ? err.message : "Could not import backup.";
+    setPhase("error", text);
+    return { ok: false, message: text };
+  } finally {
+    hydrating = false;
+  }
 }

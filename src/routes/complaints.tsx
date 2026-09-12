@@ -25,6 +25,8 @@ import { formatDayShort } from "@/lib/format";
 import { useLedger } from "@/lib/store";
 import type { RoomDef } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { SaveCube } from "@/components/save-cube";
+import { isSealed, sealKey, unsealedKeys } from "@/lib/sheet-seal";
 
 export const Route = createFileRoute("/complaints")({
   component: ComplaintsPage,
@@ -48,6 +50,8 @@ function ComplaintsPage() {
   const rooms = useLedger((s) => s.rooms);
   const complaints = useLedger((s) => s.complaints);
   const setComplaints = useLedger((s) => s.setComplaints);
+  const sealedIds = useLedger((s) => s.sealedIds);
+  const sealEntries = useLedger((s) => s.sealEntries);
   const role = useLedger((s) => s.appRole);
   const { gate } = useGate();
   const [open, setOpen] = useState<{
@@ -59,6 +63,8 @@ function ComplaintsPage() {
 
   const openCount = complaints.filter((c) => c.level !== "green").length;
   const redCount = complaints.filter((c) => c.level === "red").length;
+  const complaintKeys = complaints.map((c) => sealKey.complaint(c.id));
+  const pendingSave = unsealedKeys(complaintKeys, sealedIds).length > 0;
 
   const byFloor = useMemo(
     () =>
@@ -76,6 +82,10 @@ function ComplaintsPage() {
   }
 
   function startEdit(roomNo: string, existing: RoomComplaint) {
+    if (isSealed(sealedIds, sealKey.complaint(existing.id))) {
+      toast.message("Saved cube — this complaint will not change");
+      return;
+    }
     setNote(existing.note);
     setLevel(existing.level);
     setOpen({ roomNo, existing });
@@ -90,6 +100,10 @@ function ComplaintsPage() {
       return;
     }
     const existing = open.existing;
+    if (existing && isSealed(sealedIds, sealKey.complaint(existing.id))) {
+      toast.message("Saved cube — this complaint will not change");
+      return;
+    }
     const apply = () => {
       if (existing) {
         setComplaints(
@@ -119,6 +133,7 @@ function ComplaintsPage() {
 
   return (
     <div className="flex flex-col gap-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
       <div>
         <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">
           Housekeeping
@@ -127,10 +142,18 @@ function ComplaintsPage() {
           Complaints
         </h1>
         <p className="mt-1 text-sm text-muted">
-          Three cubes per room. Fill the last one and the first cube shrinks —
-          a new cube comes in front. Red emergency · yellow moderate · green
-          solved.
+          Log a cube, then press Save at the top. After save that cube does not
+          change. A new empty cube stays in front for the next entry.
         </p>
+      </div>
+      <SaveCube
+        hasEntries={complaints.length > 0}
+        pending={pendingSave}
+        onSave={() => {
+          sealEntries(complaintKeys);
+          toast.success("Saved — these cubes will not change");
+        }}
+      />
       </div>
 
       <div className="grid grid-cols-3 gap-3">
@@ -188,6 +211,7 @@ function ComplaintsPage() {
                         key={c.id}
                         item={c}
                         size="sm"
+                        frozen={isSealed(sealedIds, sealKey.complaint(c.id))}
                         onClick={() => startEdit(r.no, c)}
                       />
                     ))}
@@ -197,6 +221,7 @@ function ComplaintsPage() {
                           key={item.id}
                           item={item}
                           size="md"
+                          frozen={isSealed(sealedIds, sealKey.complaint(item.id))}
                           onClick={() => startEdit(r.no, item)}
                         />
                       ) : (
@@ -290,21 +315,24 @@ function ComplaintsPage() {
 function Cube({
   item,
   size,
+  frozen,
   onClick,
 }: {
   item: RoomComplaint;
   size: "sm" | "md";
+  frozen?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      title={`${item.note}${item.createdAt ? ` · ${formatDayShort(item.createdAt)}` : ""}`}
+      title={`${item.note}${item.createdAt ? ` · ${formatDayShort(item.createdAt)}` : ""}${frozen ? " · saved" : ""}`}
       className={cn(
-        "shrink-0 rounded-md text-left transition-transform",
+        "shrink-0 rounded-md text-left",
         LEVEL_FACE[item.level],
         size === "sm" ? "size-7" : "size-11 p-1",
+        frozen && "cursor-default opacity-90",
       )}
     >
       {size === "md" ? (

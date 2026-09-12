@@ -1,5 +1,5 @@
 -- App roles live in public.users. After login the client reads role here.
--- Housekeeping only opens the complaint sheet.
+-- Housekeeping (Kali, House, Housekeeping) opens Complaints + Inventory.
 
 create table if not exists public.users (
   id uuid primary key references auth.users (id) on delete cascade,

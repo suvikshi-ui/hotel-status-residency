@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Pencil, Search, Trash2, Lock, LockOpen } from "lucide-react";
+import { Pencil, Search, Trash2, Lock, LockOpen, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,9 @@ import { formatDay, formatDayShort, money } from "@/lib/format";
 import { stayDates } from "@/lib/stay";
 import { useLedger } from "@/lib/store";
 import { isDayLocked } from "@/lib/register-lock";
+import { requestCloudPullNow } from "@/lib/supabase-sync";
+import { SaveCube } from "@/components/save-cube";
+import { isSealed, sealKey, unsealedKeys } from "@/lib/sheet-seal";
 
 export const Route = createFileRoute("/register")({ component: RegisterPage });
 
@@ -28,14 +31,28 @@ function RegisterPage() {
   const guests = allGuests.filter((g) => g.date === date);
   const food = allFood.filter((f) => f.date === date);
   const ws = allWs.filter((w) => w.date === date);
+  const allExp = useLedger((s) => s.expenses);
+  const allBal = useLedger((s) => s.balReceived);
+  const expenses = allExp.filter((e) => e.date === date);
+  const receipts = allBal.filter((r) => r.date === date);
   const take = buildDayTake(guests, food, ws);
   const removeGuest = useLedger((s) => s.removeGuest);
   const setStay = useLedger((s) => s.setStay);
   const lockedDates = useLedger((s) => s.lockedDates);
   const lockRegister = useLedger((s) => s.lockRegister);
   const unlockRegister = useLedger((s) => s.unlockRegister);
+  const sealedIds = useLedger((s) => s.sealedIds);
+  const sealEntries = useLedger((s) => s.sealEntries);
   const { gate, hasCode } = useGate();
   const locked = isDayLocked(lockedDates, date);
+  const dayKeys = [
+    ...guests.map((g) => sealKey.guest(g.id)),
+    ...food.map((f) => sealKey.food(f.id)),
+    ...ws.map((w) => sealKey.wholesale(w.id)),
+    ...expenses.map((e) => sealKey.expense(e.id)),
+    ...receipts.map((r) => sealKey.balance(r.id)),
+  ];
+  const pendingSave = !locked && unsealedKeys(dayKeys, sealedIds).length > 0;
   const [q, setQ] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -71,10 +88,19 @@ function RegisterPage() {
           {formatDay(date)}
         </p>
         <p className="mt-1 text-sm text-muted">
-          {guests.length} postings · {money(take.roomsTotal)} room revenue
+          {guests.length} postings · {money(take.roomsTotal)} room revenue ·
+          Save cube at the top — after save, that day's entries will not change
         </p>
         </div>
         <div className="flex flex-wrap gap-2 print:hidden">
+          <SaveCube
+            hasEntries={dayKeys.length > 0}
+            pending={pendingSave}
+            onSave={() => {
+              sealEntries(dayKeys);
+              toast.success("Saved — today's entries will not change");
+            }}
+          />
           {locked ? (
             <Button
               type="button"
@@ -88,8 +114,8 @@ function RegisterPage() {
                   {
                     title: "Unlock this day's register?",
                     message: hasCode
-                      ? "Enter the digit code to edit this day's register again."
-                      : "Confirm to unlock. Set a digit code in Profile so only you can unlock later.",
+                      ? "Enter the digit code to edit this day's register again. Unlock applies on every computer signed in to this hotel."
+                      : "Confirm to unlock. Set a digit code in Profile so only you can unlock later. Unlock applies on every computer signed in to this hotel.",
                     confirmLabel: "Unlock",
                     requireCode: hasCode,
                   },
@@ -113,7 +139,7 @@ function RegisterPage() {
                   {
                     title: "Lock this day's register?",
                     message:
-                      "No more edits for this date until you unlock with the digit code.",
+                      "No more edits for this date on any computer signed in to this hotel, until you unlock with the digit code. The lock is saved on the hotel account — you do not need to press Lock again on the other desk.",
                     confirmLabel: "Lock",
                     requireCode: false,
                   },
@@ -124,14 +150,26 @@ function RegisterPage() {
               Lock
             </Button>
           )}
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => {
+              requestCloudPullNow();
+              toast.message("Checking the other desk…");
+            }}
+          >
+            <RefreshCw className="size-4" />
+            Refresh
+          </Button>
           <ReportsLink view="daily" label="Reports" />
         </div>
         </div>
 
       {locked ? (
         <p className="rounded-lg bg-bg-warm px-4 py-3 text-sm">
-          This day's register is locked. Unlock with the digit code to add or
-          edit.
+          This day's register is locked on every desk. Unlock with the digit
+          code to add or edit. You do not need to press Lock again on another
+          computer.
         </p>
       ) : null}
       <YesterdayRoll />
@@ -197,6 +235,7 @@ function RegisterPage() {
             <tbody>
               {filtered.map((g) => {
                 const dates = stayDates(allGuests, g);
+                const frozen = locked || isSealed(sealedIds, sealKey.guest(g.id));
                 return (
                 <tr
                   key={g.id}
@@ -224,7 +263,7 @@ function RegisterPage() {
                   <td className="px-3 py-2">
                     {g.stay === "out" ? (
                       <Badge variant="muted">Out</Badge>
-                    ) : locked ? (
+                    ) : frozen ? (
                       <Badge variant="muted">Continue</Badge>
                     ) : (
                       <Button
@@ -247,7 +286,7 @@ function RegisterPage() {
                     )}
                   </td>
                   <td className="px-3 py-2.5 text-right">
-                    {locked ? null : (
+                    {frozen ? null : (
                     <div className="flex justify-end gap-0.5">
                       <Button
                         variant="ghost"

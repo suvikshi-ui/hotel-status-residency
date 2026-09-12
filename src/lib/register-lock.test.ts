@@ -1,10 +1,16 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  bumpLockRev,
   hotelForCloud,
   hotelFromCloud,
   isDayLocked,
+  locksEqual,
   locksFromHotel,
+  lockRevFromHotel,
+  lockRevFromMeta,
+  locksFromMeta,
+  mergeLockState,
   parseLockedDates,
   pickLockedDates,
   withLocked,
@@ -40,13 +46,57 @@ describe("per-day register lock", () => {
   });
 
   it("round-trips locks inside hotel json for the account", () => {
-    const packed = hotelForCloud(hotel, { "2026-09-12": true });
+    const packed = hotelForCloud(hotel, { "2026-09-12": true }, { "2026-09-12": 42 });
     assert.deepEqual(locksFromHotel(packed), { "2026-09-12": true });
+    assert.deepEqual(lockRevFromHotel(packed), { "2026-09-12": 42 });
     assert.equal(hotelFromCloud(packed, hotel).name, "HSR");
     assert.equal(locksFromHotel(hotelFromCloud(packed, hotel)), undefined);
     assert.equal(locksFromHotel({ name: "HSR" }), undefined);
     assert.deepEqual(parseLockedDates({ "2026-09-12": true, bad: 1 }), {
       "2026-09-12": true,
     });
+  });
+
+  it("reads hotel json _lockedDates even if locked_dates column is empty", () => {
+    assert.deepEqual(
+      locksFromMeta({
+        locked_dates: {},
+        hotel: { _lockedDates: { "2026-09-12": true } },
+      }),
+      { "2026-09-12": true },
+    );
+    assert.deepEqual(
+      lockRevFromMeta({
+        lock_rev: {},
+        hotel: { _lockRev: { "2026-09-12": 9 } },
+      }),
+      { "2026-09-12": 9 },
+    );
+    assert.deepEqual(
+      locksFromMeta({ hotel: { _lockedDates: { "2026-09-01": true } } }),
+      { "2026-09-01": true },
+    );
+    assert.equal(locksFromMeta({ hotel: { name: "HSR" } }), undefined);
+  });
+
+  it("treats the same dates as equal regardless of key order", () => {
+    assert.equal(
+      locksEqual({ "2026-09-11": true, "2026-09-12": true }, {
+        "2026-09-12": true,
+        "2026-09-11": true,
+      }),
+      true,
+    );
+    assert.equal(locksEqual({ "2026-09-11": true }, {}), false);
+  });
+
+  it("bumps lock revision so unlock on one desk beats an older lock", () => {
+    const rev = bumpLockRev({ "2026-09-12": 10 }, "2026-09-12", 9);
+    assert.equal(rev["2026-09-12"], 11);
+    const unlocked = mergeLockState(
+      { locked: {}, rev: bumpLockRev({ "2026-09-12": 10 }, "2026-09-12", 50) },
+      { locked: { "2026-09-12": true }, rev: { "2026-09-12": 10 } },
+    );
+    assert.equal(unlocked.locked["2026-09-12"], undefined);
   });
 });
