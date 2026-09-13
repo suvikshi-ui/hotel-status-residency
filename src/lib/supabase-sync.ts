@@ -338,6 +338,37 @@ async function pollCloud(userId: string) {
   }
 }
 
+export async function saveAccountNow(): Promise<
+  { ok: true } | { ok: false; message: string }
+> {
+  if (!isSupabaseConfigured()) {
+    return {
+      ok: false,
+      message: "Cloud is not connected, so the account cannot be saved yet.",
+    };
+  }
+  const userId = lastUserId;
+  if (!userId) {
+    return { ok: false, message: "Sign in to save the hotel account." };
+  }
+  for (let i = 0; i < 40 && hydrating; i++) {
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  lastHash = "";
+  locksDirty = true;
+  await flush(userId);
+  for (let i = 0; i < 8; i++) {
+    if (inFlight) await inFlight;
+    else if (queued) await flush(userId);
+    else break;
+  }
+  if (phase === "synced" || phase === "migrated") return { ok: true };
+  return {
+    ok: false,
+    message: message || "Could not save to the hotel account.",
+  };
+}
+
 export function requestCloudSave() {
   const userId = lastUserId;
   if (!userId || hydrating) return;

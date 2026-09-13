@@ -19,7 +19,7 @@ import {
 } from "@/lib/inventory";
 import { canManageCatalog } from "@/lib/roles";
 import { isSealed, sealKey } from "@/lib/sheet-seal";
-import { SaveCube } from "@/components/save-cube";
+import { SaveCube, useAccountSave } from "@/components/save-cube";
 import { escapeHtml, printDocument } from "@/lib/print-sheet";
 import { useLedger } from "@/lib/store";
 import { ReportsLink } from "@/components/reports-link";
@@ -42,6 +42,7 @@ function InventoryPage() {
   const setInventory = useLedger((s) => s.setInventory);
   const sealedIds = useLedger((s) => s.sealedIds);
   const sealEntries = useLedger((s) => s.sealEntries);
+  const { busy: saving, saveAfter } = useAccountSave();
   const role = useLedger((s) => s.appRole);
   const { gate } = useGate();
   const manage = canManageCatalog(role);
@@ -97,7 +98,9 @@ function InventoryPage() {
     const go = () => {
       setInventory(rows);
       sealEntries([sealKey.inventoryMonth(monthKey)]);
-      toast.success("Saved — this month's inventory will not change");
+      void saveAfter(
+        "Account saved — this month's inventory will not change",
+      );
     };
     if (!manage) {
       go();
@@ -168,6 +171,7 @@ function InventoryPage() {
           <SaveCube
             hasEntries={rows.length > 0}
             pending={pendingSave}
+            busy={saving}
             onSave={save}
           />
           <ReportsLink view="inventory" />

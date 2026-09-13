@@ -15,7 +15,7 @@ import { staffPay } from "@/lib/staff-pay";
 import { useLedger } from "@/lib/store";
 import { HotelLogo } from "@/components/hotel-logo";
 import { ReportsLink } from "@/components/reports-link";
-import { SaveCube } from "@/components/save-cube";
+import { SaveCube, useAccountSave } from "@/components/save-cube";
 import { isSealed, sealKey } from "@/lib/sheet-seal";
 import type { AdvanceRow, StaffRow } from "@/lib/types";
 
@@ -32,6 +32,7 @@ function StaffPage() {
   const setAdvances = useLedger((s) => s.setAdvances);
   const sealedIds = useLedger((s) => s.sealedIds);
   const sealEntries = useLedger((s) => s.sealEntries);
+  const { busy: saving, saveAfter } = useAccountSave();
   const { gate } = useGate();
   const [sheet, setSheet] = useState<Sheet>("salary");
   const [monthDays, setMonthDays] = useState(30);
@@ -203,6 +204,7 @@ function StaffPage() {
           <SaveCube
             hasEntries={sheet === "salary" ? draft.length > 0 : advDraft.length > 0}
             pending={!frozen}
+            busy={saving}
             onSave={() => {
               if (sheet === "salary") {
                 gate(
@@ -213,7 +215,9 @@ function StaffPage() {
                     }));
                     setStaff(next);
                     sealEntries([sealKey.staffMonth(monthKey)]);
-                    toast.success("Saved — salary sheet will not change");
+                    void saveAfter(
+                      "Account saved — salary sheet will not change",
+                    );
                   },
                   {
                     title: "Are you sure?",
@@ -226,7 +230,9 @@ function StaffPage() {
                   () => {
                     setAdvances(advDraft);
                     sealEntries([sealKey.advanceMonth(monthKey)]);
-                    toast.success("Saved — advance sheet will not change");
+                    void saveAfter(
+                      "Account saved — advance sheet will not change",
+                    );
                   },
                   {
                     title: "Are you sure?",

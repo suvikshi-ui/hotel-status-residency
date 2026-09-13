@@ -1,4 +1,8 @@
+import { useState } from "react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useLedger } from "@/lib/store";
+import { saveAccountNow } from "@/lib/supabase-sync";
 
 export function SaveCube({
   pending,
@@ -19,13 +23,13 @@ export function SaveCube({
       disabled={!canSave}
       onClick={onSave}
       aria-label={
-        saved ? "Saved — these entries will not change" : "Save this sheet"
+        saved ? "Account saved — these entries will not change" : "Save this sheet"
       }
       title={
         saved
-          ? "Saved. These entries will not change."
+          ? "Account saved. These entries will not change."
           : canSave
-            ? "Save. After this, the entries will not change."
+            ? "Save to the hotel account. After this, the entries will not change."
             : "Add an entry, then press Save."
       }
       className={cn(
@@ -39,4 +43,28 @@ export function SaveCube({
       {busy ? "…" : saved ? "Saved" : "Save"}
     </button>
   );
+}
+
+export function useAccountSave() {
+  const sealEntries = useLedger((s) => s.sealEntries);
+  const [busy, setBusy] = useState(false);
+
+  async function report(okMessage: string) {
+    setBusy(true);
+    try {
+      const result = await saveAccountNow();
+      if (result.ok) toast.success(okMessage);
+      else toast.error(result.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function sealAndSave(keys: string[], okMessage: string) {
+    if (!keys.length) return;
+    sealEntries(keys);
+    void report(okMessage);
+  }
+
+  return { busy, sealAndSave, saveAfter: report };
 }

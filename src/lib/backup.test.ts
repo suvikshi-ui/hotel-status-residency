@@ -54,4 +54,41 @@ describe("ledger backup", () => {
       "HSR-backup-2026-09-12.json",
     );
   });
+
+  it("keeps save-cube seals and locks in the file", () => {
+    const file = buildBackupFile({
+      guests: [
+        {
+          id: "g1",
+          date: "2026-09-12",
+          slNo: 1,
+          name: "RAMESH",
+          roomNo: "101",
+          mode: "CASH",
+          amount: 1800,
+        },
+      ],
+      rooms: [{ no: "101", floor: "First" }],
+      lockedDates: { "2026-09-12": true },
+      lockRev: { "2026-09-12": 9 },
+      sealedIds: { "guest:g1": true, "inv:2026-09": true },
+      hotel: {
+        name: "Status Residency",
+        _lockedDates: { "2026-09-12": true },
+        _sealedIds: { "guest:g1": true },
+      },
+    });
+    const parsed = parseBackupFile(JSON.parse(JSON.stringify(file)));
+    assert.deepEqual(parsed.tables.sealedIds, {
+      "guest:g1": true,
+      "inv:2026-09": true,
+    });
+    assert.deepEqual(parsed.tables.lockedDates, { "2026-09-12": true });
+    const hotel = parsed.tables.hotel as {
+      _lockedDates: Record<string, true>;
+      _sealedIds: Record<string, true>;
+    };
+    assert.equal(hotel._lockedDates["2026-09-12"], true);
+    assert.equal(hotel._sealedIds["guest:g1"], true);
+  });
 });

@@ -34,7 +34,7 @@ import { printSourceGuests, printSourceSummary } from "@/lib/balance-print";
 import { DUE_PAY_MODES, formatDayShort, MODE_LABEL, money, stayStamp } from "@/lib/format";
 import { useLedger, useDayBooks } from "@/lib/store";
 import { useGate } from "@/components/security-gate";
-import { SaveCube } from "@/components/save-cube";
+import { SaveCube, useAccountSave } from "@/components/save-cube";
 import { isSealed, sealKey, unsealedKeys } from "@/lib/sheet-seal";
 import type { PayMode } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -54,7 +54,7 @@ function BalancePage() {
   const addBalReceived = useLedger((s) => s.addBalReceived);
   const removeBalReceived = useLedger((s) => s.removeBalReceived);
   const sealedIds = useLedger((s) => s.sealedIds);
-  const sealEntries = useLedger((s) => s.sealEntries);
+  const { busy: saving, sealAndSave } = useAccountSave();
   const { gate } = useGate();
   const [q, setQ] = useState("");
   const [onlyOpen, setOnlyOpen] = useState(true);
@@ -161,10 +161,13 @@ function BalancePage() {
       <SaveCube
         hasEntries={todayReceipts.length > 0}
         pending={pendingSave}
-        onSave={() => {
-          sealEntries(balanceKeys);
-          toast.success("Saved — today's collections will not change");
-        }}
+        busy={saving}
+        onSave={() =>
+          sealAndSave(
+            balanceKeys,
+            "Account saved — today's collections will not change",
+          )
+        }
       />
       </div>
 

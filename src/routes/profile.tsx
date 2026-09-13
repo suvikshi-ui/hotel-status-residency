@@ -15,7 +15,7 @@ import { useLedger } from "@/lib/store";
 import { HotelLogo } from "@/components/hotel-logo";
 import { CloudSchemaSetup } from "@/components/cloud-schema-setup";
 import { useStaffSession } from "@/lib/supabase-auth";
-import { useCloudSync, importBackupAndRefresh } from "@/lib/supabase-sync";
+import { useCloudSync, importBackupAndRefresh, saveAccountNow } from "@/lib/supabase-sync";
 import {
   backupCounts,
   backupFilename,
@@ -67,16 +67,28 @@ function BackupCard() {
   const { gate } = useGate();
   const guests = useLedger((s) => s.guests.length);
   const { user } = useStaffSession();
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<"file" | "import" | null>(null);
   const ownerId = user?.ownerId || user?.id || null;
 
-  function download() {
-    const snap = snapshotNow();
-    downloadBackupJson(buildBackupFile(snap), backupFilename());
-    const n = backupCounts(snap);
-    toast.success(
-      `Backup saved · ${n.guests} guests · ${n.dates.length || 0} days`,
-    );
+  async function download() {
+    setBusy("file");
+    try {
+      const account = await saveAccountNow();
+      const snap = snapshotNow();
+      downloadBackupJson(buildBackupFile(snap), backupFilename());
+      const n = backupCounts(snap);
+      if (account.ok) {
+        toast.success(
+          `Account saved · file saved · ${n.guests} guests · ${n.dates.length || 0} days`,
+        );
+      } else {
+        toast.error(
+          `File saved on this computer. Account: ${account.message}`,
+        );
+      }
+    } finally {
+      setBusy(null);
+    }
   }
 
   function onFile(file: File) {
@@ -92,7 +104,7 @@ function BackupCard() {
         const n = backupCounts(tables);
         gate(
           () => {
-            setBusy(true);
+            setBusy("import");
             void importBackupAndRefresh(ownerId, tables)
               .then((result) => {
                 if (!result.ok) {
@@ -106,7 +118,7 @@ function BackupCard() {
               .catch((err) => {
                 toast.error(err instanceof Error ? err.message : "Could not import backup");
               })
-              .finally(() => setBusy(false));
+              .finally(() => setBusy(null));
           },
           {
             title: "Import this backup into the hotel account?",
@@ -127,31 +139,32 @@ function BackupCard() {
       <CardHeader>
         <CardTitle>Backup</CardTitle>
         <p className="text-sm text-muted">
-          Download every table as a JSON file. Import puts each table into the
-          hotel account — existing rows update, new rows add, nothing is
-          duplicated — then all desks refresh from that copy.
+          Download every table as a JSON file. Save file first writes the live
+          books to the hotel account, then downloads that same copy. Import puts
+          each table into the hotel account — existing rows update, new rows
+          add, nothing is duplicated — then all desks refresh from that copy.
         </p>
       </CardHeader>
       <CardContent className="flex flex-wrap items-center gap-3">
-        <Button type="button" onClick={download} disabled={busy}>
-          <Download className="size-4" />
-          Download backup
+        <Button type="button" onClick={() => void download()} disabled={Boolean(busy)}>
+          {busy === "file" ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+          {busy === "file" ? "Saving…" : "Save file"}
         </Button>
         <Button
           type="button"
           variant="outline"
-          disabled={busy}
+          disabled={Boolean(busy)}
           onClick={() => fileRef.current?.click()}
         >
-          {busy ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
-          {busy ? "Importing…" : "Import backup"}
+          {busy === "import" ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+          {busy === "import" ? "Importing…" : "Import backup"}
         </Button>
         <input
           ref={fileRef}
           type="file"
           accept="application/json,.json"
           className="hidden"
-          disabled={busy}
+          disabled={Boolean(busy)}
           onChange={(e) => {
             const file = e.target.files?.[0];
             e.target.value = "";
@@ -217,11 +230,13 @@ function ProfilePage() {
                 ? "Rooms, staff, expenses and balance tables are not in your Supabase project yet. Books stay on this device until those tables exist."
                 : cloud.phase === "error"
                   ? cloud.message || "Could not reach your account's books."
-                  : cloud.phase === "migrated"
-                    ? "This device's older books were copied into your account."
-                    : cloud.phase === "saving"
-                      ? "Sending the latest entries to every desk…"
-                      : "On sign-in this computer drops its old copy and loads the hotel books from the account, so every desk matches."}
+                  : cloud.phase === "saving"
+                    ? "Sending the latest entries to every desk…"
+                    : cloud.phase === "migrated"
+                      ? "Account saved. This desk's older books were copied into the hotel account. Save file downloads that copy."
+                      : cloud.phase === "synced"
+                        ? "Account saved. Save file downloads this same copy for every desk."
+                        : "On sign-in this computer drops its old copy and loads the hotel books from the account, so every desk matches."}
             </p>
           </CardHeader>
           <CardContent>

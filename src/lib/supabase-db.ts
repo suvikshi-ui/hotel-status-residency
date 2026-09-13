@@ -837,6 +837,10 @@ export async function upsertLedgerFromBackup(
       rev: lockRevFromHotel(hotelRaw) ?? {},
     },
   );
+  const seals = mergeSealed(
+    parseSealedIds(snap.sealedIds),
+    sealedFromHotel(hotelRaw),
+  );
   const keep: LedgerPrune = {
     rooms: [],
     staff: [],
@@ -864,6 +868,7 @@ export async function upsertLedgerFromBackup(
       inventory: (snap.inventory ?? []).map((row, i) => withRowId(row, "inv", i)),
       lockedDates: locks.locked,
       lockRev: locks.rev,
+      sealedIds: seals,
     },
     "backup-import",
     role,

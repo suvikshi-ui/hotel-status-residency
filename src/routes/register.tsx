@@ -18,7 +18,7 @@ import { stayDates } from "@/lib/stay";
 import { useLedger } from "@/lib/store";
 import { isDayLocked } from "@/lib/register-lock";
 import { requestCloudPullNow } from "@/lib/supabase-sync";
-import { SaveCube } from "@/components/save-cube";
+import { SaveCube, useAccountSave } from "@/components/save-cube";
 import { isSealed, sealKey, unsealedKeys } from "@/lib/sheet-seal";
 
 export const Route = createFileRoute("/register")({ component: RegisterPage });
@@ -42,7 +42,7 @@ function RegisterPage() {
   const lockRegister = useLedger((s) => s.lockRegister);
   const unlockRegister = useLedger((s) => s.unlockRegister);
   const sealedIds = useLedger((s) => s.sealedIds);
-  const sealEntries = useLedger((s) => s.sealEntries);
+  const { busy: saving, sealAndSave } = useAccountSave();
   const { gate, hasCode } = useGate();
   const locked = isDayLocked(lockedDates, date);
   const dayKeys = [
@@ -96,10 +96,13 @@ function RegisterPage() {
           <SaveCube
             hasEntries={dayKeys.length > 0}
             pending={pendingSave}
-            onSave={() => {
-              sealEntries(dayKeys);
-              toast.success("Saved — today's entries will not change");
-            }}
+            busy={saving}
+            onSave={() =>
+              sealAndSave(
+                dayKeys,
+                "Account saved — today's entries will not change",
+              )
+            }
           />
           {locked ? (
             <Button

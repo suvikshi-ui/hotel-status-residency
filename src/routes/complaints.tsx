@@ -25,7 +25,7 @@ import { formatDayShort } from "@/lib/format";
 import { useLedger } from "@/lib/store";
 import type { RoomDef } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { SaveCube } from "@/components/save-cube";
+import { SaveCube, useAccountSave } from "@/components/save-cube";
 import { isSealed, sealKey, unsealedKeys } from "@/lib/sheet-seal";
 
 export const Route = createFileRoute("/complaints")({
@@ -51,7 +51,7 @@ function ComplaintsPage() {
   const complaints = useLedger((s) => s.complaints);
   const setComplaints = useLedger((s) => s.setComplaints);
   const sealedIds = useLedger((s) => s.sealedIds);
-  const sealEntries = useLedger((s) => s.sealEntries);
+  const { busy: saving, sealAndSave } = useAccountSave();
   const role = useLedger((s) => s.appRole);
   const { gate } = useGate();
   const [open, setOpen] = useState<{
@@ -149,10 +149,13 @@ function ComplaintsPage() {
       <SaveCube
         hasEntries={complaints.length > 0}
         pending={pendingSave}
-        onSave={() => {
-          sealEntries(complaintKeys);
-          toast.success("Saved — these cubes will not change");
-        }}
+        busy={saving}
+        onSave={() =>
+          sealAndSave(
+            complaintKeys,
+            "Account saved — these cubes will not change",
+          )
+        }
       />
       </div>
 

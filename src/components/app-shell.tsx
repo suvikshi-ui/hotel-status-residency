@@ -160,7 +160,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                       ? "Account save failed"
                       : cloud.phase === "loading"
                         ? "Loading books…"
-                        : "Live with other desks"}
+                        : "Account saved"}
               </div>
               <button
                 type="button"
