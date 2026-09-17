@@ -5,6 +5,7 @@ export function preferLocalOverCloud(input: {
   cloudScore: number;
 }) {
   if (input.localScore > 0 && input.cloudScore < 5) return true;
+  if (input.localScore >= input.cloudScore + 20) return true;
   if (input.localSavedAt > input.cloudUpdatedAt + 250) return true;
   if (input.cloudUpdatedAt > input.localSavedAt + 250) return false;
   return input.localScore > input.cloudScore;

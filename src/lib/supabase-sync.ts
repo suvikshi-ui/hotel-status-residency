@@ -240,9 +240,18 @@ async function doFlush(userId: string) {
   let toPush = local;
   const base = lastPulled;
   if (pulled.kind === "data") {
-    const merged = mergeLiveSnapshot(base, snapshotFromStore(), pulled.snapshot);
-    if (hashOf(merged) !== hashOf(local)) applyMerged(merged, local);
-    toPush = merged;
+    const cloud = pulled.snapshot;
+    const keepLocal = preferLocalOverCloud({
+      localSavedAt: local.savedAt ?? 0,
+      cloudUpdatedAt: cloud.savedAt ?? 0,
+      localScore: ledgerActivityScore(local),
+      cloudScore: ledgerActivityScore(cloud),
+    });
+    if (!keepLocal) {
+      const merged = mergeLiveSnapshot(base, snapshotFromStore(), cloud);
+      if (hashOf(merged) !== hashOf(local)) applyMerged(merged, local);
+      toPush = merged;
+    }
   }
 
   const result = await pushLedger(
@@ -250,7 +259,9 @@ async function doFlush(userId: string) {
     toPush,
     undefined,
     useLedger.getState().appRole,
-    pruneFromBase(base, toPush),
+    ledgerActivityScore(toPush) + 20 < ledgerActivityScore(local)
+      ? undefined
+      : pruneFromBase(base, toPush),
   );
   if (!result.ok) {
     if (result.missingSchema) {

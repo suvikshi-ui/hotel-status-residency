@@ -54,12 +54,18 @@ export function useAccountSave() {
     setBusy(true);
     try {
       const result = await saveAccountNow();
-      if (result.ok) toast.success(okMessage);
-      else if (isPermissionMessage(result.message)) {
+      if (result.ok) {
+        toast.success(okMessage);
+        return true;
+      }
+      if (isPermissionMessage(result.message)) {
         toast.error(
-          "Account write is blocked. Use the SQL box on this page — Copy or select it, then Run.",
+          "Account write is blocked. Books stay on this computer — do not refresh other desks yet.",
         );
-      } else toast.error(result.message);
+        return false;
+      }
+      toast.error(result.message);
+      return false;
     } finally {
       setBusy(false);
     }
@@ -67,8 +73,9 @@ export function useAccountSave() {
 
   function sealAndSave(keys: string[], okMessage: string) {
     if (!keys.length) return;
-    sealEntries(keys);
-    void report(okMessage);
+    void report(okMessage).then((ok) => {
+      if (ok) sealEntries(keys);
+    });
   }
 
   return { busy, sealAndSave, saveAfter: report };

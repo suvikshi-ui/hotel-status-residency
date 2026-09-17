@@ -20,13 +20,13 @@ describe("cloud save", () => {
     );
   });
 
-  it("loads the cloud book when it is newer", () => {
+  it("loads the cloud book when it is newer and as full", () => {
     assert.equal(
       preferLocalOverCloud({
         localSavedAt: 1_000,
         cloudUpdatedAt: 2_000,
         localScore: 40,
-        cloudScore: 10,
+        cloudScore: 42,
       }),
       false,
     );
@@ -39,6 +39,18 @@ describe("cloud save", () => {
         cloudUpdatedAt: 9_000,
         localScore: 777,
         cloudScore: 0,
+      }),
+      true,
+    );
+  });
+
+  it("does not drop a restored JSON book for a thinner newer account", () => {
+    assert.equal(
+      preferLocalOverCloud({
+        localSavedAt: 1_000,
+        cloudUpdatedAt: 9_000,
+        localScore: 777,
+        cloudScore: 80,
       }),
       true,
     );
