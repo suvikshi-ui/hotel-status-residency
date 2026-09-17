@@ -18,7 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { buildDayTake } from "@/lib/day-report";
-import { sumByBucket } from "@/lib/expense-tally";
+import { sumByBucket, expenseBucket } from "@/lib/expense-tally";
 import { formatDay, formatDayShort, money, moneyCompact } from "@/lib/format";
 import {
   inventoryDifference,
@@ -47,8 +47,8 @@ function ReportsPage() {
   const wholesale = useLedger((s) => s.wholesale);
   const expenses = useLedger((s) => s.expenses);
   const jan = useLedger((s) => s.janSales);
-  const janFood = useLedger((s) => s.janFood);
   const hotel = useLedger((s) => s.hotel);
+  const staff = useLedger((s) => s.staff);
   const restore = useLedger((s) => s.restoreSeed);
   const { gate } = useGate();
 
@@ -66,8 +66,6 @@ function ReportsPage() {
   const febFood = rows.reduce((s, r) => s + r.take.foodTotal, 0);
   const febWs = rows.reduce((s, r) => s + r.take.wsTotal, 0);
   const janSales = jan.reduce((s, d) => s + d.sales, 0);
-  const janF = janFood.reduce((s, d) => s + d.food, 0);
-  const janW = janFood.reduce((s, d) => s + d.ws, 0);
   const daysHit = rows.filter((r) => r.hit).length;
   const cash = rows.reduce((s, r) => s + r.take.cash.rooms, 0);
   const qr = rows.reduce((s, r) => s + r.take.santosh.rooms, 0);
@@ -76,12 +74,19 @@ function ReportsPage() {
   const due = rows.reduce((s, r) => s + r.take.due.rooms, 0);
   const buckets = sumByBucket(expenses);
   const expTotal = expenses.reduce((s, e) => s + e.amount, 0);
+  const janExp = expenses
+    .filter((e) => e.date.slice(5, 7) === "01")
+    .reduce((s, e) => s + e.amount, 0);
+  const febSalary = staff.reduce((s, r) => s + (r.salary || 0), 0);
+  const janSalary = expenses
+    .filter(
+      (e) => e.date.slice(5, 7) === "01" && expenseBucket(e.particular) === "salary",
+    )
+    .reduce((s, e) => s + e.amount, 0);
   const expByDay = new Map<string, number>();
   for (const e of expenses) {
     expByDay.set(e.date, (expByDay.get(e.date) ?? 0) + e.amount);
   }
-  const foodPlusWs = febFood + febWs;
-  const flyskyPlusWs = buckets.flysky + buckets.ws;
 
   const matchRows = [
     {
@@ -98,26 +103,12 @@ function ReportsPage() {
       rightLabel: "WS sales",
       right: febWs,
     },
-    {
-      label: "Flysky + WS vs Food + WS",
-      leftLabel: "Flysky + WS expense",
-      left: flyskyPlusWs,
-      rightLabel: "Food + WS sales",
-      right: foodPlusWs,
-    },
-    {
-      label: "Kitchen vs Food",
-      leftLabel: "Kitchen expense",
-      left: buckets.kitchen,
-      rightLabel: "Food sales",
-      right: febFood,
-    },
   ];
 
   const compare = [
     { name: "Rooms", Jan: janSales, Feb: febSales },
-    { name: "Food", Jan: janF, Feb: febFood },
-    { name: "Wholesale", Jan: janW, Feb: febWs },
+    { name: "Expenses", Jan: janExp, Feb: expTotal },
+    { name: "Salary", Jan: janSalary, Feb: febSalary },
   ];
 
   const daily = rows.map((r) => ({
@@ -199,13 +190,13 @@ function ReportsPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Feb room sales" value={money(febSales)} hint={`Jan ${money(janSales)}`} />
-        <Stat label="Feb food" value={money(febFood)} hint={`Jan ${money(janF)}`} />
-        <Stat label="Feb wholesale" value={money(febWs)} hint={`Jan ${money(janW)}`} />
+        <Stat label="Room sales" value={money(febSales)} hint={`Jan ${money(janSales)}`} />
+        <Stat label="Expenses" value={money(expTotal)} hint={`Jan ${money(janExp)}`} />
+        <Stat label="Salary" value={money(febSalary)} hint={`Jan ${money(janSalary)}`} />
         <Stat
-          label="Feb expenses"
-          value={money(expTotal)}
-          hint={`Flysky ${money(buckets.flysky)} · WS ${money(buckets.ws)}`}
+          label="Flysky / WS"
+          value={money(buckets.flysky)}
+          hint={`WS exp ${money(buckets.ws)}`}
         />
       </div>
 
