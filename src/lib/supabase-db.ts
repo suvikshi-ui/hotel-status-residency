@@ -2,7 +2,8 @@ import type { PostgrestError } from "@supabase/supabase-js";
 import { normalizeComplaints, type RoomComplaint } from "./complaints";
 import { normalizeInventory, type InventoryItem } from "./inventory";
 import {
-  gstIdsFromGuests,
+  gstBillsFromGuests,
+  gstBillsFromHotel,
   gstIdsFromHotel,
   withGuestGst,
 } from "./invoice";
@@ -210,6 +211,7 @@ export function snapshotFromUnknown(
     guests: withGuestGst(
       (p.guests ?? fallback.guests) as GuestEntry[],
       gstIdsFromHotel(p.hotel),
+      gstBillsFromHotel(p.hotel),
     ),
     food: (p.food ?? fallback.food) as ModeAmount[],
     wholesale: (p.wholesale ?? fallback.wholesale) as ModeAmount[],
@@ -525,7 +527,11 @@ export async function pullLedger(userId: string): Promise<CloudPull> {
     deletedIds,
     sealKey.complaint,
   );
-  snapshot.guests = withGuestGst(snapshot.guests, gstIdsFromHotel(hotelRaw));
+  snapshot.guests = withGuestGst(
+    snapshot.guests,
+    gstIdsFromHotel(hotelRaw),
+    gstBillsFromHotel(hotelRaw),
+  );
 
   return { ok: true, kind: "data", snapshot };
 }
@@ -809,7 +815,7 @@ export async function pushLedger(
       snap.sealedIds ?? {},
       snap.deletedIds ?? {},
       snap.reminders ?? [],
-      gstIdsFromGuests(snap.guests),
+      gstBillsFromGuests(snap.guests),
     ),
     opening: snap.opening,
     opening_date: snap.openingDate,

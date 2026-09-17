@@ -18,6 +18,8 @@ export interface GuestEntry {
   coDate?: string | null;
   source?: string | null;
   gst?: boolean;
+  gstInvoiceNo?: string | null;
+  payRefNo?: string | null;
 }
 
 export interface ModeAmount {

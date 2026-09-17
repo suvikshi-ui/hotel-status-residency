@@ -2,6 +2,7 @@ import type { HotelInfo } from "./types";
 import type { SealedIds } from "./sheet-seal.ts";
 import { parseSealedIds } from "./sheet-seal.ts";
 import type { HotelReminder } from "./reminders.ts";
+import type { GstBillMeta } from "./invoice.ts";
 
 export type LockState = {
   locked: Record<string, true>;
@@ -122,7 +123,7 @@ export function hotelForCloud(
   sealedIds: SealedIds = {},
   deletedIds: SealedIds = {},
   reminders: HotelReminder[] = [],
-  gstGuestIds: string[] = [],
+  gstBills: GstBillMeta[] = [],
 ): HotelInfo & {
   _lockedDates: Record<string, true>;
   _lockRev: Record<string, number>;
@@ -130,6 +131,7 @@ export function hotelForCloud(
   _deletedIds: SealedIds;
   _reminders: HotelReminder[];
   _gstGuestIds: string[];
+  _gstBills: GstBillMeta[];
 } {
   return {
     ...hotel,
@@ -138,7 +140,8 @@ export function hotelForCloud(
     _sealedIds: parseSealedIds(sealedIds),
     _deletedIds: parseSealedIds(deletedIds),
     _reminders: reminders,
-    _gstGuestIds: gstGuestIds,
+    _gstGuestIds: gstBills.map((b) => b.id),
+    _gstBills: gstBills,
   };
 }
 

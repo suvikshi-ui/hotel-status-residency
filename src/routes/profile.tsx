@@ -24,7 +24,7 @@ import {
   parseBackupFile,
 } from "@/lib/backup";
 import { hotelForCloud } from "@/lib/register-lock";
-import { gstIdsFromGuests } from "@/lib/invoice";
+import { gstBillsFromGuests } from "@/lib/invoice";
 import { snapshotFromUnknown, type LedgerSnapshot } from "@/lib/supabase-db";
 
 export const Route = createFileRoute("/profile")({ component: ProfilePage });
@@ -39,7 +39,7 @@ function snapshotNow(): LedgerSnapshot {
       s.sealedIds ?? {},
       s.deletedIds ?? {},
       s.reminders ?? [],
-      gstIdsFromGuests(s.guests),
+      gstBillsFromGuests(s.guests),
     ),
     opening: s.opening,
     rooms: s.rooms,

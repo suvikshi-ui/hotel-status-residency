@@ -35,6 +35,8 @@ type PendingPost = {
   source: string | null;
   amount: number;
   gst: boolean;
+  gstInvoiceNo: string | null;
+  payRefNo: string | null;
 };
 
 export function GuestForm({
@@ -60,6 +62,8 @@ export function GuestForm({
   const [amount, setAmount] = useState("1500");
   const [source, setSource] = useState("");
   const [gst, setGst] = useState(false);
+  const [gstInvoiceNo, setGstInvoiceNo] = useState("");
+  const [payRefNo, setPayRefNo] = useState("");
   const [dup, setDup] = useState<GuestEntry | null>(null);
   const pending = useRef<PendingPost | null>(null);
   const isEdit = Boolean(editing);
@@ -72,6 +76,8 @@ export function GuestForm({
     setAmount(String(editing.amount));
     setSource(editing.source ?? "");
     setGst(Boolean(editing.gst));
+    setGstInvoiceNo(editing.gstInvoiceNo ?? "");
+    setPayRefNo(editing.payRefNo ?? "");
     cardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     nameRef.current?.focus();
   }, [editing]);
@@ -80,6 +86,8 @@ export function GuestForm({
     setName("");
     setSource("");
     setGst(false);
+    setGstInvoiceNo("");
+    setPayRefNo("");
     setAmount("1500");
     setMode("CASH");
     setRoomNo(rooms[0]?.no ?? "101");
@@ -93,6 +101,8 @@ export function GuestForm({
     setName("");
     setSource("");
     setGst(false);
+    setGstInvoiceNo("");
+    setPayRefNo("");
     pending.current = null;
     setDup(null);
     nameRef.current?.focus();
@@ -140,6 +150,8 @@ export function GuestForm({
       source: source.trim() || null,
       amount: amt,
       gst,
+      gstInvoiceNo: gst ? gstInvoiceNo.trim() || null : null,
+      payRefNo: gst ? payRefNo.trim() || null : null,
     };
     const onDate = editing?.date ?? date;
     const hit = findDuplicateOnDate(guests, onDate, payload, editing?.id);
@@ -284,11 +296,35 @@ export function GuestForm({
               </label>
             </div>
           </div>
+          {gst ? (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-1.5">
+                <Label htmlFor="g-inv">GST invoice number</Label>
+                <Input
+                  id="g-inv"
+                  value={gstInvoiceNo}
+                  onChange={(e) => setGstInvoiceNo(e.target.value)}
+                  placeholder="Invoice no."
+                  autoComplete="off"
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="g-pref">Payment reference number</Label>
+                <Input
+                  id="g-pref"
+                  value={payRefNo}
+                  onChange={(e) => setPayRefNo(e.target.value)}
+                  placeholder="Payment ref."
+                  autoComplete="off"
+                />
+              </div>
+            </div>
+          ) : null}
           <div className="flex flex-col-reverse items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs text-muted">
               {isEdit
                 ? "Change name, room, mode, amount, source or GST, then save."
-                : "Default invoice is Non GST. Tick GST to put this bill in the GST column on Invoice."}
+                : "Default Non GST. Tick GST to send this bill to Invoice."}
             </p>
             <div className="flex flex-col gap-2 sm:flex-row">
               {isEdit ? (
