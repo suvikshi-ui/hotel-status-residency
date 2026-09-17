@@ -4,6 +4,7 @@ import {
   parseLockRev,
   parseLockedDates,
 } from "./register-lock.ts";
+import { mergeBankRows } from "./bank-recon.ts";
 import { mergeGuestGst } from "./invoice.ts";
 import { mergeSealed, parseSealedIds, dropDeletedRows, sealKey } from "./sheet-seal.ts";
 import type { LedgerSnapshot } from "./supabase-db.ts";
@@ -83,6 +84,7 @@ function emptyRows(s: LedgerSnapshot): LedgerSnapshot {
     inventory: [],
     complaints: [],
     reminders: [],
+    bankRows: [],
     ota: [],
     janSales: [],
     janFood: [],
@@ -193,6 +195,7 @@ export function mergeLiveSnapshot(
       local.reminders ?? [],
       cloud.reminders ?? [],
     ),
+    bankRows: mergeBankRows(local.bankRows ?? [], cloud.bankRows ?? []),
     savedAt: Math.max(local.savedAt ?? 0, cloud.savedAt ?? 0),
     cloudUpdatedAt: cloud.cloudUpdatedAt,
   };

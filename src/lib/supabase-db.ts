@@ -2,6 +2,11 @@ import type { PostgrestError } from "@supabase/supabase-js";
 import { normalizeComplaints, type RoomComplaint } from "./complaints";
 import { normalizeInventory, type InventoryItem } from "./inventory";
 import {
+  bankRowsFromHotel,
+  normalizeBankRows,
+  type BankRow,
+} from "./bank-recon";
+import {
   gstBillsFromGuests,
   gstBillsFromHotel,
   gstIdsFromHotel,
@@ -93,6 +98,7 @@ export type LedgerSnapshot = {
   inventory?: InventoryItem[];
   complaints?: RoomComplaint[];
   reminders?: HotelReminder[];
+  bankRows?: BankRow[];
   savedAt?: number;
   cloudUpdatedAt?: string;
 };
@@ -243,6 +249,11 @@ export function snapshotFromUnknown(
       : remindersFromHotel(p.hotel).length
         ? remindersFromHotel(p.hotel)
         : normalizeReminders(fallback.reminders),
+    bankRows: Array.isArray((p as { bankRows?: BankRow[] }).bankRows)
+      ? normalizeBankRows((p as { bankRows?: BankRow[] }).bankRows)
+      : bankRowsFromHotel(p.hotel).length
+        ? bankRowsFromHotel(p.hotel)
+        : normalizeBankRows(fallback.bankRows),
     savedAt: num((p as { savedAt?: unknown }).savedAt) || fallback.savedAt,
   };
 }
@@ -513,6 +524,7 @@ export async function pullLedger(userId: string): Promise<CloudPull> {
         ),
     savedAt: Date.parse(str(row.updated_at)) || 0,
     reminders: remindersFromHotel(hotelRaw),
+    bankRows: bankRowsFromHotel(hotelRaw),
   };
 
   const deletedIds = mergeSealed(deletedFromHotel(hotelRaw), {});
@@ -816,6 +828,7 @@ export async function pushLedger(
       snap.deletedIds ?? {},
       snap.reminders ?? [],
       gstBillsFromGuests(snap.guests),
+      snap.bankRows ?? [],
     ),
     opening: snap.opening,
     opening_date: snap.openingDate,
