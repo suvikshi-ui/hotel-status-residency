@@ -81,7 +81,10 @@ function BankReconPage() {
       }
       applyParsed(parseStatementText(text));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not read file");
+      const msg = err instanceof Error && err.message
+        ? err.message
+        : "Could not read this statement";
+      toast.error(msg);
     } finally {
       setBusy(false);
       if (fileRef.current) fileRef.current.value = "";

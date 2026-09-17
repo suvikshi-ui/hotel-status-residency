@@ -26,8 +26,14 @@ export interface ReconLine {
   office: OfficeHit | null;
 }
 
+function asText(v: unknown) {
+  if (typeof v === "string") return v.trim();
+  if (v == null) return "";
+  return String(v).trim();
+}
+
 export function normalizeRef(value: string) {
-  return value.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  return asText(value).replace(/[^A-Za-z0-9]/g, "").toUpperCase();
 }
 
 export function bankRowsFromHotel(hotel: unknown): BankRow[] {
@@ -52,12 +58,12 @@ export function normalizeBankRows(raw: unknown): BankRow[] {
       typeof r.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r.date.slice(0, 10))
         ? r.date.slice(0, 10)
         : parseLooseDate(String(r.date ?? ""));
-    const particular = typeof r.particular === "string" ? r.particular.trim() : "";
+    const particular = asText(r.particular);
     if (!date || isBalanceLine(particular)) continue;
     const split = debitCreditOf(r);
     if (!split.debit && !split.credit) continue;
-    const ref = typeof r.ref === "string" ? r.ref.trim() : "";
-    const id = typeof r.id === "string" && r.id.trim() ? r.id.trim() : uid("bk");
+    const ref = asText(r.ref);
+    const id = asText(r.id) || uid("bk");
     const next: BankRow = {
       id,
       date,
@@ -79,8 +85,8 @@ export function normalizeBankRows(raw: unknown): BankRow[] {
 }
 
 function debitCreditOf(r: Record<string, unknown>) {
-  let debit = Math.abs(num(r.debit));
-  let credit = Math.abs(num(r.credit));
+  const debit = Math.abs(num(r.debit));
+  const credit = Math.abs(num(r.credit));
   if (debit || credit) return { debit, credit };
   const amount = num(r.amount);
   if (!amount) return { debit: 0, credit: 0 };
@@ -94,7 +100,7 @@ function num(v: unknown) {
 }
 
 export function bankKey(row: Pick<BankRow, "date" | "debit" | "credit" | "ref" | "particular">) {
-  return `${row.date}|${row.debit}|${row.credit}|${normalizeRef(row.ref)}|${row.particular.slice(0, 24).toLowerCase()}`;
+  return `${row.date}|${row.debit}|${row.credit}|${normalizeRef(row.ref)}|${asText(row.particular).slice(0, 24).toLowerCase()}`;
 }
 
 export function mergeBankRows(current: BankRow[], incoming: BankRow[], month?: string) {
@@ -114,9 +120,9 @@ export function officeHitsFromGuests(guests: GuestEntry[]): OfficeHit[] {
   const out: OfficeHit[] = [];
   for (const g of guests) {
     const refs = [g.payRefNo, g.gstInvoiceNo].filter(
-      (v): v is string => Boolean(v && v.trim()),
+      (v): v is string => Boolean(v && asText(v)),
     );
-    const unique = [...new Set(refs.map((v) => v.trim()))];
+    const unique = [...new Set(refs.map((v) => asText(v)))].filter(Boolean);
     for (const ref of unique) {
       out.push({
         id: g.id,
@@ -148,7 +154,7 @@ function pickOffice(
   offices: OfficeHit[],
   used: Set<string>,
 ): OfficeHit | null {
-  if (!bank.ref.trim()) return null;
+  if (!asText(bank.ref)) return null;
   const hits = offices.filter(
     (o) => !used.has(o.id + o.ref) && refsMatch(bank.ref, o.ref),
   );
@@ -177,33 +183,45 @@ export function refsMatch(a: string, b: string) {
 
 const DATE_HEAD = /^(txn |value |posting |tran )?date|txn.?dt|value.?dt/i;
 const NARR_HEAD = /narrat|desc|particular|remark|detail|info/i;
-const CREDIT_HEAD = /^(credit|cr|deposit|cr amount|amount credited)$/i;
-const DEBIT_HEAD = /^(debit|dr|withdrawal|wdl|dr amount|amount debited)$/i;
+const CREDIT_HEAD = /credit|deposit|amount credited|(^|\s)cr(\s|$)/i;
+const DEBIT_HEAD = /debit|withdrawal|wdl|amount debited|(^|\s)dr(\s|$)/i;
 const REF_HEAD =
   /ch\.?\s*\/?\s*ref|cheque|chq|utr|txn.?id|transaction.?id|payment.?ref|rrn|reference|ref\.?\s*no/i;
 const SKIP_HEAD = /closing|opening|available|running|^balance$/i;
 
 export function parseStatementText(text: string): BankRow[] {
-  const raw = text.replace(/^\uFEFF/, "").trim();
+  const raw = asText(text).replace(/^\uFEFF/, "");
   if (!raw) return [];
-  const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const lines = raw.split(/\r?\n/).map((l) => asText(l)).filter(Boolean);
   if (!lines.length) return [];
   const header = findHeader(lines);
   if (header) {
     return normalizeBankRows(
-      lines.slice(header.index + 1).map((line) =>
-        rowFromCells(splitRow(line, header.delim), header.mapped, line),
-      ),
+      lines.slice(header.index + 1).map((line) => {
+        try {
+          return rowFromCells(splitRow(line, header.delim), header.mapped, line);
+        } catch {
+          return null;
+        }
+      }),
     );
   }
-  return normalizeBankRows(lines.map(rowFromLooseLine).filter(Boolean));
+  return normalizeBankRows(
+    lines.map((line) => {
+      try {
+        return rowFromLooseLine(line);
+      } catch {
+        return null;
+      }
+    }),
+  );
 }
 
 function findHeader(lines: string[]) {
   const limit = Math.min(lines.length, 40);
   for (let i = 0; i < limit; i++) {
     const delim = guessDelim(lines[i] ?? "");
-    const cells = splitRow(lines[i] ?? "", delim).map((c) => c.trim());
+    const cells = splitRow(lines[i] ?? "", delim).map((c) => asText(c));
     const mapped = mapHeaders(cells);
     if (
       mapped.date >= 0 &&
@@ -260,25 +278,30 @@ function mapHeaders(cells: string[]) {
   return mapped;
 }
 
+function cellAt(cells: string[], index: number) {
+  if (index < 0 || index >= cells.length) return "";
+  return asText(cells[index]);
+}
+
 function rowFromCells(
   cells: string[],
   mapped: ReturnType<typeof mapHeaders>,
   rawLine: string,
 ): Partial<BankRow> | null {
-  const date = parseLooseDate(cells[mapped.date] ?? "");
+  const date = parseLooseDate(cellAt(cells, mapped.date));
   if (!date) return null;
-  const particular = (cells[mapped.particular] ?? "").trim();
+  const particular = cellAt(cells, mapped.particular);
   if (isBalanceLine(particular)) return null;
-  let debit = mapped.debit >= 0 ? parseAmount(cells[mapped.debit] ?? "") : 0;
-  let credit = mapped.credit >= 0 ? parseAmount(cells[mapped.credit] ?? "") : 0;
+  let debit = mapped.debit >= 0 ? parseAmount(cellAt(cells, mapped.debit)) : 0;
+  let credit = mapped.credit >= 0 ? parseAmount(cellAt(cells, mapped.credit)) : 0;
   if (!debit && !credit && mapped.amount >= 0) {
-    const amount = parseAmount(cells[mapped.amount] ?? "");
-    const side = sideOf(rawLine + " " + (cells[mapped.amount] ?? ""));
+    const amount = parseAmount(cellAt(cells, mapped.amount));
+    const side = sideOf(`${rawLine} ${cellAt(cells, mapped.amount)}`);
     if (side === "debit" || amount < 0) debit = Math.abs(amount);
     else credit = Math.abs(amount);
   }
   const ref =
-    cleanRefCell(mapped.ref >= 0 ? cells[mapped.ref] : "") ||
+    cleanRefCell(cellAt(cells, mapped.ref)) ||
     extractRef(particular) ||
     extractRef(rawLine);
   return { date, particular, debit, credit, amount: credit || debit, ref };
@@ -288,7 +311,7 @@ function rowFromLooseLine(line: string): Partial<BankRow> | null {
   if (isBalanceLine(line)) return null;
   const date = parseLooseDate(line);
   if (!date) return null;
-  const amounts = [...line.matchAll(/(?:\u20B9\s*)?(\d{1,3}(?:,\d{3})+|\d+)(?:\.\d{1,2})/g)];
+  const amounts = [...line.matchAll(/(?:\u20B9\s*)?(\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|\d+\.\d{1,2})/g)];
   if (!amounts.length) return null;
   const txn = amounts.length >= 2 ? amounts.slice(0, -1) : amounts;
   const values = txn.map((m) => parseAmount(m[0] ?? "")).filter((n) => n);
@@ -315,12 +338,11 @@ function rowFromLooseLine(line: string): Partial<BankRow> | null {
 }
 
 function stripAmounts(line: string, date: string) {
-  return line
+  return asText(line)
     .replace(date, "")
-    .replace(/(?:\u20B9\s*)?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d{1,2})/g, "")
+    .replace(/(?:\u20B9\s*)?(?:\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|\d+\.\d{1,2})/g, "")
     .replace(/\b(dr|cr|debit|credit)\b/gi, "")
-    .replace(/\s+/g, " ")
-    .trim();
+    .replace(/\s+/g, " ");
 }
 
 function sideOf(text: string): "debit" | "credit" | "" {
@@ -330,11 +352,12 @@ function sideOf(text: string): "debit" | "credit" | "" {
 }
 
 function isBalanceLine(text: string) {
+  const t = asText(text);
   return (
-    /\b(opening|closing|available)\s+balance\b/i.test(text) ||
-    /\bbalance\s*(b\/f|c\/f|bd|cd|brought|carried)\b/i.test(text) ||
-    /\b(brought|carried)\s+forward\b/i.test(text) ||
-    /^(opening|closing|available|balance|total)\b/i.test(text.trim())
+    /\b(opening|closing|available)\s+balance\b/i.test(t) ||
+    /\bbalance\s*(b\/f|c\/f|bd|cd|brought|carried)\b/i.test(t) ||
+    /\b(brought|carried)\s+forward\b/i.test(t) ||
+    /^(opening|closing|available|balance|total)\b/i.test(t)
   );
 }
 
@@ -346,7 +369,7 @@ export function dcOf(row: Pick<BankRow, "debit" | "credit">) {
 }
 
 export function extractRef(text: string) {
-  const t = text.replace(/\s+/g, " ").trim();
+  const t = asText(text).replace(/\s+/g, " ");
   if (!t) return "";
   const labeled = t.match(
     /\b(?:UPI|IMPS|NEFT|RTGS|NACH|ACH|IFT|INFT|UTR|RRN)(?:[\s/.:-]{0,3}(?:DR|CR|P2A|P2P|INFT))?[\s/.:-]{0,3}([A-Z0-9]{8,})\b/i,
@@ -363,32 +386,32 @@ export function extractRef(text: string) {
   return "";
 }
 
-function cleanRefCell(raw: string) {
-  const t = raw.trim();
+function cleanRefCell(raw: unknown) {
+  const t = asText(raw);
   if (!t || /^(0+|-+|na|n\/a|\.)$/i.test(t)) return "";
   return t;
 }
 
 function parseAmount(raw: string) {
-  const t = raw.replace(/[^\d.\-]/g, "");
+  const t = asText(raw).replace(/[^\d.\-]/g, "");
   const n = Number(t);
   return Number.isFinite(n) ? n : 0;
 }
 
 export function parseLooseDate(raw: string): string {
-  const t = raw.trim();
+  const t = asText(raw);
   const iso = t.match(/\b(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})\b/);
   if (iso) return ymd(iso[1], iso[2], iso[3]);
   const mon = t.match(
     /\b(\d{1,2})[\s\-\/.](jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[\s\-\/.,]+(\d{2,4})\b/i,
   );
   if (mon) {
-    const year = mon[3].length === 2 ? `20${mon[3]}` : mon[3];
-    return ymd(year, monthNum(mon[2]), mon[1]);
+    const year = (mon[3] ?? "").length === 2 ? `20${mon[3]}` : mon[3];
+    return ymd(year, monthNum(mon[2] ?? ""), mon[1]);
   }
   const dmy = t.match(/\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})\b/);
   if (dmy) {
-    const year = dmy[3].length === 2 ? `20${dmy[3]}` : dmy[3];
+    const year = (dmy[3] ?? "").length === 2 ? `20${dmy[3]}` : dmy[3];
     return ymd(year, dmy[2], dmy[1]);
   }
   return "";
@@ -398,7 +421,7 @@ function monthNum(name: string) {
   const i = [
     "jan", "feb", "mar", "apr", "may", "jun",
     "jul", "aug", "sep", "oct", "nov", "dec",
-  ].indexOf(name.slice(0, 3).toLowerCase());
+  ].indexOf(asText(name).slice(0, 3).toLowerCase());
   return i < 0 ? "" : String(i + 1);
 }
 
@@ -409,6 +432,36 @@ function ymd(y?: string, m?: string, d?: string) {
   if (Number(month) < 1 || Number(month) > 12) return "";
   if (Number(day) < 1 || Number(day) > 31) return "";
   return `${y}-${month}-${day}`;
+}
+
+function linesFromPdfItems(items: unknown[]) {
+  const rows = new Map<number, { x: number; str: string }[]>();
+  for (const item of items) {
+    if (!item || typeof item !== "object" || !("str" in item)) continue;
+    const str = asText((item as { str?: unknown }).str);
+    if (!str) continue;
+    const transform = (item as { transform?: number[] }).transform ?? [];
+    const x = transform[4] ?? 0;
+    const y = Math.round((transform[5] ?? 0) * 2) / 2;
+    const row = rows.get(y) ?? [];
+    row.push({ x, str });
+    rows.set(y, row);
+  }
+  return [...rows.entries()]
+    .sort((a, b) => b[0] - a[0])
+    .map(([, cells]) => {
+      cells.sort((a, b) => a.x - b.x);
+      let line = cells[0]?.str ?? "";
+      for (let i = 1; i < cells.length; i++) {
+        const prev = cells[i - 1];
+        const cur = cells[i];
+        const gap = (cur?.x ?? 0) - (prev?.x ?? 0) - (prev?.str.length ?? 0) * 4;
+        line += gap > 12 ? "\t" : " ";
+        line += cur?.str ?? "";
+      }
+      return line;
+    })
+    .join("\n");
 }
 
 export async function statementTextFromPdf(
@@ -425,35 +478,21 @@ export async function statementTextFromPdf(
     }).promise;
     const pages: string[] = [];
     for (let i = 1; i <= doc.numPages; i++) {
-      const page = await doc.getPage(i);
-      const content = await page.getTextContent();
-      const rows = new Map<number, { x: number; str: string }[]>();
-      for (const item of content.items) {
-        if (!item || typeof item !== "object" || !("str" in item)) continue;
-        const str = String((item as { str?: string }).str ?? "");
-        if (!str.trim()) continue;
-        const transform = (item as { transform?: number[] }).transform ?? [];
-        const x = transform[4] ?? 0;
-        const y = Math.round((transform[5] ?? 0) * 2) / 2;
-        const row = rows.get(y) ?? [];
-        row.push({ x, str });
-        rows.set(y, row);
+      try {
+        const page = await doc.getPage(i);
+        const content = await page.getTextContent();
+        pages.push(linesFromPdfItems(content.items as unknown[]));
+      } catch {
+        pages.push("");
       }
-      const lines = [...rows.entries()]
-        .sort((a, b) => b[0] - a[0])
-        .map(([, cells]) => {
-          cells.sort((a, b) => a.x - b.x);
-          let line = cells[0]?.str ?? "";
-          for (let i = 1; i < cells.length; i++) {
-            const gap = (cells[i]?.x ?? 0) - (cells[i - 1]?.x ?? 0) - (cells[i - 1]?.str.length ?? 0) * 4;
-            line += gap > 12 ? "\t" : " ";
-            line += cells[i]?.str ?? "";
-          }
-          return line;
-        });
-      pages.push(lines.join("\n"));
     }
-    return pages.join("\n");
+    const text = pages.join("\n").trim();
+    if (!text) {
+      throw new Error(
+        "This PDF has no readable text. Download CSV from net banking and upload that.",
+      );
+    }
+    return text;
   } catch (err) {
     const name = err && typeof err === "object" && "name" in err
       ? String((err as { name?: string }).name)
@@ -468,6 +507,7 @@ export async function statementTextFromPdf(
           : "This statement is locked. Enter the password, then upload.",
       );
     }
-    throw err;
+    if (err instanceof Error && err.message) throw err;
+    throw new Error("Could not read this PDF. Try CSV from net banking.");
   }
 }

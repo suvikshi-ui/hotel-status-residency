@@ -34,6 +34,17 @@ describe("bank recon", () => {
     assert.equal(bank[0]?.credit, 1500);
   });
 
+  it("does not crash when a row is missing the ref cell", () => {
+    const csv = [
+      "Date,Narration,Ch./Ref. no.,Debit,Credit",
+      "17/09/2026,UPI hotel",
+      "18/09/2026,IMPS guest,IMPS99887766,0,2200",
+    ].join("\n");
+    const bank = parseStatementText(csv);
+    assert.equal(bank.length, 1);
+    assert.equal(bank[0]?.ref, "IMPS99887766");
+  });
+
   it("reads Ch./Ref. no. when the header is below the title", () => {
     const csv = [
       "Account Statement September 2026",
