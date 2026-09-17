@@ -240,19 +240,10 @@ export function buildDueAccounts(
 
   const keys = [...map.keys()].sort((a, b) => b.length - a.length);
   for (const r of receipts) {
-    if (r.kind === "ota") continue;
-    const name = (r.particular ?? "").trim().toUpperCase();
-    if (!name) continue;
+    if (r.kind === "ota" || r.kind === "other" || r.kind === "list") continue;
     const hit = keys.find((k) => receiptMatches(r.particular, k));
-    const row = hit ? map.get(hit)! : ensure(name);
-    if (!hit) keys.push(row.key);
-    if (!row.firstDate || r.date < row.firstDate) row.firstDate = r.date;
-    if (!row.lastDate || r.date > row.lastDate) row.lastDate = r.date;
-    if (r.kind === "list") {
-      row.listBilled += r.amount;
-      row.billed += r.amount;
-      continue;
-    }
+    if (!hit) continue;
+    const row = map.get(hit)!;
     row.collected += r.amount;
     row.receipts.push({
       id: r.id,
@@ -332,7 +323,7 @@ export function uniqueSources(
     }
   }
   for (const r of receipts ?? []) {
-    if (r.kind === "ota") continue;
+    if (r.kind === "ota" || r.kind === "other" || r.kind === "list") continue;
     const s = (r.particular ?? "").trim();
     if (s) set.add(s);
   }

@@ -242,7 +242,7 @@ describe("buildDueAccounts stays", () => {
     assert.equal(motor!.collected, 0);
   });
 
-  it("puts an Other entry on the source list and cuts that source like a normal receive", () => {
+  it("keeps Other and list entries off the Balance source list", () => {
     const accounts = buildDueAccounts(
       [
         guest({ id: "a1", date: "2026-09-01", name: "RAMESH", stay: "out" }),
@@ -251,34 +251,9 @@ describe("buildDueAccounts stays", () => {
         receipt({
           id: "o1",
           amount: 500,
-          particular: "Flysky",
+          particular: "Other · tea",
           kind: "other",
         }),
-        receipt({
-          id: "o2",
-          amount: 800,
-          particular: "Walk-in Co",
-          kind: "other",
-        }),
-      ],
-    );
-    const fly = accounts.find((a) => a.key === "FLYSKY");
-    const extra = accounts.find((a) => a.key === "WALK-IN CO");
-    assert.ok(fly);
-    assert.ok(extra);
-    assert.equal(fly!.collected, 500);
-    assert.equal(fly!.remaining, 1500);
-    assert.equal(extra!.billed, 0);
-    assert.equal(extra!.collected, 800);
-    assert.equal(extra!.settled, false);
-  });
-
-  it("adds a list entry to the source list without treating it as a receive", () => {
-    const accounts = buildDueAccounts(
-      [
-        guest({ id: "a1", date: "2026-09-01", name: "RAMESH", stay: "out" }),
-      ],
-      [
         receipt({
           id: "l1",
           amount: 3500,
@@ -288,16 +263,11 @@ describe("buildDueAccounts stays", () => {
         }),
       ],
     );
-    const extra = accounts.find((a) => a.key === "NEW CO");
+    assert.equal(accounts.some((a) => a.key === "OTHER · TEA"), false);
+    assert.equal(accounts.some((a) => a.key === "NEW CO"), false);
     const fly = accounts.find((a) => a.key === "FLYSKY");
-    assert.ok(extra);
     assert.ok(fly);
-    assert.equal(extra!.listBilled, 3500);
-    assert.equal(extra!.billed, 3500);
-    assert.equal(extra!.collected, 0);
-    assert.equal(extra!.remaining, 3500);
-    assert.equal(extra!.receipts.length, 0);
-    assert.equal(fly!.listBilled, 0);
+    assert.equal(fly!.collected, 0);
     assert.equal(fly!.remaining, 2000);
   });
 });

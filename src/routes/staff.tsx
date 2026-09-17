@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Printer } from "lucide-react";
+import { Plus, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -70,6 +70,28 @@ function StaffPage() {
   const salaryFrozen = isSealed(sealedIds, sealKey.staffMonth(monthKey));
   const advFrozen = isSealed(sealedIds, sealKey.advanceMonth(monthKey));
   const frozen = sheet === "salary" ? salaryFrozen : advFrozen;
+
+  function addStaff() {
+    if (salaryFrozen) return;
+    setDraft((prev) => [
+      ...prev,
+      {
+        id: uid("st"),
+        name: "",
+        salary: 0,
+        role: "Staff",
+        days: "30 DAYS",
+        absent: 0,
+        working: 0,
+        extra: 0,
+        advance: 0,
+        weekOff: 0,
+        total: 0,
+        status: "",
+        month: date.slice(0, 7),
+      },
+    ]);
+  }
 
   function patchStaff(id: string, field: keyof StaffRow, value: string) {
     if (salaryFrozen) return;
@@ -237,12 +259,17 @@ function StaffPage() {
               <Label htmlFor="month-days">Days in month</Label>
               <Input
                 id="month-days"
-                type="number"
-                min={1}
-                max={31}
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
                 className="w-24"
-                value={monthDays}
-                onChange={(e) => setMonthDays(Number(e.target.value) || 30)}
+                value={monthDays || ""}
+                onChange={(e) =>
+                  setMonthDays(Number(e.target.value.replace(/[^\d]/g, "")) || 0)
+                }
+                onBlur={() => {
+                  if (monthDays < 1) setMonthDays(30);
+                }}
               />
             </div>
             <div className="flex flex-wrap gap-2">
@@ -306,46 +333,34 @@ function StaffPage() {
                         />
                       </td>
                       <td className="px-3 py-2">
-                        <Input
+                        <AmountField
                           aria-label={`${r.name} basic salary`}
-                          type="number"
-                          className="text-right tabular"
                           value={r.salary}
-                          onChange={(e) => patchStaff(r.id, "salary", e.target.value)}
+                          onChange={(v) => patchStaff(r.id, "salary", v)}
                         />
                       </td>
                       <td className="px-3 py-2">
-                        <Input
+                        <AmountField
                           aria-label={`${r.name} working days`}
-                          type="number"
-                          className="text-right tabular"
                           value={r.working}
-                          onChange={(e) =>
-                            patchStaff(r.id, "working", e.target.value)
-                          }
+                          onChange={(v) => patchStaff(r.id, "working", v)}
                         />
                       </td>
                       <td className="px-3 py-2">
-                        <Input
+                        <AmountField
                           aria-label={`${r.name} extra working day`}
-                          type="number"
-                          className="text-right tabular"
                           value={r.extra}
-                          onChange={(e) => patchStaff(r.id, "extra", e.target.value)}
+                          onChange={(v) => patchStaff(r.id, "extra", v)}
                         />
                       </td>
                       <td className="px-3 py-2.5 text-right tabular">
                         {money(r.earned)}
                       </td>
                       <td className="px-3 py-2">
-                        <Input
+                        <AmountField
                           aria-label={`${r.name} advance`}
-                          type="number"
-                          className="text-right tabular"
                           value={r.advance}
-                          onChange={(e) =>
-                            patchStaff(r.id, "advance", e.target.value)
-                          }
+                          onChange={(v) => patchStaff(r.id, "advance", v)}
                         />
                       </td>
                       <td
@@ -380,6 +395,17 @@ function StaffPage() {
                   </tr>
                 </tfoot>
               </table>
+              <div className="border-t border-border p-3 print:hidden">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={addStaff}
+                  disabled={salaryFrozen}
+                >
+                  <Plus className="size-4" />
+                  Add
+                </Button>
+              </div>
             </CardContent>
           </Card>
           </fieldset>
@@ -508,5 +534,27 @@ function StaffPage() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+function AmountField({
+  value,
+  onChange,
+  "aria-label": ariaLabel,
+}: {
+  value: number;
+  onChange: (value: string) => void;
+  "aria-label": string;
+}) {
+  return (
+    <Input
+      aria-label={ariaLabel}
+      type="text"
+      inputMode="decimal"
+      autoComplete="off"
+      className="text-right tabular"
+      value={value === 0 ? "" : String(value)}
+      onChange={(e) => onChange(e.target.value.replace(/[^\d.]/g, ""))}
+    />
   );
 }

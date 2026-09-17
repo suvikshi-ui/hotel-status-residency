@@ -101,13 +101,10 @@ function BalancePage() {
     .filter((r) => r.kind === "other")
     .slice()
     .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
-  const listRows = receipts
-    .filter((r) => r.kind === "list")
-    .slice()
-    .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
   const otherToday = otherRows
     .filter((r) => r.date === date)
     .reduce((s, r) => s + r.amount, 0);
+  const otherTotal = otherRows.reduce((s, r) => s + r.amount, 0);
 
   function collectFrom(account: DueAccount, mode: PayMode, amount: number) {
     gate(
@@ -197,7 +194,7 @@ function BalancePage() {
             Balance
           </TabsTrigger>
           <TabsTrigger value="other" className="w-full">
-            Entry
+            Other
           </TabsTrigger>
         </TabsList>
 
@@ -312,45 +309,22 @@ function BalancePage() {
           <OtherTab
             booksCb={books?.outstanding.cb ?? 0}
             today={otherToday}
-            receiveRows={otherRows}
-            listRows={listRows}
-            sources={sourceHints}
-            onAddList={(amount, particular) => {
+            total={otherTotal}
+            rows={otherRows}
+            onAdd={(mode, amount, note) => {
               gate(
                 () => {
                   addBalReceived({
-                    particular,
-                    mode: "BALANCE",
-                    amount,
-                    kind: "list",
-                  });
-                  toast.success(
-                    `${particular} ${money(amount)} added to the Balance list`,
-                  );
-                },
-                {
-                  title: "Add this source to the list?",
-                  message: `${particular} · ${money(amount)} will show on the Balance list. Books outstanding will not change.`,
-                  confirmLabel: "Save",
-                },
-              );
-            }}
-            onAddReceive={(mode, amount, particular) => {
-              gate(
-                () => {
-                  addBalReceived({
-                    particular,
+                    particular: note.trim() ? `Other · ${note.trim()}` : "Other",
                     mode,
                     amount,
                     kind: "other",
                   });
-                  toast.success(
-                    `Received ${money(amount)} from ${particular}`,
-                  );
+                  toast.success(`Other ${money(amount)} saved`);
                 },
                 {
-                  title: "Receive this amount?",
-                  message: `Collect ${money(amount)} from ${particular}? Cuts that source like a normal receive.`,
+                  title: "Save this Other entry?",
+                  message: `Other ${money(amount)}. It will not show on the Balance list.`,
                   confirmLabel: "Save",
                 },
               );
@@ -359,11 +333,11 @@ function BalancePage() {
               gate(
                 () => {
                   removeBalReceived(id);
-                  toast.success("Entry removed");
+                  toast.success("Other entry removed");
                 },
                 {
-                  title: "Delete this entry?",
-                  message: "Remove this from the list?",
+                  title: "Delete this Other entry?",
+                  message: "Remove this Other amount?",
                   confirmLabel: "Delete",
                   danger: true,
                 },
@@ -379,28 +353,21 @@ function BalancePage() {
 function OtherTab({
   booksCb,
   today,
-  receiveRows,
-  listRows,
-  sources,
-  onAddList,
-  onAddReceive,
+  total,
+  rows,
+  onAdd,
   onRemove,
 }: {
   booksCb: number;
   today: number;
-  receiveRows: { id: string; date: string; particular: string; mode: PayMode; amount: number }[];
-  listRows: { id: string; date: string; particular: string; mode: PayMode; amount: number }[];
-  sources: string[];
-  onAddList: (amount: number, particular: string) => void;
-  onAddReceive: (mode: PayMode, amount: number, particular: string) => void;
+  total: number;
+  rows: { id: string; date: string; particular: string; mode: PayMode; amount: number }[];
+  onAdd: (mode: PayMode, amount: number, note: string) => void;
   onRemove: (id: string) => void;
 }) {
   const [mode, setMode] = useState<PayMode>("CASH");
-  const [recvAmt, setRecvAmt] = useState("");
-  const [recvSource, setRecvSource] = useState("");
-  const [listAmt, setListAmt] = useState("");
-  const [listSource, setListSource] = useState("");
-  const listTotal = listRows.reduce((s, r) => s + r.amount, 0);
+  const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
 
   return (
     <>
@@ -410,18 +377,17 @@ function OtherTab({
           <div className="mt-1 font-display text-2xl font-semibold tabular text-due">
             {money(booksCb)}
           </div>
-          <p className="mt-1 text-xs text-muted">List add does not change this</p>
         </Card>
         <Card className="p-4">
-          <div className="text-xs font-medium text-muted">On the list</div>
+          <div className="text-xs font-medium text-muted">Other today</div>
           <div className="mt-1 font-display text-2xl font-semibold tabular">
-            {money(listTotal)}
+            {money(today)}
           </div>
         </Card>
         <Card className="col-span-2 p-4 lg:col-span-1">
-          <div className="text-xs font-medium text-muted">Received today</div>
+          <div className="text-xs font-medium text-muted">Other posted</div>
           <div className="mt-1 font-display text-2xl font-semibold tabular">
-            {money(today)}
+            {money(total)}
           </div>
         </Card>
       </div>
@@ -430,162 +396,31 @@ function OtherTab({
         <CardContent className="flex flex-col gap-4 p-5">
           <div>
             <p className="font-display text-lg font-semibold tracking-tight">
-              Add to list
+              Other
             </p>
             <p className="mt-1 text-sm text-muted">
-              Source name + their balance. Name appears on the main Balance list.
-              Books outstanding does not change. Later receive on the list cuts as
-              usual.
+              Amount + note. Name stays Other. It does not appear on the Balance
+              list.
             </p>
           </div>
           <form
-            className="grid gap-3 sm:grid-cols-[1fr_8rem_auto]"
+            className="grid gap-3 sm:grid-cols-[9rem_8rem_1fr_auto]"
             onSubmit={(e) => {
               e.preventDefault();
-              const name = listSource.trim();
-              if (!name) {
-                toast.error("Enter the source or company name");
-                return;
-              }
-              const amt = Number(listAmt);
-              if (!Number.isFinite(amt) || amt <= 0) {
-                toast.error("Enter their balance amount");
-                return;
-              }
-              onAddList(amt, name);
-              setListAmt("");
-              setListSource("");
-            }}
-          >
-            <div className="grid gap-1.5">
-              <Label htmlFor="list-source">Source</Label>
-              <Input
-                id="list-source"
-                value={listSource}
-                onChange={(e) => setListSource(e.target.value)}
-                placeholder="Company / person"
-                list="list-source-hints"
-                autoComplete="off"
-              />
-              <datalist id="list-source-hints">
-                {sources.map((s) => (
-                  <option key={s} value={s} />
-                ))}
-              </datalist>
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="list-balance">Balance</Label>
-              <Input
-                id="list-balance"
-                type="number"
-                min={0}
-                value={listAmt}
-                onChange={(e) => setListAmt(e.target.value)}
-                placeholder="0"
-              />
-            </div>
-            <div className="flex items-end">
-              <Button type="submit" className="w-full">
-                Add to list
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="overflow-x-auto p-0">
-          <table className="w-full min-w-[28rem] text-left text-sm">
-            <thead className="text-xs uppercase tracking-wide text-muted">
-              <tr className="border-y border-border">
-                <th className="px-5 py-2 font-medium">Date</th>
-                <th className="px-3 py-2 font-medium">Source</th>
-                <th className="px-3 py-2 text-right font-medium">Balance</th>
-                <th className="px-3 py-2" />
-              </tr>
-            </thead>
-            <tbody>
-              {listRows.map((r) => (
-                <tr key={r.id} className="border-b border-border/70">
-                  <td className="px-5 py-2.5 tabular text-muted">
-                    {formatDayShort(r.date)}
-                  </td>
-                  <td className="px-3 py-2.5 font-medium">{r.particular}</td>
-                  <td className="px-3 py-2.5 text-right tabular">
-                    {money(r.amount)}
-                  </td>
-                  <td className="px-3 py-2.5 text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-9 min-h-9 text-muted hover:text-danger"
-                      aria-label="Remove list entry"
-                      onClick={() => onRemove(r.id)}
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {listRows.length === 0 ? (
-            <p className="py-10 text-center text-sm text-muted">
-              No names added to the list yet.
-            </p>
-          ) : null}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="flex flex-col gap-4 p-5">
-          <div>
-            <p className="font-display text-lg font-semibold tracking-tight">
-              Receive
-            </p>
-            <p className="mt-1 text-sm text-muted">
-              Cuts that source like a normal Balance receive.
-            </p>
-          </div>
-          <form
-            className="grid gap-3 sm:grid-cols-[1fr_9rem_8rem_auto]"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const name = recvSource.trim();
-              if (!name) {
-                toast.error("Enter the source or customer name");
-                return;
-              }
-              const amt = Number(recvAmt);
+              const amt = Number(amount);
               if (!Number.isFinite(amt) || amt <= 0) {
                 toast.error("Enter an amount");
                 return;
               }
-              onAddReceive(mode, amt, name);
-              setRecvAmt("");
-              setRecvSource("");
+              onAdd(mode, amt, note);
+              setAmount("");
+              setNote("");
             }}
           >
             <div className="grid gap-1.5">
-              <Label htmlFor="recv-source">Source</Label>
-              <Input
-                id="recv-source"
-                value={recvSource}
-                onChange={(e) => setRecvSource(e.target.value)}
-                placeholder="Company / person"
-                list="recv-source-hints"
-                autoComplete="off"
-              />
-              <datalist id="recv-source-hints">
-                {sources.map((s) => (
-                  <option key={s} value={s} />
-                ))}
-              </datalist>
-            </div>
-            <div className="grid gap-1.5">
               <Label>Paid by</Label>
               <Select value={mode} onValueChange={(v) => setMode(v as PayMode)}>
-                <SelectTrigger aria-label="Receive payment mode">
+                <SelectTrigger aria-label="Other payment mode">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -598,18 +433,28 @@ function OtherTab({
               </Select>
             </div>
             <div className="grid gap-1.5">
-              <Label>Amount received</Label>
+              <Label>Amount</Label>
               <Input
-                type="number"
-                min={0}
-                value={recvAmt}
-                onChange={(e) => setRecvAmt(e.target.value)}
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
                 placeholder="0"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="other-note">Note</Label>
+              <Input
+                id="other-note"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Optional"
               />
             </div>
             <div className="flex items-end">
               <Button type="submit" className="w-full">
-                Receive
+                Save
               </Button>
             </div>
           </form>
@@ -622,19 +467,19 @@ function OtherTab({
             <thead className="text-xs uppercase tracking-wide text-muted">
               <tr className="border-y border-border">
                 <th className="px-5 py-2 font-medium">Date</th>
-                <th className="px-3 py-2 font-medium">Source</th>
+                <th className="px-3 py-2 font-medium">Note</th>
                 <th className="px-3 py-2 font-medium">Paid by</th>
-                <th className="px-3 py-2 text-right font-medium">Received</th>
+                <th className="px-3 py-2 text-right font-medium">Amount</th>
                 <th className="px-3 py-2" />
               </tr>
             </thead>
             <tbody>
-              {receiveRows.map((r) => (
+              {rows.map((r) => (
                 <tr key={r.id} className="border-b border-border/70">
                   <td className="px-5 py-2.5 tabular text-muted">
                     {formatDayShort(r.date)}
                   </td>
-                  <td className="px-3 py-2.5 font-medium">{r.particular}</td>
+                  <td className="px-3 py-2.5">{r.particular}</td>
                   <td className="px-3 py-2.5">
                     <ModeBadge mode={r.mode} />
                   </td>
@@ -646,7 +491,7 @@ function OtherTab({
                       variant="ghost"
                       size="icon"
                       className="size-9 min-h-9 text-muted hover:text-danger"
-                      aria-label="Remove receive"
+                      aria-label="Remove other entry"
                       onClick={() => onRemove(r.id)}
                     >
                       <Trash2 className="size-4" />
@@ -656,9 +501,9 @@ function OtherTab({
               ))}
             </tbody>
           </table>
-          {receiveRows.length === 0 ? (
+          {rows.length === 0 ? (
             <p className="py-10 text-center text-sm text-muted">
-              No receive entries yet.
+              No Other entries yet.
             </p>
           ) : null}
         </CardContent>
