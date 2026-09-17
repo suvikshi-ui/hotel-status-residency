@@ -23,8 +23,8 @@ describe("bank recon", () => {
       "Date",
       "Narration",
       "Ch./Ref. no.",
-      "Debit",
-      "Credit",
+      "Withdrawal",
+      "Deposit",
     ]);
     assert.equal(bank[0]?.dateRaw, "17/09/2026");
     assert.equal(bank[0]?.particular, "TO TRANSFER UPI/DR/412345678901/RAMESH");

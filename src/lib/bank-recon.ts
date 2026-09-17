@@ -217,7 +217,7 @@ const CREDIT_HEAD = /^(credit|cr|deposit|cr amount|amount credited)$/i;
 const DEBIT_HEAD = /^(debit|dr|withdrawal|wdl|dr amount|amount debited)$/i;
 const REF_HEAD = /ch\.?\s*\/?\s*ref|^ref$|ref\.?\s*no|cheque|chq|reference/i;
 const DC_HEAD = /^(d\/c|dr\/cr|type)$/i;
-const CLEAN_HEADERS = ["Date", "Narration", "Ch./Ref. no.", "Debit", "Credit"];
+const CLEAN_HEADERS = ["Date", "Narration", "Ch./Ref. no.", "Withdrawal", "Deposit"];
 
 export function parseStatementText(text: string, month = ""): BankRow[] {
   const raw = asText(text).replace(/^\uFEFF/, "");
@@ -506,6 +506,24 @@ export function extractRef(text: string) {
   const bankCode = t.match(/\b([A-Z]{4}[A-Z0-9]{6,})\b/i);
   if (bankCode?.[1]) return bankCode[1];
   return "";
+}
+
+export const STATEMENT_HEADERS = [
+  "Date",
+  "Narration",
+  "Ch./Ref. no.",
+  "Withdrawal",
+  "Deposit",
+] as const;
+
+export function statementChartRows(rows: BankRow[]) {
+  return rows.map((r) => [
+    r.dateRaw || r.cells[0] || "",
+    r.particular || r.cells[1] || "",
+    r.ref || r.cells[2] || "",
+    r.debit ? String(r.debit) : "",
+    r.credit ? String(r.credit) : "",
+  ]);
 }
 
 export function statementCsv(headers: string[], rows: string[][]) {

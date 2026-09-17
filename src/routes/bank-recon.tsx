@@ -1,22 +1,21 @@
 import { useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Download, Landmark, Upload } from "lucide-react";
+import { Download, Upload } from "lucide-react";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { SaveCube, useAccountSave } from "@/components/save-cube";
 import { useGate } from "@/components/security-gate";
 import {
+  STATEMENT_HEADERS,
   mergeBankRows,
   parseStatementText,
-  reconcileBank,
+  statementChartRows,
   statementCsv,
   statementTextFromPdf,
   type BankRow,
 } from "@/lib/bank-recon";
-import { formatDayShort, money } from "@/lib/format";
 import { useLedger } from "@/lib/store";
 
 export const Route = createFileRoute("/bank-recon")({
@@ -25,7 +24,6 @@ export const Route = createFileRoute("/bank-recon")({
 
 function BankReconPage() {
   const date = useLedger((s) => s.selectedDate);
-  const guests = useLedger((s) => s.guests);
   const bankRows = useLedger((s) => s.bankRows);
   const setBankRows = useLedger((s) => s.setBankRows);
   const { busy: saving, saveToServer } = useAccountSave();
@@ -38,12 +36,6 @@ function BankReconPage() {
     () => bankRows.filter((r) => r.month === month),
     [bankRows, month],
   );
-  const lines = useMemo(
-    () => reconcileBank(monthRows, guests),
-    [monthRows, guests],
-  );
-  const matched = lines.filter((l) => l.office);
-  const unmatched = lines.filter((l) => !l.office);
 
   function applyParsed(parsed: BankRow[]) {
     if (!parsed.length) {
@@ -54,11 +46,11 @@ function BankReconPage() {
       () => {
         const kept = bankRows.filter((r) => r.month !== month);
         setBankRows(mergeBankRows(kept, parsed, month));
-        toast.success(`Uploaded ${parsed.length} rows as printed`);
+        toast.success(`Ready to download ${parsed.length} rows`);
       },
       {
         title: "Upload this bank statement?",
-        message: `${parsed.length} rows will replace ${month}, as printed.`,
+        message: `${parsed.length} rows will be kept for download.`,
         confirmLabel: "Upload",
       },
     );
@@ -88,18 +80,12 @@ function BankReconPage() {
 
   function downloadStatement() {
     if (!monthRows.length) {
-      toast.error("No statement to download");
+      toast.error("Upload a statement first");
       return;
     }
     const csv = statementCsv(
-      ["Date", "Narration", "Ch./Ref. no.", "Debit", "Credit"],
-      monthRows.map((r) => [
-        r.dateRaw || r.cells[0] || "",
-        r.particular || r.cells[1] || "",
-        r.ref || r.cells[2] || "",
-        r.debit ? String(r.debit) : "",
-        r.credit ? String(r.credit) : "",
-      ]),
+      [...STATEMENT_HEADERS],
+      statementChartRows(monthRows),
     );
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -121,8 +107,8 @@ function BankReconPage() {
             Bank recon
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Date, Narration, Ch./Ref. no., Debit and Credit only. Address and
-            closing balance are not uploaded.
+            Upload the bank statement, then download only Date, Narration,
+            Ch./Ref. no., Withdrawal and Deposit.
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
@@ -161,8 +147,7 @@ function BankReconPage() {
           </Button>
           <Button
             type="button"
-            variant="outline"
-            disabled={!monthRows.length}
+            disabled={!monthRows.length || busy}
             onClick={downloadStatement}
           >
             <Download className="size-4" />
@@ -172,107 +157,14 @@ function BankReconPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-        <Stat label="Uploaded" value={String(monthRows.length)} />
-        <Stat label="Matched" value={String(matched.length)} />
-        <Stat label="Later" value={String(unmatched.length)} />
-      </div>
-
-      <Card>
-        <CardHeader className="gap-3 md:flex-row md:items-center md:justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <Landmark className="size-4" />
-            {month}
-            <Badge variant="ok">{matched.length} matched</Badge>
-            {unmatched.length ? (
-              <Badge variant="muted">{unmatched.length} later</Badge>
-            ) : null}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="overflow-x-auto p-0">
-          <table className="w-full min-w-[64rem] text-left text-sm">
-            <thead className="text-xs uppercase tracking-wide text-muted">
-              <tr className="border-y border-border bg-bg-warm/50">
-                <th className="px-5 py-2 font-medium" colSpan={5}>
-                  Bank statement
-                </th>
-                <th className="px-3 py-2 font-medium" colSpan={3}>
-                  Entry in office
-                </th>
-              </tr>
-              <tr className="border-b border-border">
-                <th className="px-5 py-2 font-medium">Date</th>
-                <th className="px-3 py-2 font-medium">Narration</th>
-                <th className="px-3 py-2 font-medium">Ch./Ref. no.</th>
-                <th className="px-3 py-2 text-right font-medium">Debit</th>
-                <th className="px-3 py-2 text-right font-medium">Credit</th>
-                <th className="px-3 py-2 font-medium">Yes/No</th>
-                <th className="px-3 py-2 font-medium">Office date</th>
-                <th className="px-3 py-2 font-medium">Office entry</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lines.map((line) => (
-                <tr key={line.bank.id} className="border-b border-border/70">
-                  <td className="px-5 py-2.5 tabular">
-                    {line.bank.dateRaw || line.bank.cells[0] || "—"}
-                  </td>
-                  <td className="px-3 py-2.5">
-                    {line.bank.particular || line.bank.cells[1] || "—"}
-                  </td>
-                  <td className="px-3 py-2.5 font-mono text-xs">
-                    {line.bank.ref || line.bank.cells[2] || "—"}
-                  </td>
-                  <td className="px-3 py-2.5 text-right tabular">
-                    {line.bank.debit ? money(line.bank.debit) : "—"}
-                  </td>
-                  <td className="px-3 py-2.5 text-right tabular">
-                    {line.bank.credit ? money(line.bank.credit) : "—"}
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <Badge variant={line.office ? "ok" : "muted"}>
-                      {line.office ? "Yes" : "No"}
-                    </Badge>
-                  </td>
-                  {line.office ? (
-                    <>
-                      <td className="px-3 py-2.5 tabular">
-                        {formatDayShort(line.office.date)}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <div className="font-medium">{line.office.name}</div>
-                        <div className="text-xs text-muted">
-                          {line.office.source || line.office.ref}
-                        </div>
-                      </td>
-                    </>
-                  ) : (
-                    <td className="px-3 py-2.5 text-muted" colSpan={2}>
-                      —
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {lines.length === 0 ? (
-            <p className="py-10 text-center text-sm text-muted">
-              Upload this month's bank statement. CSV, TXT or PDF.
-            </p>
-          ) : null}
-        </CardContent>
+      <Card className="p-5">
+        <p className="text-sm text-muted">
+          Download chart: Date · Narration · Ch./Ref. no. · Withdrawal · Deposit
+        </p>
+        <p className="mt-2 font-display text-2xl font-semibold tabular">
+          {monthRows.length ? `${monthRows.length} rows ready` : "No statement uploaded"}
+        </p>
       </Card>
     </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <Card className="p-4">
-      <div className="text-xs font-medium text-muted">{label}</div>
-      <div className="mt-1 font-display text-xl font-semibold tabular">
-        {value}
-      </div>
-    </Card>
   );
 }
