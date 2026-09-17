@@ -112,6 +112,30 @@ describe("bank recon", () => {
     assert.equal(bank[1]?.debit, 500);
   });
 
+  it("does not put closing/running balance into deposit", () => {
+    const loose = parseStatementText(
+      "17/09/2026 UPI-RAMESH 1,800.00 20,000.00\n18/09/2026 ATM WDL 500.00 19,500.00",
+      "2026-09",
+    );
+    assert.equal(loose[0]?.credit, 1800);
+    assert.equal(loose[0]?.debit, 0);
+    assert.equal(loose[1]?.debit, 500);
+    assert.equal(loose[1]?.credit, 0);
+    assert.equal(loose.every((r) => r.credit !== 20000 && r.debit !== 20000), true);
+
+    const grid = parseStatementText(
+      [
+        "Date,Narration,Ch./Ref. no.,Withdrawal,Deposit,Balance",
+        "17/09/2026,UPI hotel,4123,0,1800,20000",
+        "30/09/2026,Closing Balance,,,,21500",
+      ].join("\n"),
+      "2026-09",
+    );
+    assert.equal(grid.length, 1);
+    assert.equal(grid[0]?.credit, 1800);
+    assert.equal(grid[0]?.debit, 0);
+  });
+
   it("pulls UPI/IMPS numbers out of narration", () => {
     assert.equal(extractRef("TO TRANSFER UPI/DR/412345678901/RAMESH/SBIN"), "412345678901");
   });

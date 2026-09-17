@@ -332,20 +332,7 @@ function rowFromLoose(line: string, month: string): Partial<BankRow> | null {
       /(?:\u20B9\s*)?(\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|\d+\.\d{1,2})/g,
     ),
   ];
-  const txn = amounts.length >= 3 ? amounts.slice(-3, -1) : amounts.slice(-2);
-  const debit = parseAmount(txn[0]?.[0] ?? "");
-  const credit = parseAmount(txn[1]?.[0] ?? (txn.length === 1 ? txn[0]?.[0] ?? "" : ""));
-  let withdrawal = debit;
-  let deposit = credit;
-  if (txn.length === 1) {
-    if (/\b(dr|debit|wdl|withdrawal)\b/i.test(line)) {
-      withdrawal = parseAmount(txn[0]?.[0] ?? "");
-      deposit = 0;
-    } else {
-      withdrawal = 0;
-      deposit = parseAmount(txn[0]?.[0] ?? "");
-    }
-  }
+  const { withdrawal, deposit } = wdlDepFromAmounts(amounts, line);
   const ref = mappedRefFromLine(line, dateRaw);
   let particular = line;
   if (dateRaw) particular = particular.replace(dateRaw, "");
@@ -378,6 +365,31 @@ function rowFromLoose(line: string, month: string): Partial<BankRow> | null {
 function mappedRefFromLine(line: string, dateRaw: string) {
   const withoutDate = dateRaw ? line.replace(dateRaw, "") : line;
   return extractRef(withoutDate);
+}
+
+function wdlDepFromAmounts(
+  amounts: RegExpMatchArray[],
+  line: string,
+): { withdrawal: number; deposit: number } {
+  const values = amounts.map((m) => parseAmount(m[0] ?? "")).filter((n) => Number.isFinite(n));
+  if (values.length >= 3) {
+    return {
+      withdrawal: values[values.length - 3] ?? 0,
+      deposit: values[values.length - 2] ?? 0,
+    };
+  }
+  if (values.length === 2 || values.length === 1) {
+    const txn = values[0] ?? 0;
+    if (isWithdrawalNarration(line)) return { withdrawal: txn, deposit: 0 };
+    return { withdrawal: 0, deposit: txn };
+  }
+  return { withdrawal: 0, deposit: 0 };
+}
+
+function isWithdrawalNarration(line: string) {
+  return /\b(atm|pos|charge|fee|wdl|withdrawal|neft\s*out|rtgs\s*out|imps\s*out|by\s+clg|debit\s+card)\b/i.test(
+    line,
+  );
 }
 
 function slimRow(row: Partial<BankRow> | null): Partial<BankRow> | null {
@@ -462,6 +474,7 @@ function mapHeaders(cells: string[]) {
     dc: -1,
   };
   cells.forEach((cell, i) => {
+    if (/balance/i.test(cell)) return;
     if (mapped.date < 0 && DATE_HEAD.test(cell)) mapped.date = i;
     else if (mapped.ref < 0 && REF_HEAD.test(cell)) mapped.ref = i;
     else if (mapped.dc < 0 && DC_HEAD.test(cell)) mapped.dc = i;
