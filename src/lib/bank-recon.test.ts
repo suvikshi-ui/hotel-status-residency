@@ -58,6 +58,19 @@ describe("bank recon", () => {
     assert.equal(lines[0]?.bank.ref, "IMPS998877");
   });
 
+  it("reads Withdrawal Amount and Deposit Amount headers", () => {
+    const csv = [
+      "Tran Date,Transaction Remarks,Chq/Ref No.,Withdrawal Amount,Deposit Amount,Balance",
+      "17/09/2026,UPI-RAMESH,412345678901,0,1800,20000",
+    ].join("\n");
+    const bank = parseStatementText(csv, "2026-09");
+    assert.equal(bank.length, 1);
+    assert.equal(bank[0]?.particular, "UPI-RAMESH");
+    assert.equal(bank[0]?.ref, "412345678901");
+    assert.equal(bank[0]?.credit, 1800);
+    assert.equal(bank[0]?.cells.includes("20000"), false);
+  });
+
   it("pulls UPI/IMPS numbers out of narration", () => {
     assert.equal(extractRef("TO TRANSFER UPI/DR/412345678901/RAMESH/SBIN"), "412345678901");
   });

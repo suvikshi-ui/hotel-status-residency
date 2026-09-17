@@ -1,9 +1,9 @@
 import { useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Download, Upload } from "lucide-react";
+import { Download, Landmark, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { SaveCube, useAccountSave } from "@/components/save-cube";
 import { useGate } from "@/components/security-gate";
@@ -11,11 +11,12 @@ import {
   STATEMENT_HEADERS,
   mergeBankRows,
   parseStatementText,
+  statementChartHtml,
   statementChartRows,
-  statementCsv,
   statementTextFromPdf,
   type BankRow,
 } from "@/lib/bank-recon";
+import { money } from "@/lib/format";
 import { useLedger } from "@/lib/store";
 
 export const Route = createFileRoute("/bank-recon")({
@@ -46,11 +47,11 @@ function BankReconPage() {
       () => {
         const kept = bankRows.filter((r) => r.month !== month);
         setBankRows(mergeBankRows(kept, parsed, month));
-        toast.success(`Ready to download ${parsed.length} rows`);
+        toast.success(`${parsed.length} rows ready in the chart`);
       },
       {
         title: "Upload this bank statement?",
-        message: `${parsed.length} rows will be kept for download.`,
+        message: `${parsed.length} rows will replace ${month}.`,
         confirmLabel: "Upload",
       },
     );
@@ -83,15 +84,15 @@ function BankReconPage() {
       toast.error("Upload a statement first");
       return;
     }
-    const csv = statementCsv(
+    const html = statementChartHtml(
       [...STATEMENT_HEADERS],
       statementChartRows(monthRows),
     );
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const blob = new Blob([html], { type: "application/vnd.ms-excel" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `bank-statement-${month}.csv`;
+    a.download = `bank-statement-${month}.xls`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -107,8 +108,8 @@ function BankReconPage() {
             Bank recon
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Upload the bank statement, then download only Date, Narration,
-            Ch./Ref. no., Withdrawal and Deposit.
+            Upload, check the chart, then download Date, Narration, Ch./Ref.
+            no., Withdrawal and Deposit.
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
@@ -157,13 +158,48 @@ function BankReconPage() {
         </div>
       </div>
 
-      <Card className="p-5">
-        <p className="text-sm text-muted">
-          Download chart: Date · Narration · Ch./Ref. no. · Withdrawal · Deposit
-        </p>
-        <p className="mt-2 font-display text-2xl font-semibold tabular">
-          {monthRows.length ? `${monthRows.length} rows ready` : "No statement uploaded"}
-        </p>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Landmark className="size-4" />
+            {monthRows.length ? `${monthRows.length} rows` : "Chart"}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="overflow-x-auto p-0">
+          <table className="w-full min-w-[52rem] text-left text-sm">
+            <thead className="text-xs uppercase tracking-wide text-muted">
+              <tr className="border-y border-border bg-bg-warm/50">
+                <th className="px-5 py-2 font-medium">Date</th>
+                <th className="px-3 py-2 font-medium">Narration</th>
+                <th className="px-3 py-2 font-medium">Ch./Ref. no.</th>
+                <th className="px-3 py-2 text-right font-medium">Withdrawal</th>
+                <th className="px-3 py-2 text-right font-medium">Deposit</th>
+              </tr>
+            </thead>
+            <tbody>
+              {monthRows.map((row) => (
+                <tr key={row.id} className="border-b border-border/70">
+                  <td className="px-5 py-2.5 tabular">{row.dateRaw || "—"}</td>
+                  <td className="px-3 py-2.5">{row.particular || "—"}</td>
+                  <td className="px-3 py-2.5 font-mono text-xs">
+                    {row.ref || "—"}
+                  </td>
+                  <td className="px-3 py-2.5 text-right tabular">
+                    {row.debit ? money(row.debit) : "—"}
+                  </td>
+                  <td className="px-3 py-2.5 text-right tabular">
+                    {row.credit ? money(row.credit) : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {monthRows.length === 0 ? (
+            <p className="py-10 text-center text-sm text-muted">
+              Upload a statement to fill this chart.
+            </p>
+          ) : null}
+        </CardContent>
       </Card>
     </div>
   );

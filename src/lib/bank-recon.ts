@@ -212,9 +212,9 @@ function cellByHeader(row: BankRow, pattern: RegExp) {
 }
 
 const DATE_HEAD = /date|txn.?dt|value.?dt/i;
-const NARR_HEAD = /narrat|desc|particular/i;
-const CREDIT_HEAD = /^(credit|cr|deposit|cr amount|amount credited)$/i;
-const DEBIT_HEAD = /^(debit|dr|withdrawal|wdl|dr amount|amount debited)$/i;
+const NARR_HEAD = /narrat|desc|particular|remarks?/i;
+const CREDIT_HEAD = /credit|deposit|amount credited/i;
+const DEBIT_HEAD = /debit|withdrawal|wdl|amount debited/i;
 const REF_HEAD = /ch\.?\s*\/?\s*ref|^ref$|ref\.?\s*no|cheque|chq|reference/i;
 const DC_HEAD = /^(d\/c|dr\/cr|type)$/i;
 const CLEAN_HEADERS = ["Date", "Narration", "Ch./Ref. no.", "Withdrawal", "Deposit"];
@@ -529,7 +529,20 @@ export function statementChartRows(rows: BankRow[]) {
 export function statementCsv(headers: string[], rows: string[][]) {
   const esc = (s: string) =>
     /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  return [headers, ...rows].map((r) => r.map(esc).join(",")).join("\n");
+  return `\uFEFF${[headers, ...rows].map((r) => r.map(esc).join(",")).join("\n")}`;
+}
+
+export function statementChartHtml(headers: string[], rows: string[][]) {
+  const esc = (s: string) =>
+    String(s)
+      .replace(/&/g, "&")
+      .replace(/</g, "<")
+      .replace(/>/g, ">");
+  const head = headers.map((h) => `<th>${esc(h)}</th>`).join("");
+  const body = rows
+    .map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`)
+    .join("");
+  return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"></head><body><table border="1"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></body></html>`;
 }
 
 function linesFromPdfItems(items: unknown[]) {
