@@ -85,7 +85,10 @@ function BalancePage() {
   const collected = accounts.reduce((s, a) => s + a.collected, 0);
   const billed = accounts.reduce((s, a) => s + a.billed, 0);
   const searchHit = lookupDueAccount(accounts, q);
-  const sourceHints = useMemo(() => uniqueSources(guests), [guests]);
+  const sourceHints = useMemo(
+    () => uniqueSources(guests, receipts),
+    [guests, receipts],
+  );
   const listed = useMemo(
     () =>
       searchHit
@@ -191,7 +194,7 @@ function BalancePage() {
             Balance
           </TabsTrigger>
           <TabsTrigger value="other" className="w-full">
-            Other
+            Entry
           </TabsTrigger>
         </TabsList>
 
@@ -308,6 +311,7 @@ function BalancePage() {
             today={otherToday}
             total={otherTotal}
             rows={otherRows}
+            sources={sourceHints}
             onAdd={(mode, amount, particular) => {
               gate(
                 () => {
@@ -318,12 +322,12 @@ function BalancePage() {
                     kind: "other",
                   });
                   toast.success(
-                    `Other ${money(amount)} cut from main balance`,
+                    `Received ${money(amount)} from ${particular} · on the Balance list`,
                   );
                 },
                 {
-                  title: "Are you sure?",
-                  message: `Cut ${money(amount)} from main balance?`,
+                  title: "Add this entry?",
+                  message: `Receive ${money(amount)} from ${particular}. Name goes on the main Balance list. Outstanding does not plus — it cuts like a normal receive.`,
                   confirmLabel: "Save",
                 },
               );
@@ -354,6 +358,7 @@ function OtherTab({
   today,
   total,
   rows,
+  sources,
   onAdd,
   onRemove,
 }: {
@@ -361,12 +366,13 @@ function OtherTab({
   today: number;
   total: number;
   rows: { id: string; date: string; particular: string; mode: PayMode; amount: number }[];
+  sources: string[];
   onAdd: (mode: PayMode, amount: number, particular: string) => void;
   onRemove: (id: string) => void;
 }) {
   const [mode, setMode] = useState<PayMode>("CASH");
   const [amount, setAmount] = useState("");
-  const [note, setNote] = useState("");
+  const [source, setSource] = useState("");
 
   return (
     <>
@@ -378,13 +384,13 @@ function OtherTab({
           </div>
         </Card>
         <Card className="p-4">
-          <div className="text-xs font-medium text-muted">Other today</div>
+          <div className="text-xs font-medium text-muted">Entry today</div>
           <div className="mt-1 font-display text-2xl font-semibold tabular">
             {money(today)}
           </div>
         </Card>
         <Card className="col-span-2 p-4 lg:col-span-1">
-          <div className="text-xs font-medium text-muted">Other posted</div>
+          <div className="text-xs font-medium text-muted">Entry posted</div>
           <div className="mt-1 font-display text-2xl font-semibold tabular">
             {money(total)}
           </div>
@@ -395,31 +401,53 @@ function OtherTab({
         <CardContent className="flex flex-col gap-4 p-5">
           <div>
             <p className="font-display text-lg font-semibold tracking-tight">
-              Cut from main balance
+              Entry
             </p>
             <p className="mt-1 text-sm text-muted">
-              Amount only — no source name. Lands in cash / Santosh QR / P.K. QR
-              and reduces the books outstanding.
+              Source name + received amount. The name is added to the main Balance
+              list. Outstanding does not plus — later receive cuts that source as
+              usual.
             </p>
           </div>
           <form
-            className="grid gap-3 sm:grid-cols-[9rem_1fr_auto]"
+            className="grid gap-3 sm:grid-cols-[1fr_9rem_8rem_auto]"
             onSubmit={(e) => {
               e.preventDefault();
+              const name = source.trim();
+              if (!name) {
+                toast.error("Enter the source or customer name");
+                return;
+              }
               const amt = Number(amount);
               if (!Number.isFinite(amt) || amt <= 0) {
                 toast.error("Enter an amount");
                 return;
               }
-              onAdd(mode, amt, note.trim() || "Other");
+              onAdd(mode, amt, name);
               setAmount("");
-              setNote("");
+              setSource("");
             }}
           >
             <div className="grid gap-1.5">
+              <Label htmlFor="entry-source">Source</Label>
+              <Input
+                id="entry-source"
+                value={source}
+                onChange={(e) => setSource(e.target.value)}
+                placeholder="Company / person"
+                list="entry-source-hints"
+                autoComplete="off"
+              />
+              <datalist id="entry-source-hints">
+                {sources.map((s) => (
+                  <option key={s} value={s} />
+                ))}
+              </datalist>
+            </div>
+            <div className="grid gap-1.5">
               <Label>Paid by</Label>
               <Select value={mode} onValueChange={(v) => setMode(v as PayMode)}>
-                <SelectTrigger aria-label="Other payment mode">
+                <SelectTrigger aria-label="Entry payment mode">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -432,7 +460,7 @@ function OtherTab({
               </Select>
             </div>
             <div className="grid gap-1.5">
-              <Label>Amount</Label>
+              <Label>Amount received</Label>
               <Input
                 type="number"
                 min={0}
@@ -443,17 +471,8 @@ function OtherTab({
             </div>
             <div className="flex items-end">
               <Button type="submit" className="w-full">
-                Cut balance
+                Add entry
               </Button>
-            </div>
-            <div className="grid gap-1.5 sm:col-span-3">
-              <Label htmlFor="other-note">Note (optional)</Label>
-              <Input
-                id="other-note"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="Not a source name"
-              />
             </div>
           </form>
         </CardContent>
@@ -465,9 +484,9 @@ function OtherTab({
             <thead className="text-xs uppercase tracking-wide text-muted">
               <tr className="border-y border-border">
                 <th className="px-5 py-2 font-medium">Date</th>
-                <th className="px-3 py-2 font-medium">Note</th>
+                <th className="px-3 py-2 font-medium">Source</th>
                 <th className="px-3 py-2 font-medium">Paid by</th>
-                <th className="px-3 py-2 text-right font-medium">Amount</th>
+                <th className="px-3 py-2 text-right font-medium">Received</th>
                 <th className="px-3 py-2" />
               </tr>
             </thead>
@@ -477,7 +496,7 @@ function OtherTab({
                   <td className="px-5 py-2.5 tabular text-muted">
                     {formatDayShort(r.date)}
                   </td>
-                  <td className="px-3 py-2.5">{r.particular}</td>
+                  <td className="px-3 py-2.5 font-medium">{r.particular}</td>
                   <td className="px-3 py-2.5">
                     <ModeBadge mode={r.mode} />
                   </td>
@@ -489,7 +508,7 @@ function OtherTab({
                       variant="ghost"
                       size="icon"
                       className="size-9 min-h-9 text-muted hover:text-danger"
-                      aria-label="Remove other collection"
+                      aria-label="Remove entry"
                       onClick={() => onRemove(r.id)}
                     >
                       <Trash2 className="size-4" />
@@ -501,7 +520,7 @@ function OtherTab({
           </table>
           {rows.length === 0 ? (
             <p className="py-10 text-center text-sm text-muted">
-              No other cuts yet.
+              No entries yet.
             </p>
           ) : null}
         </CardContent>

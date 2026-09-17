@@ -241,4 +241,35 @@ describe("buildDueAccounts stays", () => {
     assert.equal(motor!.stays[0]!.status, "open");
     assert.equal(motor!.collected, 0);
   });
+
+  it("puts an Other entry on the source list and cuts that source like a normal receive", () => {
+    const accounts = buildDueAccounts(
+      [
+        guest({ id: "a1", date: "2026-09-01", name: "RAMESH", stay: "out" }),
+      ],
+      [
+        receipt({
+          id: "o1",
+          amount: 500,
+          particular: "Flysky",
+          kind: "other",
+        }),
+        receipt({
+          id: "o2",
+          amount: 800,
+          particular: "Walk-in Co",
+          kind: "other",
+        }),
+      ],
+    );
+    const fly = accounts.find((a) => a.key === "FLYSKY");
+    const extra = accounts.find((a) => a.key === "WALK-IN CO");
+    assert.ok(fly);
+    assert.ok(extra);
+    assert.equal(fly!.collected, 500);
+    assert.equal(fly!.remaining, 1500);
+    assert.equal(extra!.billed, 0);
+    assert.equal(extra!.collected, 800);
+    assert.equal(extra!.settled, false);
+  });
 });

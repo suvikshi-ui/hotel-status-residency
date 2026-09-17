@@ -238,10 +238,12 @@ export function buildDueAccounts(
 
   const keys = [...map.keys()].sort((a, b) => b.length - a.length);
   for (const r of receipts) {
-    if (r.kind === "ota" || r.kind === "other") continue;
+    if (r.kind === "ota") continue;
+    const name = (r.particular ?? "").trim().toUpperCase();
+    if (!name) continue;
     const hit = keys.find((k) => receiptMatches(r.particular, k));
-    if (!hit) continue;
-    const row = map.get(hit)!;
+    const row = hit ? map.get(hit)! : ensure(name);
+    if (!hit) keys.push(row.key);
     row.collected += r.amount;
     row.receipts.push({
       id: r.id,
@@ -250,11 +252,13 @@ export function buildDueAccounts(
       mode: r.mode,
       amount: r.amount,
     });
+    if (!row.firstDate || r.date < row.firstDate) row.firstDate = r.date;
+    if (!row.lastDate || r.date > row.lastDate) row.lastDate = r.date;
   }
 
   for (const row of map.values()) {
     row.remaining = row.billed - row.collected;
-    row.settled = row.remaining <= 0;
+    row.settled = row.billed > 0 && row.remaining <= 0;
     row.guests.sort(
       (a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name),
     );
@@ -307,15 +311,23 @@ export function buildDueAccounts(
   });
 }
 
-export function uniqueSources(guests: GuestEntry[]): string[] {
+export function uniqueSources(
+  guests: GuestEntry[],
+  receipts?: NamedAmount[],
+): string[] {
   const set = new Set<string>();
   for (const g of guests) {
     const s = (g.source ?? "").trim();
     if (s) set.add(s);
     if (g.mode === "BALANCE") {
       const key = sourceKey(g);
-      if (key && key !== "Unknown") set.add(key);
+      if (key && key !== "UNKNOWN") set.add(key);
     }
+  }
+  for (const r of receipts ?? []) {
+    if (r.kind === "ota") continue;
+    const s = (r.particular ?? "").trim();
+    if (s) set.add(s);
   }
   return [...set].sort((a, b) => a.localeCompare(b));
 }
