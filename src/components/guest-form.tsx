@@ -97,24 +97,25 @@ export function GuestForm({
     if (!editing) return;
     gate(
       () => {
-        updateGuest(editing.id, payload);
+        updateGuest(editing.id, payload, { bypass: true });
         toast.success(`Updated ${payload.name} · Room ${payload.roomNo}`);
         resetAdd();
         onCancelEdit?.();
         nameRef.current?.focus();
       },
       {
-        title: "Are you sure?",
-        message: `Save changes to ${payload.name} · Room ${payload.roomNo}?`,
+        title: "Save this edit?",
+        message: `Save changes to ${payload.name} · Room ${payload.roomNo}. Enter the security code.`,
         confirmLabel: "Save",
+        requireCode: true,
       },
     );
   }
 
   function submit(e: FormEvent) {
     e.preventDefault();
-    if (locked) {
-      toast.error("This day's register is locked");
+    if (locked && !editing) {
+      toast.error("This day's register is locked. Use Edit + security code to change an old entry.");
       return;
     }
     if (!name.trim()) {

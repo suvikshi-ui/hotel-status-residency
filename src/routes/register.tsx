@@ -20,7 +20,6 @@ import { isDayLocked } from "@/lib/register-lock";
 import { requestCloudPullNow } from "@/lib/supabase-sync";
 import { SaveCube, useAccountSave } from "@/components/save-cube";
 import { AccountWriteFix } from "@/components/account-write-fix";
-import { isSealed, sealKey } from "@/lib/sheet-seal";
 
 export const Route = createFileRoute("/register")({ component: RegisterPage });
 
@@ -42,7 +41,6 @@ function RegisterPage() {
   const lockedDates = useLedger((s) => s.lockedDates);
   const lockRegister = useLedger((s) => s.lockRegister);
   const unlockRegister = useLedger((s) => s.unlockRegister);
-  const sealedIds = useLedger((s) => s.sealedIds);
   const { busy: saving, saveToServer } = useAccountSave();
   const { gate, hasCode } = useGate();
   const locked = isDayLocked(lockedDates, date);
@@ -82,7 +80,8 @@ function RegisterPage() {
           {formatDay(date)}
         </p>
         <p className="mt-1 text-sm text-muted">
-          {guests.length} postings · {money(take.roomsTotal)} room revenue
+          {guests.length} postings · {money(take.roomsTotal)} room revenue ·
+          Edit / Delete need the security code. Then press Save.
         </p>
         </div>
         <div className="flex flex-wrap gap-2 print:hidden">
@@ -221,7 +220,6 @@ function RegisterPage() {
             <tbody>
               {filtered.map((g) => {
                 const dates = stayDates(allGuests, g);
-                const frozen = locked || isSealed(sealedIds, sealKey.guest(g.id));
                 return (
                 <tr
                   key={g.id}
@@ -249,8 +247,6 @@ function RegisterPage() {
                   <td className="px-3 py-2">
                     {g.stay === "out" ? (
                       <Badge variant="muted">Out</Badge>
-                    ) : frozen ? (
-                      <Badge variant="muted">Continue</Badge>
                     ) : (
                       <Button
                         type="button"
@@ -258,11 +254,12 @@ function RegisterPage() {
                         variant="outline"
                         onClick={() =>
                           gate(
-                            () => setStay(g.id, "out"),
+                            () => setStay(g.id, "out", { bypass: true }),
                             {
-                              title: "Are you sure?",
-                              message: `Check out ${g.name} from room ${g.roomNo}?`,
+                              title: "Check out?",
+                              message: `Check out ${g.name} from room ${g.roomNo}. Enter the security code.`,
                               confirmLabel: "Check out",
+                              requireCode: true,
                             },
                           )
                         }
@@ -272,42 +269,49 @@ function RegisterPage() {
                     )}
                   </td>
                   <td className="px-3 py-2.5 text-right">
-                    {frozen ? null : (
-                    <div className="flex justify-end gap-0.5">
+                    <div className="flex justify-end gap-1 print:hidden">
                       <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-9 min-h-9 text-muted hover:text-primary"
+                        variant="outline"
+                        size="sm"
                         aria-label={`Edit ${g.name}`}
-                        onClick={() => setEditingId(g.id)}
+                        onClick={() =>
+                          gate(() => setEditingId(g.id), {
+                            title: "Edit this entry?",
+                            message: `Edit ${g.name} · Room ${g.roomNo}. Enter the security code.`,
+                            confirmLabel: "Edit",
+                            requireCode: true,
+                          })
+                        }
                       >
                         <Pencil className="size-4" />
+                        Edit
                       </Button>
                       <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-9 min-h-9 text-muted hover:text-danger"
-                        aria-label={`Remove ${g.name}`}
+                        variant="outline"
+                        size="sm"
+                        className="text-danger hover:text-danger"
+                        aria-label={`Delete ${g.name}`}
                         onClick={() =>
                           gate(
                             () => {
                               if (editingId === g.id) setEditingId(null);
-                              removeGuest(g.id);
+                              removeGuest(g.id, { bypass: true });
                               toast.success(`Removed ${g.name}`);
                             },
                             {
-                              title: "Are you sure?",
-                              message: `Delete ${g.name} · Room ${g.roomNo}? This cannot be undone.`,
+                              title: "Delete this entry?",
+                              message: `Delete ${g.name} · Room ${g.roomNo}. Enter the security code. Then press Save.`,
                               confirmLabel: "Delete",
                               danger: true,
+                              requireCode: true,
                             },
                           )
                         }
                       >
                         <Trash2 className="size-4" />
+                        Delete
                       </Button>
                     </div>
-                    )}
                   </td>
                 </tr>
                 );

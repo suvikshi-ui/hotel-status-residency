@@ -28,6 +28,7 @@ import {
   freezeIfSealed,
   isSealed,
   mergeSealed,
+  omitSealed,
   parseSealedIds,
   sealKey,
   withSealed,
@@ -99,18 +100,18 @@ export interface LedgerState {
   unlockRegister: (date: string) => void;
   sealEntries: (keys: string[]) => void;
   addGuest: (g: Omit<GuestEntry, "id" | "slNo" | "date"> & { date?: string }) => void;
-  updateGuest: (id: string, patch: Partial<GuestEntry>) => void;
-  setStay: (id: string, stay: "continue" | "out") => void;
+  updateGuest: (id: string, patch: Partial<GuestEntry>, opts?: BypassGuard) => void;
+  setStay: (id: string, stay: "continue" | "out", opts?: BypassGuard) => void;
   rollYesterday: (fromDate: string, continueIds: string[]) => void;
-  removeGuest: (id: string) => void;
+  removeGuest: (id: string, opts?: BypassGuard) => void;
   addFood: (row: Omit<ModeAmount, "id" | "date"> & { date?: string }) => void;
-  removeFood: (id: string) => void;
+  removeFood: (id: string, opts?: BypassGuard) => void;
   addWholesale: (row: Omit<ModeAmount, "id" | "date"> & { date?: string }) => void;
-  removeWholesale: (id: string) => void;
+  removeWholesale: (id: string, opts?: BypassGuard) => void;
   addExpense: (row: Omit<NamedAmount, "id" | "date"> & { date?: string }) => void;
-  removeExpense: (id: string) => void;
+  removeExpense: (id: string, opts?: BypassGuard) => void;
   addBalReceived: (row: Omit<NamedAmount, "id" | "date"> & { date?: string }) => void;
-  removeBalReceived: (id: string) => void;
+  removeBalReceived: (id: string, opts?: BypassGuard) => void;
   restoreSeed: () => void;
   setStaff: (staff: StaffRow[]) => void;
   setAdvances: (advances: AdvanceRow[]) => void;
@@ -296,6 +297,20 @@ function dayIsLocked(state: { lockedDates?: Record<string, true> }, date: string
   return isDayLocked(state.lockedDates, date);
 }
 
+type BypassGuard = { bypass?: boolean };
+
+function blockedRow(
+  state: LedgerState,
+  date: string | undefined,
+  key: string | undefined,
+  opts?: BypassGuard,
+) {
+  if (opts?.bypass) return false;
+  if (date && dayIsLocked(state, date)) return true;
+  if (key && isSealed(state.sealedIds, key)) return true;
+  return false;
+}
+
 function rebuildFrom(
   state: LedgerState,
   fromDate: string,
@@ -383,22 +398,30 @@ export const useLedger = create<LedgerState>()(
         const next = { ...get(), guests };
         save({ guests, ...rebuildFrom(next, date) });
       },
-      updateGuest: (id, patch) => {
+      updateGuest: (id, patch, opts) => {
         const current = get().guests.find((g) => g.id === id);
-        if (current && dayIsLocked(get(), current.date)) return;
-        if (isSealed(get().sealedIds, sealKey.guest(id))) return;
+        const key = sealKey.guest(id);
+        if (blockedRow(get(), current?.date, key, opts)) return;
         const guests = applyGuestPatch(get().guests, id, patch);
         const row = guests.find((g) => g.id === id);
         const next = { ...get(), guests };
-        save({ guests, ...rebuildFrom(next, row?.date ?? get().selectedDate) });
+        save({
+          guests,
+          sealedIds: opts?.bypass ? omitSealed(get().sealedIds, [key]) : get().sealedIds,
+          ...rebuildFrom(next, row?.date ?? get().selectedDate),
+        });
       },
-      setStay: (id, stay) => {
+      setStay: (id, stay, opts) => {
         const row = get().guests.find((g) => g.id === id);
-        if (row && dayIsLocked(get(), row.date)) return;
-        if (isSealed(get().sealedIds, sealKey.guest(id))) return;
+        const key = sealKey.guest(id);
+        if (blockedRow(get(), row?.date, key, opts)) return;
         const guests = applyStay(get().guests, id, stay);
         const next = { ...get(), guests };
-        save({ guests, ...rebuildFrom(next, row?.date ?? get().selectedDate) });
+        save({
+          guests,
+          sealedIds: opts?.bypass ? omitSealed(get().sealedIds, [key]) : get().sealedIds,
+          ...rebuildFrom(next, row?.date ?? get().selectedDate),
+        });
       },
       rollYesterday: (fromDate, continueIds) => {
         const onto = /* today is selectedDate */ get().selectedDate;
@@ -407,15 +430,16 @@ export const useLedger = create<LedgerState>()(
         const next = { ...get(), guests };
         save({ guests, ...rebuildFrom(next, fromDate) });
       },
-      removeGuest: (id) => {
+      removeGuest: (id, opts) => {
         const row = get().guests.find((g) => g.id === id);
-        if (row && dayIsLocked(get(), row.date)) return;
-        if (isSealed(get().sealedIds, sealKey.guest(id))) return;
+        const key = sealKey.guest(id);
+        if (blockedRow(get(), row?.date, key, opts)) return;
         const guests = get().guests.filter((g) => g.id !== id);
         const next = { ...get(), guests };
         save({
           guests,
-          deletedIds: withSealed(get().deletedIds, [sealKey.guest(id)]),
+          sealedIds: omitSealed(get().sealedIds, [key]),
+          deletedIds: withSealed(get().deletedIds, [key]),
           ...rebuildFrom(next, row?.date ?? get().selectedDate),
         });
       },
@@ -426,15 +450,16 @@ export const useLedger = create<LedgerState>()(
         const next = { ...get(), food };
         save({ food, ...rebuildFrom(next, date) });
       },
-      removeFood: (id) => {
+      removeFood: (id, opts) => {
         const row = get().food.find((x) => x.id === id);
-        if (row && dayIsLocked(get(), row.date)) return;
-        if (isSealed(get().sealedIds, sealKey.food(id))) return;
+        const key = sealKey.food(id);
+        if (blockedRow(get(), row?.date, key, opts)) return;
         const food = get().food.filter((x) => x.id !== id);
         const next = { ...get(), food };
         save({
           food,
-          deletedIds: withSealed(get().deletedIds, [sealKey.food(id)]),
+          sealedIds: omitSealed(get().sealedIds, [key]),
+          deletedIds: withSealed(get().deletedIds, [key]),
           ...rebuildFrom(next, row?.date ?? get().selectedDate),
         });
       },
@@ -445,15 +470,16 @@ export const useLedger = create<LedgerState>()(
         const next = { ...get(), wholesale };
         save({ wholesale, ...rebuildFrom(next, date) });
       },
-      removeWholesale: (id) => {
+      removeWholesale: (id, opts) => {
         const row = get().wholesale.find((x) => x.id === id);
-        if (row && dayIsLocked(get(), row.date)) return;
-        if (isSealed(get().sealedIds, sealKey.wholesale(id))) return;
+        const key = sealKey.wholesale(id);
+        if (blockedRow(get(), row?.date, key, opts)) return;
         const wholesale = get().wholesale.filter((x) => x.id !== id);
         const next = { ...get(), wholesale };
         save({
           wholesale,
-          deletedIds: withSealed(get().deletedIds, [sealKey.wholesale(id)]),
+          sealedIds: omitSealed(get().sealedIds, [key]),
+          deletedIds: withSealed(get().deletedIds, [key]),
           ...rebuildFrom(next, row?.date ?? get().selectedDate),
         });
       },
@@ -464,15 +490,16 @@ export const useLedger = create<LedgerState>()(
         const next = { ...get(), expenses };
         save({ expenses, ...rebuildFrom(next, date) });
       },
-      removeExpense: (id) => {
+      removeExpense: (id, opts) => {
         const row = get().expenses.find((x) => x.id === id);
-        if (row && dayIsLocked(get(), row.date)) return;
-        if (isSealed(get().sealedIds, sealKey.expense(id))) return;
+        const key = sealKey.expense(id);
+        if (blockedRow(get(), row?.date, key, opts)) return;
         const expenses = get().expenses.filter((x) => x.id !== id);
         const next = { ...get(), expenses };
         save({
           expenses,
-          deletedIds: withSealed(get().deletedIds, [sealKey.expense(id)]),
+          sealedIds: omitSealed(get().sealedIds, [key]),
+          deletedIds: withSealed(get().deletedIds, [key]),
           ...rebuildFrom(next, row?.date ?? get().selectedDate),
         });
       },
@@ -486,15 +513,16 @@ export const useLedger = create<LedgerState>()(
         const next = { ...get(), balReceived };
         save({ balReceived, ...rebuildFrom(next, date) });
       },
-      removeBalReceived: (id) => {
+      removeBalReceived: (id, opts) => {
         const row = get().balReceived.find((x) => x.id === id);
-        if (row && dayIsLocked(get(), row.date)) return;
-        if (isSealed(get().sealedIds, sealKey.balance(id))) return;
+        const key = sealKey.balance(id);
+        if (blockedRow(get(), row?.date, key, opts)) return;
         const balReceived = get().balReceived.filter((x) => x.id !== id);
         const next = { ...get(), balReceived };
         save({
           balReceived,
-          deletedIds: withSealed(get().deletedIds, [sealKey.balance(id)]),
+          sealedIds: omitSealed(get().sealedIds, [key]),
+          deletedIds: withSealed(get().deletedIds, [key]),
           ...rebuildFrom(next, row?.date ?? get().selectedDate),
         });
       },

@@ -24,8 +24,6 @@ import {
 } from "@/lib/format";
 import { useLedger } from "@/lib/store";
 import { isDayLocked } from "@/lib/register-lock";
-import { isSealed, sealKey } from "@/lib/sheet-seal";
-import { cn } from "@/lib/utils";
 import type { ModeAmount, NamedAmount, PayMode } from "@/lib/types";
 
 function ModeLineCard({
@@ -34,14 +32,14 @@ function ModeLineCard({
   empty,
   onAdd,
   onRemove,
-  frozenIds,
+  addDisabled,
 }: {
   title: string;
   rows: ModeAmount[];
   empty: string;
   onAdd: (mode: PayMode, amount: number) => void;
   onRemove: (id: string) => void;
-  frozenIds?: Record<string, true>;
+  addDisabled?: boolean;
 }) {
   const [mode, setMode] = useState<PayMode>("CASH");
   const [amount, setAmount] = useState("");
@@ -58,6 +56,7 @@ function ModeLineCard({
           className="grid gap-3 sm:grid-cols-[8rem_1fr_auto]"
           onSubmit={(e) => {
             e.preventDefault();
+            if (addDisabled) return;
             const amt = Number(amount);
             if (!Number.isFinite(amt) || amt <= 0) {
               toast.error(`Enter a ${title} amount`);
@@ -94,7 +93,7 @@ function ModeLineCard({
             />
           </div>
           <div className="flex items-end">
-            <Button type="submit" className="w-full">
+            <Button type="submit" className="w-full" disabled={addDisabled}>
               Add
             </Button>
           </div>
@@ -105,17 +104,16 @@ function ModeLineCard({
               <ModeBadge mode={r.mode} />
               <div className="flex items-center gap-1">
                 <span className="tabular text-sm font-medium">{money(r.amount)}</span>
-                {frozenIds?.[r.id] ? null : (
                 <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-9 min-h-9 text-muted hover:text-danger"
-                  aria-label={`Remove ${title} entry`}
+                  variant="outline"
+                  size="sm"
+                  className="text-danger hover:text-danger"
+                  aria-label={`Delete ${title} entry`}
                   onClick={() => onRemove(r.id)}
                 >
                   <Trash2 className="size-4" />
+                  Delete
                 </Button>
-                )}
               </div>
             </li>
           ))}
@@ -133,13 +131,13 @@ function ExpenseLineCard({
   heads,
   onAdd,
   onRemove,
-  frozenIds,
+  addDisabled,
 }: {
   rows: NamedAmount[];
   heads: string[];
   onAdd: (particular: string, mode: PayMode, amount: number) => void;
   onRemove: (id: string) => void;
-  frozenIds?: Record<string, true>;
+  addDisabled?: boolean;
 }) {
   const [particular, setParticular] = useState("");
   const [mode, setMode] = useState<PayMode>("CASH");
@@ -157,6 +155,7 @@ function ExpenseLineCard({
           className="grid gap-3 sm:grid-cols-[1fr_8rem_8rem_auto]"
           onSubmit={(e) => {
             e.preventDefault();
+            if (addDisabled) return;
             const amt = Number(amount);
             if (!particular.trim()) {
               toast.error("Enter what the expense is for");
@@ -214,7 +213,7 @@ function ExpenseLineCard({
             />
           </div>
           <div className="flex items-end">
-            <Button type="submit" className="w-full">
+            <Button type="submit" className="w-full" disabled={addDisabled}>
               Add
             </Button>
           </div>
@@ -228,17 +227,16 @@ function ExpenseLineCard({
               </div>
               <div className="flex items-center gap-1">
                 <span className="tabular text-sm font-medium">{money(r.amount)}</span>
-                {frozenIds?.[r.id] ? null : (
                 <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-9 min-h-9 text-muted hover:text-danger"
-                  aria-label="Remove expense"
+                  variant="outline"
+                  size="sm"
+                  className="text-danger hover:text-danger"
+                  aria-label="Delete expense"
                   onClick={() => onRemove(r.id)}
                 >
                   <Trash2 className="size-4" />
+                  Delete
                 </Button>
-                )}
               </div>
             </li>
           ))}
@@ -256,11 +254,9 @@ function ExpenseLineCard({
 function ReceiptList({
   rows,
   onRemove,
-  frozenIds,
 }: {
   rows: NamedAmount[];
   onRemove: (id: string) => void;
-  frozenIds?: Record<string, true>;
 }) {
   if (rows.length === 0) {
     return <p className="text-sm text-muted">No collections today.</p>;
@@ -277,17 +273,16 @@ function ReceiptList({
           </div>
           <div className="flex items-center gap-1">
             <span className="tabular text-sm font-medium">{money(r.amount)}</span>
-            {frozenIds?.[r.id] ? null : (
             <Button
-              variant="ghost"
-              size="icon"
-              className="size-9 min-h-9 text-muted hover:text-danger"
-              aria-label="Remove collection"
+              variant="outline"
+              size="sm"
+              className="text-danger hover:text-danger"
+              aria-label="Delete collection"
               onClick={() => onRemove(r.id)}
             >
               <Trash2 className="size-4" />
+              Delete
             </Button>
-            )}
           </div>
         </li>
       ))}
@@ -315,15 +310,6 @@ export function RegisterLines() {
   const addExpense = useLedger((s) => s.addExpense);
   const removeExpense = useLedger((s) => s.removeExpense);
   const locked = isDayLocked(useLedger((s) => s.lockedDates), date);
-  const sealedIds = useLedger((s) => s.sealedIds);
-  const foodFrozen: Record<string, true> = {};
-  for (const r of food) if (isSealed(sealedIds, sealKey.food(r.id))) foodFrozen[r.id] = true;
-  const wsFrozen: Record<string, true> = {};
-  for (const r of ws) if (isSealed(sealedIds, sealKey.wholesale(r.id))) wsFrozen[r.id] = true;
-  const expFrozen: Record<string, true> = {};
-  for (const r of expenses) if (isSealed(sealedIds, sealKey.expense(r.id))) expFrozen[r.id] = true;
-  const balFrozen: Record<string, true> = {};
-  for (const r of receipts) if (isSealed(sealedIds, sealKey.balance(r.id))) balFrozen[r.id] = true;
   const { gate } = useGate();
   const sources = useMemo(() => uniqueSources(guests), [guests]);
   const accounts = useMemo(
@@ -347,23 +333,21 @@ export function RegisterLines() {
   );
 
   return (
-    <fieldset
-      disabled={locked}
-      className={cn("flex min-w-0 flex-col gap-5 border-0 p-0", locked && "opacity-80")}
-    >
+    <div className="flex min-w-0 flex-col gap-5">
       <div className="grid gap-3 lg:grid-cols-2">
         <ModeLineCard
           title="Food"
           rows={food}
           empty="No food posted today."
-          frozenIds={foodFrozen}
+          addDisabled={locked}
           onAdd={(mode, amount) => addFood({ mode, amount })}
           onRemove={(id) =>
-            gate(() => removeFood(id), {
-              title: "Are you sure?",
-              message: "Delete this food entry?",
+            gate(() => removeFood(id, { bypass: true }), {
+              title: "Delete this food entry?",
+              message: "Enter the security code, then press Save.",
               confirmLabel: "Delete",
               danger: true,
+              requireCode: true,
             })
           }
         />
@@ -371,14 +355,15 @@ export function RegisterLines() {
           title="WS"
           rows={ws}
           empty="No WS posted today."
-          frozenIds={wsFrozen}
+          addDisabled={locked}
           onAdd={(mode, amount) => addWs({ mode, amount })}
           onRemove={(id) =>
-            gate(() => removeWs(id), {
-              title: "Are you sure?",
-              message: "Delete this WS entry?",
+            gate(() => removeWs(id, { bypass: true }), {
+              title: "Delete this WS entry?",
+              message: "Enter the security code, then press Save.",
               confirmLabel: "Delete",
               danger: true,
+              requireCode: true,
             })
           }
         />
@@ -387,16 +372,17 @@ export function RegisterLines() {
       <ExpenseLineCard
         rows={expenses}
         heads={heads}
-        frozenIds={expFrozen}
+        addDisabled={locked}
         onAdd={(particular, mode, amount) =>
           addExpense({ particular, mode, amount })
         }
         onRemove={(id) =>
-          gate(() => removeExpense(id), {
-            title: "Are you sure?",
-            message: "Delete this expense?",
+          gate(() => removeExpense(id, { bypass: true }), {
+            title: "Delete this expense?",
+            message: "Enter the security code, then press Save.",
             confirmLabel: "Delete",
             danger: true,
+            requireCode: true,
           })
         }
       />
@@ -519,13 +505,13 @@ export function RegisterLines() {
             <Button type="submit">Collect from source</Button>
             <ReceiptList
               rows={dueRows}
-              frozenIds={balFrozen}
               onRemove={(id) =>
-                gate(() => removeBal(id), {
-                  title: "Are you sure?",
-                  message: "Delete this balance received?",
+                gate(() => removeBal(id, { bypass: true }), {
+                  title: "Delete this collection?",
+                  message: "Enter the security code, then press Save.",
                   confirmLabel: "Delete",
                   danger: true,
+                  requireCode: true,
                 })
               }
             />
@@ -596,19 +582,19 @@ export function RegisterLines() {
             <Button type="submit">Collect online</Button>
             <ReceiptList
               rows={otaRows}
-              frozenIds={balFrozen}
               onRemove={(id) =>
-                gate(() => removeBal(id), {
-                  title: "Are you sure?",
-                  message: "Delete this balance received?",
+                gate(() => removeBal(id, { bypass: true }), {
+                  title: "Delete this collection?",
+                  message: "Enter the security code, then press Save.",
                   confirmLabel: "Delete",
                   danger: true,
+                  requireCode: true,
                 })
               }
             />
           </form>
         </CardContent>
       </Card>
-    </fieldset>
+    </div>
   );
 }
