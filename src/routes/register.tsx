@@ -42,7 +42,7 @@ function RegisterPage() {
   const lockRegister = useLedger((s) => s.lockRegister);
   const unlockRegister = useLedger((s) => s.unlockRegister);
   const { busy: saving, saveToServer } = useAccountSave();
-  const { gate, hasCode } = useGate();
+  const { gate } = useGate();
   const locked = isDayLocked(lockedDates, date);
   const [q, setQ] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -85,7 +85,7 @@ function RegisterPage() {
         </p>
         <p className="mt-1 text-sm text-muted">
           {guests.length} postings · {money(take.roomsTotal)} room revenue ·
-          Edit / Delete when unlocked. Lock hides them. Then press Save.
+          Lock / Unlock / Edit / Delete always need the security code. Then press Save.
         </p>
         </div>
         <div className="flex flex-wrap gap-2 print:hidden">
@@ -102,11 +102,10 @@ function RegisterPage() {
                   },
                   {
                     title: "Unlock this day's register?",
-                    message: hasCode
-                      ? "Enter the digit code to edit this day's register again. Unlock applies on every computer signed in to this hotel."
-                      : "Confirm to unlock. Set a digit code in Profile so only you can unlock later. Unlock applies on every computer signed in to this hotel.",
+                    message:
+                      "Enter the security code to unlock. Edit and Delete come back after unlock.",
                     confirmLabel: "Unlock",
-                    requireCode: hasCode,
+                    requireCode: true,
                   },
                 );
               }}
@@ -128,9 +127,9 @@ function RegisterPage() {
                   {
                     title: "Lock this day's register?",
                     message:
-                      "No more edits for this date on any computer signed in to this hotel, until you unlock with the digit code. The lock is saved on the hotel account — you do not need to press Lock again on the other desk.",
+                      "Enter the security code to lock. Edit and Delete hide until you unlock with the same code.",
                     confirmLabel: "Lock",
-                    requireCode: false,
+                    requireCode: true,
                   },
                 )
               }

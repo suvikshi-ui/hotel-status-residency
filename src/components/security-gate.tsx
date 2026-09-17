@@ -25,7 +25,7 @@ export type GateOpts = {
   message?: string;
   confirmLabel?: string;
   danger?: boolean;
-  /** Default true when a code is set. Locking a day skips the code. */
+  /** Kept for callers. A stored code is always required — it cannot be skipped. */
   requireCode?: boolean;
 };
 
@@ -57,8 +57,7 @@ export function SecurityProvider({ children }: { children: ReactNode }) {
   }
 
   function run() {
-    const needCode = opts.requireCode !== false && stored;
-    if (needCode && !codeOk(stored, value)) {
+    if (stored && !codeOk(stored, value)) {
       toast.error("Wrong security code");
       return;
     }
@@ -93,7 +92,7 @@ export function SecurityProvider({ children }: { children: ReactNode }) {
               run();
             }}
           >
-            {hasCode && opts.requireCode !== false ? (
+            {hasCode ? (
               <div className="grid gap-1.5">
                 <Label htmlFor="sec-code">Security code</Label>
                 <Input
