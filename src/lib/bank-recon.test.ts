@@ -45,6 +45,23 @@ describe("bank recon", () => {
     assert.equal(bank[0]?.ref, "IMPS99887766");
   });
 
+  it("keeps date, narration and Ch./Ref. as printed, no extra lines", () => {
+    const csv = [
+      "Date,Narration,Ch./Ref. no.,Debit,Credit,Balance,Extra",
+      "17/09/2026,TO TRANSFER UPI/DR/412345678901/RAMESH,412345678901,0,1800,20000,ignore me",
+      "18/09/2026,UPI hotel,,0,1500,21500,",
+      "30/09/2026,Closing Balance,,,,21500,",
+    ].join("\n");
+    const bank = parseStatementText(csv);
+    assert.equal(bank.length, 2);
+    assert.equal(bank[0]?.dateRaw, "17/09/2026");
+    assert.equal(bank[0]?.particular, "TO TRANSFER UPI/DR/412345678901/RAMESH");
+    assert.equal(bank[0]?.ref, "412345678901");
+    assert.equal(bank[0]?.credit, 1800);
+    assert.equal(bank[1]?.ref, "");
+    assert.equal(bank[1]?.particular, "UPI hotel");
+  });
+
   it("reads Ch./Ref. no. when the header is below the title", () => {
     const csv = [
       "Account Statement September 2026",
@@ -55,6 +72,7 @@ describe("bank recon", () => {
     const bank = parseStatementText(csv);
     assert.equal(bank.length, 1);
     assert.equal(bank[0]?.ref, "412345678901");
+    assert.equal(bank[0]?.dateRaw, "17/09/2026");
   });
 
   it("pulls UPI/IMPS numbers out of narration", () => {

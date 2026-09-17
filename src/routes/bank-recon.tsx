@@ -102,8 +102,8 @@ function BankReconPage() {
             Bank recon
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Upload only Date, Narration, Ch./Ref. no., Debit and Credit.
-            Closing balance is not uploaded.
+            Upload only Date, Narration, Ch./Ref. no., D/C, Amount Debited
+            and Amount Credited — as printed on the statement.
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
@@ -190,8 +190,8 @@ function BankReconPage() {
                 const side = dcOf(line.bank);
                 return (
                 <tr key={line.bank.id} className="border-b border-border/70">
-                  <td className="px-5 py-2.5 tabular text-muted">
-                    {formatDayShort(line.bank.date)}
+                  <td className="px-5 py-2.5 tabular">
+                    {line.bank.dateRaw || formatDayShort(line.bank.date)}
                   </td>
                   <td className="px-3 py-2.5">{line.bank.particular || "—"}</td>
                   <td className="px-3 py-2.5 font-mono text-xs">

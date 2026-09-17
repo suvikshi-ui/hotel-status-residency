@@ -4,11 +4,13 @@ import type { GuestEntry } from "./types";
 export interface BankRow {
   id: string;
   date: string;
+  dateRaw: string;
   particular: string;
   debit: number;
   credit: number;
   amount: number;
   ref: string;
+  dc: string;
   month: string;
 }
 
@@ -54,12 +56,13 @@ export function normalizeBankRows(raw: unknown): BankRow[] {
   for (const row of raw) {
     if (!row || typeof row !== "object") continue;
     const r = row as Record<string, unknown>;
+    const dateRaw = asText(r.dateRaw) || asText(r.date);
     const date =
       typeof r.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r.date.slice(0, 10))
         ? r.date.slice(0, 10)
-        : parseLooseDate(String(r.date ?? ""));
+        : parseLooseDate(dateRaw);
     const particular = asText(r.particular);
-    if (!date || isBalanceLine(particular)) continue;
+    if (!date || isBalanceLine(particular) || isBalanceLine(dateRaw)) continue;
     const split = debitCreditOf(r);
     if (!split.debit && !split.credit) continue;
     const ref = asText(r.ref);
@@ -67,11 +70,13 @@ export function normalizeBankRows(raw: unknown): BankRow[] {
     const next: BankRow = {
       id,
       date,
+      dateRaw: dateRaw || date,
       particular,
       debit: split.debit,
       credit: split.credit,
       amount: split.credit || split.debit,
       ref,
+      dc: asText(r.dc) || (split.debit && !split.credit ? "D" : split.credit ? "C" : ""),
       month: date.slice(0, 7),
     };
     const key = bankKey(next);
@@ -182,11 +187,12 @@ export function refsMatch(a: string, b: string) {
 }
 
 const DATE_HEAD = /^(txn |value |posting |tran )?date|txn.?dt|value.?dt/i;
-const NARR_HEAD = /narrat|desc|particular|remark|detail|info/i;
-const CREDIT_HEAD = /credit|deposit|amount credited|(^|\s)cr(\s|$)/i;
-const DEBIT_HEAD = /debit|withdrawal|wdl|amount debited|(^|\s)dr(\s|$)/i;
+const NARR_HEAD = /narrat|desc|particular/i;
+const CREDIT_HEAD = /^(credit|cr|deposit|cr amount|amount credited)$/i;
+const DEBIT_HEAD = /^(debit|dr|withdrawal|wdl|dr amount|amount debited)$/i;
 const REF_HEAD =
-  /ch\.?\s*\/?\s*ref|cheque|chq|utr|txn.?id|transaction.?id|payment.?ref|rrn|reference|ref\.?\s*no/i;
+  /ch\.?\s*\/?\s*ref|^ref$|ref\.?\s*no|cheque|chq|reference/i;
+const DC_HEAD = /^(d\/c|dr\/cr|type)$/i;
 const SKIP_HEAD = /closing|opening|available|running|^balance$/i;
 
 export function parseStatementText(text: string): BankRow[] {
@@ -195,26 +201,36 @@ export function parseStatementText(text: string): BankRow[] {
   const lines = raw.split(/\r?\n/).map((l) => asText(l)).filter(Boolean);
   if (!lines.length) return [];
   const header = findHeader(lines);
-  if (header) {
-    return normalizeBankRows(
-      lines.slice(header.index + 1).map((line) => {
-        try {
-          return rowFromCells(splitRow(line, header.delim), header.mapped, line);
-        } catch {
-          return null;
-        }
-      }),
-    );
-  }
+  const body = header ? lines.slice(header.index + 1) : lines;
+  const delim = header?.delim ?? guessDelim(lines[0] ?? "");
+  const mapped = header?.mapped ?? positionalMap(splitRow(lines[0] ?? "", delim).length);
   return normalizeBankRows(
-    lines.map((line) => {
+    body.map((line) => {
       try {
-        return rowFromLooseLine(line);
+        const cells = splitRow(line, delim);
+        if (!header && !looksLikeTxnRow(cells)) return null;
+        return rowFromCells(cells, mapped);
       } catch {
         return null;
       }
     }),
   );
+}
+
+function looksLikeTxnRow(cells: string[]) {
+  return cells.length >= 4 && Boolean(parseLooseDate(asText(cells[0])));
+}
+
+function positionalMap(width: number) {
+  return {
+    date: 0,
+    particular: width > 1 ? 1 : -1,
+    ref: width > 2 ? 2 : -1,
+    debit: width > 3 ? 3 : -1,
+    credit: width > 4 ? 4 : -1,
+    amount: -1,
+    dc: -1,
+  };
 }
 
 function findHeader(lines: string[]) {
@@ -223,10 +239,7 @@ function findHeader(lines: string[]) {
     const delim = guessDelim(lines[i] ?? "");
     const cells = splitRow(lines[i] ?? "", delim).map((c) => asText(c));
     const mapped = mapHeaders(cells);
-    if (
-      mapped.date >= 0 &&
-      (mapped.credit >= 0 || mapped.debit >= 0 || mapped.amount >= 0 || mapped.ref >= 0)
-    ) {
+    if (mapped.date >= 0 && (mapped.credit >= 0 || mapped.debit >= 0 || mapped.dc >= 0)) {
       return { index: i, delim, mapped };
     }
   }
@@ -265,15 +278,23 @@ function splitRow(line: string, delim: string) {
 }
 
 function mapHeaders(cells: string[]) {
-  const mapped = { date: -1, particular: -1, amount: -1, credit: -1, debit: -1, ref: -1 };
+  const mapped = {
+    date: -1,
+    particular: -1,
+    amount: -1,
+    credit: -1,
+    debit: -1,
+    ref: -1,
+    dc: -1,
+  };
   cells.forEach((cell, i) => {
     if (SKIP_HEAD.test(cell)) return;
     if (mapped.date < 0 && DATE_HEAD.test(cell)) mapped.date = i;
     else if (mapped.ref < 0 && REF_HEAD.test(cell)) mapped.ref = i;
+    else if (mapped.dc < 0 && DC_HEAD.test(cell)) mapped.dc = i;
     else if (mapped.particular < 0 && NARR_HEAD.test(cell)) mapped.particular = i;
     else if (mapped.debit < 0 && DEBIT_HEAD.test(cell)) mapped.debit = i;
     else if (mapped.credit < 0 && CREDIT_HEAD.test(cell)) mapped.credit = i;
-    else if (mapped.amount < 0 && /^amount$/i.test(cell)) mapped.amount = i;
   });
   return mapped;
 }
@@ -286,69 +307,32 @@ function cellAt(cells: string[], index: number) {
 function rowFromCells(
   cells: string[],
   mapped: ReturnType<typeof mapHeaders>,
-  rawLine: string,
 ): Partial<BankRow> | null {
-  const date = parseLooseDate(cellAt(cells, mapped.date));
+  const dateRaw = cellAt(cells, mapped.date);
+  const date = parseLooseDate(dateRaw);
   if (!date) return null;
-  const particular = cellAt(cells, mapped.particular);
-  if (isBalanceLine(particular)) return null;
+  const particular = mapped.particular >= 0 ? cellAt(cells, mapped.particular) : "";
+  if (isBalanceLine(particular) || isBalanceLine(dateRaw)) return null;
+  const dc = mapped.dc >= 0 ? cellAt(cells, mapped.dc) : "";
   let debit = mapped.debit >= 0 ? parseAmount(cellAt(cells, mapped.debit)) : 0;
   let credit = mapped.credit >= 0 ? parseAmount(cellAt(cells, mapped.credit)) : 0;
   if (!debit && !credit && mapped.amount >= 0) {
     const amount = parseAmount(cellAt(cells, mapped.amount));
-    const side = sideOf(`${rawLine} ${cellAt(cells, mapped.amount)}`);
-    if (side === "debit" || amount < 0) debit = Math.abs(amount);
-    else credit = Math.abs(amount);
+    const side = dcOf({ debit: 0, credit: 0, dc });
+    if (side === "D") debit = Math.abs(amount);
+    else if (side === "C") credit = Math.abs(amount);
   }
-  const ref =
-    cleanRefCell(cellAt(cells, mapped.ref)) ||
-    extractRef(particular) ||
-    extractRef(rawLine);
-  return { date, particular, debit, credit, amount: credit || debit, ref };
-}
-
-function rowFromLooseLine(line: string): Partial<BankRow> | null {
-  if (isBalanceLine(line)) return null;
-  const date = parseLooseDate(line);
-  if (!date) return null;
-  const amounts = [...line.matchAll(/(?:\u20B9\s*)?(\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|\d+\.\d{1,2})/g)];
-  if (!amounts.length) return null;
-  const txn = amounts.length >= 2 ? amounts.slice(0, -1) : amounts;
-  const values = txn.map((m) => parseAmount(m[0] ?? "")).filter((n) => n);
-  const particular = stripAmounts(line, date);
-  const side = sideOf(line);
-  let debit = 0;
-  let credit = 0;
-  if (values.length >= 2) {
-    debit = values[0] ?? 0;
-    credit = values[1] ?? 0;
-  } else if (side === "debit") {
-    debit = values[0] ?? 0;
-  } else {
-    credit = values[0] ?? 0;
-  }
+  if (!debit && !credit) return null;
   return {
     date,
+    dateRaw,
     particular,
     debit,
     credit,
     amount: credit || debit,
-    ref: extractRef(line) || extractRef(particular),
+    ref: cleanRefCell(cellAt(cells, mapped.ref)),
+    dc: dc || (debit && !credit ? "D" : "C"),
   };
-}
-
-function stripAmounts(line: string, date: string) {
-  return asText(line)
-    .replace(date, "")
-    .replace(/(?:\u20B9\s*)?(?:\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|\d+\.\d{1,2})/g, "")
-    .replace(/\b(dr|cr|debit|credit)\b/gi, "")
-    .replace(/\s+/g, " ");
-}
-
-function sideOf(text: string): "debit" | "credit" | "" {
-  if (/\b(dr|debit|wdl|withdrawal)\b/i.test(text)) return "debit";
-  if (/\b(cr|credit|deposit)\b/i.test(text)) return "credit";
-  return "";
 }
 
 function isBalanceLine(text: string) {
@@ -361,7 +345,10 @@ function isBalanceLine(text: string) {
   );
 }
 
-export function dcOf(row: Pick<BankRow, "debit" | "credit">) {
+export function dcOf(row: Pick<BankRow, "debit" | "credit"> & { dc?: string }) {
+  const d = asText(row.dc).toUpperCase();
+  if (d.startsWith("D")) return "D";
+  if (d.startsWith("C")) return "C";
   if (row.debit && !row.credit) return "D";
   if (row.credit && !row.debit) return "C";
   if (row.debit && row.credit) return row.debit >= row.credit ? "D" : "C";
