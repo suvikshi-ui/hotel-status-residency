@@ -14,6 +14,7 @@ import {
 } from "./supabase-db";
 import { ledgerOwnerKey, useLedger } from "./store";
 import { isSupabaseConfigured } from "./supabase-config";
+import { isPermissionMessage } from "./cloud-errors";
 import {
   isDayLocked,
   locksEqual,
@@ -99,6 +100,7 @@ function snapshotFromStore(): LedgerSnapshot {
     lockedDates: s.lockedDates ?? {},
     lockRev: s.lockRev ?? {},
     sealedIds: s.sealedIds ?? {},
+    deletedIds: s.deletedIds ?? {},
     inventory: s.inventory,
     complaints: s.complaints,
     savedAt: s.savedAt,
@@ -118,6 +120,7 @@ function disarmRetry() {
 }
 
 function armRetry(userId: string) {
+  if (isPermissionMessage(message)) return;
   if (retryTimer) return;
   retryTimer = setInterval(() => {
     lastHash = "";
@@ -155,6 +158,7 @@ function applyMerged(merged: LedgerSnapshot, previous: LedgerSnapshot) {
     lockedDates: merged.lockedDates ?? {},
     lockRev: merged.lockRev ?? {},
     sealedIds: merged.sealedIds ?? {},
+    deletedIds: merged.deletedIds ?? {},
     inventory: merged.inventory,
     complaints: merged.complaints,
     savedAt: merged.savedAt,
@@ -364,13 +368,8 @@ export async function saveAccountNow(): Promise<
   }
   if (phase === "synced" || phase === "migrated") return { ok: true };
   const raw = message || "Could not save to the hotel account.";
-  const m = raw.toLowerCase();
-  if (m.includes("permission denied") || m.includes("row-level security")) {
-    return {
-      ok: false,
-      message:
-        "Save cube could not write the hotel account (permission). Entries stay frozen on this desk. Open Profile → copy table SQL, run it, then press Save again.",
-    };
+  if (isPermissionMessage(raw)) {
+    return { ok: false, message: raw };
   }
   return { ok: false, message: raw };
 }

@@ -119,16 +119,19 @@ export function hotelForCloud(
   lockedDates: Record<string, true>,
   lockRev: Record<string, number> = {},
   sealedIds: SealedIds = {},
+  deletedIds: SealedIds = {},
 ): HotelInfo & {
   _lockedDates: Record<string, true>;
   _lockRev: Record<string, number>;
   _sealedIds: SealedIds;
+  _deletedIds: SealedIds;
 } {
   return {
     ...hotel,
     _lockedDates: lockedDates,
     _lockRev: lockRev,
     _sealedIds: parseSealedIds(sealedIds),
+    _deletedIds: parseSealedIds(deletedIds),
   };
 }
 

@@ -160,6 +160,11 @@ export function AppShell({ children }: { children: ReactNode }) {
                         ? "Loading books…"
                         : "Account saved"}
               </div>
+              {cloud.phase === "error" && cloud.message ? (
+                <p className="mt-1 text-[10px] leading-snug text-due">
+                  {cloud.message}
+                </p>
+              ) : null}
               <button
                 type="button"
                 onClick={onSignOut}

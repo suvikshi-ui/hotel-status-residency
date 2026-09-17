@@ -56,6 +56,21 @@ export function sealedFromHotel(hotel: unknown): SealedIds | undefined {
   return parseSealedIds((hotel as { _sealedIds?: unknown })._sealedIds);
 }
 
+export function deletedFromHotel(hotel: unknown): SealedIds | undefined {
+  if (!hotel || typeof hotel !== "object") return undefined;
+  if (!Object.prototype.hasOwnProperty.call(hotel, "_deletedIds")) return undefined;
+  return parseSealedIds((hotel as { _deletedIds?: unknown })._deletedIds);
+}
+
+export function dropDeletedRows<T extends { id: string }>(
+  rows: T[],
+  deleted: SealedIds | undefined,
+  keyOf: (id: string) => string,
+): T[] {
+  if (!deleted || !Object.keys(deleted).length) return rows;
+  return rows.filter((row) => row.id && !isSealed(deleted, keyOf(row.id)));
+}
+
 export function freezeIfSealed<T extends { id: string }>(
   previous: T[],
   next: T[],

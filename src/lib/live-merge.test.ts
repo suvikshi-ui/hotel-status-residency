@@ -51,12 +51,23 @@ describe("live merge across desks", () => {
     assert.ok(next.some((r) => r.id === "b"));
   });
 
-  it("does not restore a guest the other desk already deleted", () => {
-    const base = [{ id: "gone", date: "2026-09-12" }];
-    const local = [{ id: "gone", date: "2026-09-12" }];
-    const cloud: { id: string; date: string }[] = [];
-    const next = mergeByKey((r) => r.id, base, local, cloud);
-    assert.equal(next.length, 0);
+  it("does not restore a guest this desk deleted even if the account still has it", () => {
+    const gone = {
+      id: "g6",
+      date: "2026-09-06",
+      slNo: 1,
+      name: "SIXTH",
+      roomNo: "101",
+      mode: "CASH" as const,
+      amount: 1,
+    };
+    const next = mergeLiveSnapshot(
+      snap({ guests: [gone], deletedIds: {} }),
+      snap({ guests: [], deletedIds: { "guest:g6": true } }),
+      snap({ guests: [gone], deletedIds: {} }),
+    );
+    assert.equal(next.guests.length, 0);
+    assert.equal(next.deletedIds?.["guest:g6"], true);
   });
 
   it("keeps a guest this desk added and one the other desk added", () => {

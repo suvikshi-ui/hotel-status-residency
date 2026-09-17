@@ -12,13 +12,11 @@ export function isMissingSchema(error: {
   );
 }
 
-/** sheet_seals is optional — hotel json `_sealedIds` is enough. */
-export function isSkippableSealError(error: {
+export function isPermissionDenied(error: {
   code?: string;
   message?: string;
 } | null): boolean {
   if (!error) return false;
-  if (isMissingSchema(error)) return true;
   const m = (error.message ?? "").toLowerCase();
   const code = error.code ?? "";
   return (
@@ -27,4 +25,21 @@ export function isSkippableSealError(error: {
     m.includes("row-level security") ||
     m.includes("rls")
   );
+}
+
+export function isPermissionMessage(raw?: string) {
+  const m = (raw ?? "").toLowerCase();
+  return (
+    m.includes("permission denied") ||
+    m.includes("row-level security") ||
+    m.includes("rls")
+  );
+}
+
+/** Optional tables / prune-delete must not block Daily register Save. */
+export function isSkippableSealError(error: {
+  code?: string;
+  message?: string;
+} | null): boolean {
+  return isMissingSchema(error) || isPermissionDenied(error);
 }

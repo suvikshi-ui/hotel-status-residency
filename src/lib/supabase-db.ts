@@ -19,6 +19,9 @@ import {
   mergeSealed,
   parseSealedIds,
   sealedFromHotel,
+  deletedFromHotel,
+  dropDeletedRows,
+  sealKey,
   type SealedIds,
 } from "./sheet-seal";
 import type {
@@ -74,6 +77,7 @@ export type LedgerSnapshot = {
   lockedDates?: Record<string, true>;
   lockRev?: Record<string, number>;
   sealedIds?: SealedIds;
+  deletedIds?: SealedIds;
   inventory?: InventoryItem[];
   complaints?: RoomComplaint[];
   savedAt?: number;
@@ -358,10 +362,10 @@ export async function pullLedger(userId: string): Promise<CloudPull> {
     food.error ||
     wholesale.error ||
     advances.error;
-  if (complaints.error && !isMissingSchema(complaints.error)) {
+  if (complaints.error && !isSkippableSealError(complaints.error)) {
     return asError(complaints.error);
   }
-  if (inventory.error && !isMissingSchema(inventory.error)) {
+  if (inventory.error && !isSkippableSealError(inventory.error)) {
     return asError(inventory.error);
   }
   if (seals.error && !isSkippableSealError(seals.error)) {
@@ -453,7 +457,7 @@ export async function pullLedger(userId: string): Promise<CloudPull> {
         : parseSealedIds((seals.data ?? []).map((r) => str((r as { id?: unknown }).id))),
     ),
     cloudUpdatedAt: str(row.updated_at),
-    complaints: isMissingSchema(complaints.error)
+    complaints: isSkippableSealError(complaints.error)
       ? []
       : normalizeComplaints(
           (complaints.data ?? []).map((r) => {
@@ -467,7 +471,7 @@ export async function pullLedger(userId: string): Promise<CloudPull> {
             };
           }),
         ),
-    inventory: isMissingSchema(inventory.error)
+    inventory: isSkippableSealError(inventory.error)
       ? []
       : normalizeInventory(
           (inventory.data ?? []).map((r) => {
@@ -483,6 +487,19 @@ export async function pullLedger(userId: string): Promise<CloudPull> {
         ),
     savedAt: Date.parse(str(row.updated_at)) || 0,
   };
+
+  const deletedIds = mergeSealed(deletedFromHotel(hotelRaw), {});
+  snapshot.deletedIds = deletedIds;
+  snapshot.guests = dropDeletedRows(snapshot.guests, deletedIds, sealKey.guest);
+  snapshot.food = dropDeletedRows(snapshot.food, deletedIds, sealKey.food);
+  snapshot.wholesale = dropDeletedRows(snapshot.wholesale, deletedIds, sealKey.wholesale);
+  snapshot.expenses = dropDeletedRows(snapshot.expenses, deletedIds, sealKey.expense);
+  snapshot.balReceived = dropDeletedRows(snapshot.balReceived, deletedIds, sealKey.balance);
+  snapshot.complaints = dropDeletedRows(
+    snapshot.complaints ?? [],
+    deletedIds,
+    sealKey.complaint,
+  );
 
   return { ok: true, kind: "data", snapshot };
 }
@@ -510,12 +527,15 @@ async function replaceRows(
       : prune.filter((id) => id && !keep.has(id));
 
   if (extra.length) {
-    const { error } = await sb
-      .from(table)
-      .delete()
-      .eq("user_id", userId)
-      .in(idField, extra);
-    if (error) return error;
+    const chunk = 80;
+    for (let i = 0; i < extra.length; i += chunk) {
+      const { error } = await sb
+        .from(table)
+        .delete()
+        .eq("user_id", userId)
+        .in(idField, extra.slice(i, i + chunk));
+      if (error && !isSkippableSealError(error)) return error;
+    }
   }
 
   if (!rows.length) {
@@ -759,6 +779,7 @@ export async function pushLedger(
       snap.lockedDates ?? {},
       snap.lockRev ?? {},
       snap.sealedIds ?? {},
+      snap.deletedIds ?? {},
     ),
     opening: snap.opening,
     opening_date: snap.openingDate,
@@ -826,6 +847,10 @@ export async function upsertLedgerFromBackup(
       rev: lockRevFromHotel(hotelRaw) ?? {},
     },
   );
+  const gone = mergeSealed(
+    parseSealedIds(snap.deletedIds),
+    deletedFromHotel(hotelRaw),
+  );
   const seals = mergeSealed(
     parseSealedIds(snap.sealedIds),
     sealedFromHotel(hotelRaw),
@@ -858,6 +883,7 @@ export async function upsertLedgerFromBackup(
       lockedDates: locks.locked,
       lockRev: locks.rev,
       sealedIds: seals,
+      deletedIds: gone,
     },
     "backup-import",
     role,

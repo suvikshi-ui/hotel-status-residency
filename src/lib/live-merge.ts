@@ -4,7 +4,7 @@ import {
   parseLockRev,
   parseLockedDates,
 } from "./register-lock.ts";
-import { mergeSealed, parseSealedIds } from "./sheet-seal.ts";
+import { mergeSealed, parseSealedIds, dropDeletedRows, sealKey } from "./sheet-seal.ts";
 import type { LedgerSnapshot } from "./supabase-db.ts";
 
 export function rowEq(a: unknown, b: unknown) {
@@ -88,6 +88,7 @@ function emptyRows(s: LedgerSnapshot): LedgerSnapshot {
     lockedDates: {},
     lockRev: {},
     sealedIds: {},
+    deletedIds: {},
   };
 }
 
@@ -107,19 +108,43 @@ export function mergeLiveSnapshot(
       rev: parseLockRev(cloud.lockRev),
     },
   );
+  const deletedIds = mergeSealed(
+    parseSealedIds(local.deletedIds),
+    parseSealedIds(cloud.deletedIds),
+  );
   return {
     hotel: pick3(b.hotel, local.hotel, cloud.hotel),
     opening: pick3(b.opening, local.opening, cloud.opening),
     rooms: mergeByKey((r) => r.no, b.rooms, local.rooms, cloud.rooms),
-    guests: mergeByKey((r) => r.id, b.guests, local.guests, cloud.guests),
-    food: mergeByKey((r) => r.id, b.food, local.food, cloud.food),
-    wholesale: mergeByKey((r) => r.id, b.wholesale, local.wholesale, cloud.wholesale),
-    expenses: mergeByKey((r) => r.id, b.expenses, local.expenses, cloud.expenses),
-    balReceived: mergeByKey(
-      (r) => r.id,
-      b.balReceived,
-      local.balReceived,
-      cloud.balReceived,
+    guests: dropDeletedRows(
+      mergeByKey((r) => r.id, b.guests, local.guests, cloud.guests),
+      deletedIds,
+      sealKey.guest,
+    ),
+    food: dropDeletedRows(
+      mergeByKey((r) => r.id, b.food, local.food, cloud.food),
+      deletedIds,
+      sealKey.food,
+    ),
+    wholesale: dropDeletedRows(
+      mergeByKey((r) => r.id, b.wholesale, local.wholesale, cloud.wholesale),
+      deletedIds,
+      sealKey.wholesale,
+    ),
+    expenses: dropDeletedRows(
+      mergeByKey((r) => r.id, b.expenses, local.expenses, cloud.expenses),
+      deletedIds,
+      sealKey.expense,
+    ),
+    balReceived: dropDeletedRows(
+      mergeByKey(
+        (r) => r.id,
+        b.balReceived,
+        local.balReceived,
+        cloud.balReceived,
+      ),
+      deletedIds,
+      sealKey.balance,
     ),
     staff: mergeByKey((r) => r.id, b.staff, local.staff, cloud.staff),
     advances: mergeByKey((r) => r.id, b.advances, local.advances, cloud.advances),
@@ -137,17 +162,22 @@ export function mergeLiveSnapshot(
       parseSealedIds(local.sealedIds),
       parseSealedIds(cloud.sealedIds),
     ),
+    deletedIds,
     inventory: mergeByKey(
       (r) => r.id,
       b.inventory ?? [],
       local.inventory ?? [],
       cloud.inventory ?? [],
     ),
-    complaints: mergeByKey(
-      (r) => r.id,
-      b.complaints ?? [],
-      local.complaints ?? [],
-      cloud.complaints ?? [],
+    complaints: dropDeletedRows(
+      mergeByKey(
+        (r) => r.id,
+        b.complaints ?? [],
+        local.complaints ?? [],
+        cloud.complaints ?? [],
+      ),
+      deletedIds,
+      sealKey.complaint,
     ),
     savedAt: Math.max(local.savedAt ?? 0, cloud.savedAt ?? 0),
     cloudUpdatedAt: cloud.cloudUpdatedAt,

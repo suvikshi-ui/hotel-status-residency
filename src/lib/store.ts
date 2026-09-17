@@ -89,6 +89,7 @@ export interface LedgerState {
   lockedDates: Record<string, true>;
   lockRev: Record<string, number>;
   sealedIds: SealedIds;
+  deletedIds: SealedIds;
   savedAt: number;
   setDate: (date: string) => void;
   setOpening: (date: string, opening: OpeningBalances) => void;
@@ -179,6 +180,7 @@ function seedState(): Omit<
     lockedDates: {},
     lockRev: {},
     sealedIds: {},
+    deletedIds: {},
     savedAt: 0,
   };
 }
@@ -223,6 +225,9 @@ function mergeSnapshot(
   const sealedIds = opts?.replace
     ? parseSealedIds(persisted.sealedIds)
     : mergeSealed(current.sealedIds, persisted.sealedIds);
+  const deletedIds = opts?.replace
+    ? parseSealedIds(persisted.deletedIds)
+    : mergeSealed(current.deletedIds, persisted.deletedIds);
   const guests = opts?.replace
     ? (persisted.guests ?? [])
     : opts?.skipSeedFill
@@ -282,6 +287,7 @@ function mergeSnapshot(
     lockedDates,
     lockRev,
     sealedIds,
+    deletedIds,
     hotel: fromHotel.name ? fromHotel : current.hotel,
   };
 }
@@ -407,7 +413,11 @@ export const useLedger = create<LedgerState>()(
         if (isSealed(get().sealedIds, sealKey.guest(id))) return;
         const guests = get().guests.filter((g) => g.id !== id);
         const next = { ...get(), guests };
-        save({ guests, ...rebuildFrom(next, row?.date ?? get().selectedDate) });
+        save({
+          guests,
+          deletedIds: withSealed(get().deletedIds, [sealKey.guest(id)]),
+          ...rebuildFrom(next, row?.date ?? get().selectedDate),
+        });
       },
       addFood: (row) => {
         const date = row.date ?? get().selectedDate;
@@ -422,7 +432,11 @@ export const useLedger = create<LedgerState>()(
         if (isSealed(get().sealedIds, sealKey.food(id))) return;
         const food = get().food.filter((x) => x.id !== id);
         const next = { ...get(), food };
-        save({ food, ...rebuildFrom(next, row?.date ?? get().selectedDate) });
+        save({
+          food,
+          deletedIds: withSealed(get().deletedIds, [sealKey.food(id)]),
+          ...rebuildFrom(next, row?.date ?? get().selectedDate),
+        });
       },
       addWholesale: (row) => {
         const date = row.date ?? get().selectedDate;
@@ -439,6 +453,7 @@ export const useLedger = create<LedgerState>()(
         const next = { ...get(), wholesale };
         save({
           wholesale,
+          deletedIds: withSealed(get().deletedIds, [sealKey.wholesale(id)]),
           ...rebuildFrom(next, row?.date ?? get().selectedDate),
         });
       },
@@ -457,6 +472,7 @@ export const useLedger = create<LedgerState>()(
         const next = { ...get(), expenses };
         save({
           expenses,
+          deletedIds: withSealed(get().deletedIds, [sealKey.expense(id)]),
           ...rebuildFrom(next, row?.date ?? get().selectedDate),
         });
       },
@@ -478,6 +494,7 @@ export const useLedger = create<LedgerState>()(
         const next = { ...get(), balReceived };
         save({
           balReceived,
+          deletedIds: withSealed(get().deletedIds, [sealKey.balance(id)]),
           ...rebuildFrom(next, row?.date ?? get().selectedDate),
         });
       },
@@ -542,6 +559,7 @@ export const useLedger = create<LedgerState>()(
           lockedDates: parseLockedDates(p.lockedDates ?? cur.lockedDates),
           lockRev: parseLockRev(p.lockRev ?? cur.lockRev),
           sealedIds: mergeSealed(cur.sealedIds, p.sealedIds),
+          deletedIds: mergeSealed(cur.deletedIds, p.deletedIds),
         };
         set({
           ...next,
@@ -594,6 +612,7 @@ export const useLedger = create<LedgerState>()(
         delete disk.lockedDates;
         delete disk.lockRev;
         delete disk.sealedIds;
+        delete disk.deletedIds;
         return withBooks(mergeSnapshot(disk, current));
       },
     },
