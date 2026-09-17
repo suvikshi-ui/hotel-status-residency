@@ -57,6 +57,7 @@ export interface DueAccount {
   stays: DueStay[];
   receipts: DueReceipt[];
   settled: boolean;
+  listBilled: number;
 }
 
 export function sourceKey(g: GuestEntry): string {
@@ -208,6 +209,7 @@ export function buildDueAccounts(
         stays: [],
         receipts: [],
         settled: false,
+        listBilled: 0,
       };
       map.set(key, row);
     }
@@ -244,6 +246,13 @@ export function buildDueAccounts(
     const hit = keys.find((k) => receiptMatches(r.particular, k));
     const row = hit ? map.get(hit)! : ensure(name);
     if (!hit) keys.push(row.key);
+    if (!row.firstDate || r.date < row.firstDate) row.firstDate = r.date;
+    if (!row.lastDate || r.date > row.lastDate) row.lastDate = r.date;
+    if (r.kind === "list") {
+      row.listBilled += r.amount;
+      row.billed += r.amount;
+      continue;
+    }
     row.collected += r.amount;
     row.receipts.push({
       id: r.id,
@@ -252,8 +261,6 @@ export function buildDueAccounts(
       mode: r.mode,
       amount: r.amount,
     });
-    if (!row.firstDate || r.date < row.firstDate) row.firstDate = r.date;
-    if (!row.lastDate || r.date > row.lastDate) row.lastDate = r.date;
   }
 
   for (const row of map.values()) {

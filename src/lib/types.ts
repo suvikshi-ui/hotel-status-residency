@@ -28,7 +28,7 @@ export interface ModeAmount {
 
 export interface NamedAmount extends ModeAmount {
   particular: string;
-  kind?: "due" | "ota" | "other";
+  kind?: "due" | "ota" | "other" | "list";
 }
 
 export interface MixSlice {

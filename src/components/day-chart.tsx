@@ -206,7 +206,7 @@ export function DayChart({
 }) {
   const next = addDaysIso(date, 1);
   const take = buildDayTake(guests, food, ws);
-  const due = receipts.filter((r) => r.kind !== "ota");
+  const due = receipts.filter((r) => r.kind !== "ota" && r.kind !== "list");
   const ota = receipts.filter((r) => r.kind === "ota");
   const cashRecv = byMode(receipts, "CASH");
   const qrsRecv = byMode(receipts, "QRS");

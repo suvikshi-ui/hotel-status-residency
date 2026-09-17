@@ -333,7 +333,9 @@ export function RegisterLines() {
   const dueAccount = lookupDueAccount(accounts, source);
   const dueLeft = dueAccount ? Math.max(0, dueAccount.remaining) : 0;
 
-  const dueRows = receipts.filter((r) => r.kind !== "ota" && r.kind !== "other");
+  const dueRows = receipts.filter(
+    (r) => r.kind !== "ota" && r.kind !== "other" && r.kind !== "list",
+  );
   const otaRows = receipts.filter((r) => r.kind === "ota");
   const heads = useMemo(
     () => [...new Set(allExp.map((e) => e.particular))].sort(),

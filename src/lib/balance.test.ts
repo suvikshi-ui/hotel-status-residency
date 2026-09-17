@@ -272,4 +272,32 @@ describe("buildDueAccounts stays", () => {
     assert.equal(extra!.collected, 800);
     assert.equal(extra!.settled, false);
   });
+
+  it("adds a list entry to the source list without treating it as a receive", () => {
+    const accounts = buildDueAccounts(
+      [
+        guest({ id: "a1", date: "2026-09-01", name: "RAMESH", stay: "out" }),
+      ],
+      [
+        receipt({
+          id: "l1",
+          amount: 3500,
+          particular: "New Co",
+          kind: "list",
+          mode: "BALANCE",
+        }),
+      ],
+    );
+    const extra = accounts.find((a) => a.key === "NEW CO");
+    const fly = accounts.find((a) => a.key === "FLYSKY");
+    assert.ok(extra);
+    assert.ok(fly);
+    assert.equal(extra!.listBilled, 3500);
+    assert.equal(extra!.billed, 3500);
+    assert.equal(extra!.collected, 0);
+    assert.equal(extra!.remaining, 3500);
+    assert.equal(extra!.receipts.length, 0);
+    assert.equal(fly!.listBilled, 0);
+    assert.equal(fly!.remaining, 2000);
+  });
 });

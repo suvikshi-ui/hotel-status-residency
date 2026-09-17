@@ -145,4 +145,23 @@ describe("balance carry-forward", () => {
     assert.equal(map.get("2026-09-03")!.outstanding.ob, 3000);
     assert.equal(map.get("2026-09-03")!.cashBook.ob, 2000);
   });
+
+  it("list entry does not change outstanding books", () => {
+    const row: NamedAmount = {
+      id: "l1",
+      date: "2026-09-02",
+      mode: "BALANCE",
+      amount: 3500,
+      particular: "New Co",
+      kind: "list",
+    };
+    const { map } = booksFor([guest("2026-09-01", 5000, "BALANCE")], "2026-09-03", {
+      balReceived: [row],
+    });
+    assert.equal(map.get("2026-09-01")!.outstanding.cb, 5000);
+    assert.equal(map.get("2026-09-02")!.outstanding.ob, 5000);
+    assert.equal(map.get("2026-09-02")!.outstanding.cb, 5000);
+    assert.equal(map.get("2026-09-02")!.cashBook.cb, 0);
+    assert.equal(map.get("2026-09-03")!.outstanding.ob, 5000);
+  });
 });

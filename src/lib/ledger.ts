@@ -87,7 +87,9 @@ export function computeBooks(input: {
     .filter((e) => e.mode === "QRPK")
     .reduce((s, e) => s + e.amount, 0);
 
-  const due = input.balReceived.filter((e) => e.kind !== "ota");
+  const due = input.balReceived.filter(
+    (e) => e.kind !== "ota" && e.kind !== "list",
+  );
   const ota = input.balReceived.filter((e) => e.kind === "ota");
   const dueCash = sumAmt(due.filter((e) => e.mode === "CASH"));
   const dueQr = sumAmt(due.filter((e) => e.mode === "QRS"));
