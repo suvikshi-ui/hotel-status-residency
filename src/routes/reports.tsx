@@ -421,7 +421,7 @@ function DetailDailyPanel() {
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
         <p className="text-sm text-muted">
-          {formatDay(date)} · detailed daily chart
+          {formatDay(date)} · same layout as Daily register
         </p>
         <Button
           type="button"

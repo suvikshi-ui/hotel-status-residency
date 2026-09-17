@@ -1,7 +1,6 @@
 import { format, parseISO } from "date-fns";
 import type { CSSProperties, ReactNode } from "react";
 import { buildDayTake } from "@/lib/day-report";
-import { MODE_SHORT } from "@/lib/format";
 import { publicUrl } from "@/lib/public-url";
 import { addDaysIso, stayDates } from "@/lib/stay";
 import type {
@@ -33,6 +32,10 @@ function sum(rows: { amount: number }[]) {
   return rows.reduce((s, r) => s + r.amount, 0);
 }
 
+function byMode(rows: { mode: PayMode; amount: number }[], mode: PayMode) {
+  return rows.filter((r) => r.mode === mode).reduce((s, r) => s + r.amount, 0);
+}
+
 const PILL: Record<PayMode, { bg: string; fg: string; label: string }> = {
   CASH: { bg: "#d8efe4", fg: "#1f6b4a", label: "CASH" },
   QRS: { bg: "#d8efe4", fg: "#1f6b4a", label: "QRS" },
@@ -61,15 +64,6 @@ function Pill({ mode }: { mode: PayMode }) {
   );
 }
 
-function receiptLine(r: NamedAmount) {
-  const mode = PILL[r.mode]?.label ?? r.mode;
-  if (r.kind === "other") {
-    const note = r.particular.trim();
-    return note ? `Other · ${note} · ${mode}` : `Other · ${mode}`;
-  }
-  return `${r.particular} · ${mode}`;
-}
-
 function Section({
   title,
   children,
@@ -96,37 +90,67 @@ function Section({
   );
 }
 
-function Line({
-  label,
-  value,
-  strong,
-  sign,
+function TwoCol({
+  left,
+  right,
 }: {
-  label: string;
-  value: number;
-  strong?: boolean;
-  sign?: "+" | "−" | "";
+  left: ReactNode;
+  right: ReactNode;
 }) {
-  const show = sign ? (sign === "−" ? -Math.abs(value) : value) : value;
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: 20,
+        marginTop: 4,
+      }}
+    >
+      <div>{left}</div>
+      <div>{right}</div>
+    </div>
+  );
+}
+
+function EmptyLine() {
+  return (
+    <div
+      style={{
+        padding: "8px 2px",
+        borderBottom: "1px solid #eadfcd",
+        color: "#6f675c",
+        fontSize: 12,
+      }}
+    >
+      —
+    </div>
+  );
+}
+
+function ItemRow({
+  left,
+  amount,
+}: {
+  left: ReactNode;
+  amount: number;
+}) {
   return (
     <div
       style={{
         display: "flex",
         justifyContent: "space-between",
-        gap: 12,
-        padding: "6px 2px",
-        borderBottom: strong ? "1px solid #1a1a1a" : "1px solid #eadfcd",
-        fontWeight: strong ? 700 : 400,
-        fontSize: strong ? 13 : 12,
+        alignItems: "center",
+        gap: 10,
+        padding: "7px 2px",
+        borderBottom: "1px solid #eadfcd",
+        fontSize: 12,
       }}
     >
-      <span>{label}</span>
-      <span className="tabular" style={{ fontVariantNumeric: "tabular-nums" }}>
-        {sign === "−"
-          ? `−${rupee(Math.abs(value))}`
-          : sign === "+"
-            ? rupee(value)
-            : rupee(show)}
+      <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+        {left}
+      </span>
+      <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>
+        {rupee(amount)}
       </span>
     </div>
   );
@@ -148,6 +172,15 @@ const td: CSSProperties = {
   verticalAlign: "top",
   fontSize: 12,
 };
+const num: CSSProperties = {
+  ...td,
+  textAlign: "right",
+  fontVariantNumeric: "tabular-nums",
+};
+
+function cellAmt(n: number) {
+  return n ? rupee(n) : "—";
+}
 
 export function DayChart({
   hotel,
@@ -159,7 +192,6 @@ export function DayChart({
   ws,
   expenses,
   receipts,
-  books,
 }: {
   hotel: string;
   blessing: string;
@@ -176,45 +208,30 @@ export function DayChart({
   const take = buildDayTake(guests, food, ws);
   const due = receipts.filter((r) => r.kind !== "ota");
   const ota = receipts.filter((r) => r.kind === "ota");
-  const recvQrs = sum(due.filter((r) => r.mode === "QRS"));
-  const recvPk = sum(due.filter((r) => r.mode === "QRPK"));
-  const cashExp = sum(expenses.filter((e) => e.mode === "CASH"));
-  const qrExp = sum(expenses.filter((e) => e.mode === "QRS"));
-  const pkExp = sum(expenses.filter((e) => e.mode === "QRPK"));
-  const qrsIn =
-    take.santosh.rooms + take.santosh.food + take.santosh.ws + recvQrs;
-  const pkIn = take.pk.rooms + take.pk.food + take.pk.ws + recvPk;
-  const otaIn = sum(ota);
-  const onlineIn = take.online.rooms + take.online.food + take.online.ws;
-  const allRecv = sum(due);
-  const cashOb = books?.cashBook.ob ?? 0;
-  const qrOb = books?.santosh.ob ?? 0;
-  const pkOb = books?.pk.ob ?? 0;
-  const onOb = books?.online.ob ?? 0;
-  const balOb = books?.outstanding.ob ?? 0;
-  const cashCb =
-    cashOb +
-    take.roomsTotal +
-    take.foodTotal +
-    take.wsTotal +
-    allRecv -
-    cashExp -
-    qrsIn -
-    (pkIn + otaIn) -
-    onlineIn -
-    take.due.rooms;
-  const qrCb = qrOb + qrsIn - qrExp;
-  const pkCb = pkOb + pkIn + otaIn - pkExp;
-  const onCb = onOb + take.online.rooms - otaIn;
-  const balCb = balOb + take.due.rooms - allRecv;
-  const rooms = guests.map((g) => padRoom(g.roomNo));
-
-  const modes: PayMode[] = ["CASH", "QRS", "QRPK", "ONLINE", "BALANCE"];
-  const slice = (m: PayMode) => {
-    const roomsAmt = guests.filter((g) => g.mode === m).reduce((s, g) => s + g.amount, 0);
-    const foodAmt = food.filter((f) => f.mode === m).reduce((s, f) => s + f.amount, 0);
-    const wsAmt = ws.filter((w) => w.mode === m).reduce((s, w) => s + w.amount, 0);
-    return { roomsAmt, foodAmt, wsAmt, total: roomsAmt + foodAmt + wsAmt };
+  const cashRecv = byMode(receipts, "CASH");
+  const qrsRecv = byMode(receipts, "QRS");
+  const pkRecv = byMode(receipts, "QRPK");
+  const onRecv = byMode(receipts, "ONLINE");
+  const qrRooms = take.santosh.rooms + take.pk.rooms;
+  const qrFood = take.santosh.food + take.pk.food;
+  const qrWs = take.santosh.ws + take.pk.ws;
+  const qrRecv = qrsRecv + pkRecv;
+  const cashIn =
+    take.cash.rooms + take.cash.food + take.cash.ws + cashRecv;
+  const qrIn = qrRooms + qrFood + qrWs + qrRecv;
+  const onIn =
+    take.online.rooms + take.online.food + take.online.ws + onRecv;
+  const payRows: { label: string; cash: number; qr: number; online: number }[] = [
+    { label: "Room sale", cash: take.cash.rooms, qr: qrRooms, online: take.online.rooms },
+    { label: "Food", cash: take.cash.food, qr: qrFood, online: take.online.food },
+    { label: "WS", cash: take.cash.ws, qr: qrWs, online: take.online.ws },
+    { label: "Balance received", cash: cashRecv, qr: qrRecv, online: onRecv },
+  ];
+  const payTotal = {
+    cash: cashIn,
+    qr: qrIn,
+    online: onIn,
+    all: cashIn + qrIn + onIn,
   };
 
   return (
@@ -224,8 +241,7 @@ export function DayChart({
       style={{
         background: "#f7f1e6",
         color: "#1a1a1a",
-        fontFamily:
-          'Georgia, "Times New Roman", Times, serif',
+        fontFamily: 'Georgia, "Times New Roman", Times, serif',
         padding: "18px 20px 28px",
         border: "1px solid #e2d6c2",
       }}
@@ -254,14 +270,14 @@ export function DayChart({
         </div>
         <div style={{ marginTop: 4, fontSize: 12, color: "#6f675c" }}>{blessing}</div>
         <div style={{ marginTop: 10, fontSize: 18, fontWeight: 700 }}>
-          Day chart · {longDay(date)}
+          Detailed daily · {longDay(date)}
         </div>
         <div style={{ marginTop: 4, fontSize: 12 }}>
           {sept(date)} 11:00 AM — {sept(next)} 11:00 AM
         </div>
         <div style={{ marginTop: 3, fontSize: 11, color: "#6f675c" }}>
-          Check-in 11:00 AM · Check-out 11:00 AM · {guests.length} rooms · due{" "}
-          {sept(next)} 11:00 AM
+          Same layout as Daily register · {guests.length} posting
+          {guests.length === 1 ? "" : "s"}
         </div>
       </div>
 
@@ -328,218 +344,145 @@ export function DayChart({
             fontWeight: 700,
           }}
         >
-          <span>Sale total</span>
+          <span>Posting total</span>
           <span style={{ fontVariantNumeric: "tabular-nums" }}>
             {rupee(take.roomsTotal)}
           </span>
         </div>
       </Section>
 
-      <Section title="Food">
-        <SimpleList
-          rows={food.map((f) => ({
-            label: MODE_SHORT[f.mode] === "QR" ? "QRS" : MODE_SHORT[f.mode] === "Cash" ? "Cash" : MODE_SHORT[f.mode],
-            amount: f.amount,
-          }))}
-          total={take.foodTotal}
-        />
-      </Section>
-
-      <Section title="WS">
-        <SimpleList
-          rows={ws.map((f) => ({
-            label: MODE_SHORT[f.mode] === "QR" ? "QRS" : MODE_SHORT[f.mode],
-            amount: f.amount,
-          }))}
-          total={take.wsTotal}
-        />
-      </Section>
-
-      <Section title="Balance received">
-        <SimpleList
-          rows={due.map((r) => ({
-            label: receiptLine(r),
-            amount: r.amount,
-          }))}
-          total={allRecv}
-        />
-      </Section>
+      <TwoCol
+        left={
+          <Section title="Food">
+            {food.length === 0 ? (
+              <EmptyLine />
+            ) : (
+              food.map((f) => (
+                <ItemRow
+                  key={f.id}
+                  left={<Pill mode={f.mode} />}
+                  amount={f.amount}
+                />
+              ))
+            )}
+          </Section>
+        }
+        right={
+          <Section title="WS">
+            {ws.length === 0 ? (
+              <EmptyLine />
+            ) : (
+              ws.map((w) => (
+                <ItemRow
+                  key={w.id}
+                  left={<Pill mode={w.mode} />}
+                  amount={w.amount}
+                />
+              ))
+            )}
+          </Section>
+        }
+      />
 
       <Section title="Expenses">
-        <SimpleList
-          rows={expenses.map((e) => ({
-            label: `${e.particular} · ${PILL[e.mode].label}`,
-            amount: e.amount,
-          }))}
-          total={sum(expenses)}
-        />
+        {expenses.length === 0 ? (
+          <EmptyLine />
+        ) : (
+          expenses.map((e) => (
+            <ItemRow
+              key={e.id}
+              left={
+                <>
+                  <span style={{ fontWeight: 600 }}>{e.particular}</span>
+                  <Pill mode={e.mode} />
+                </>
+              }
+              amount={e.amount}
+            />
+          ))
+        )}
       </Section>
 
-      <Section title="By mode">
+      <TwoCol
+        left={
+          <Section title="Balance received · source">
+            {due.length === 0 ? (
+              <EmptyLine />
+            ) : (
+              due.map((r) => (
+                <ItemRow
+                  key={r.id}
+                  left={
+                    <>
+                      <span style={{ fontWeight: 600 }}>{r.particular}</span>
+                      <Pill mode={r.mode} />
+                    </>
+                  }
+                  amount={r.amount}
+                />
+              ))
+            )}
+          </Section>
+        }
+        right={
+          <Section title="Fab / Bravistay">
+            {ota.length === 0 ? (
+              <EmptyLine />
+            ) : (
+              ota.map((r) => (
+                <ItemRow
+                  key={r.id}
+                  left={
+                    <>
+                      <span style={{ fontWeight: 600 }}>{r.particular}</span>
+                      <Pill mode={r.mode} />
+                    </>
+                  }
+                  amount={r.amount}
+                />
+              ))
+            )}
+          </Section>
+        }
+      />
+
+      <Section title="Payment in">
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr>
-              <th style={th} />
-              <th style={{ ...th, textAlign: "right" }}>Sale</th>
-              <th style={{ ...th, textAlign: "right" }}>Food</th>
-              <th style={{ ...th, textAlign: "right" }}>WS</th>
+              <th style={th}>Particular</th>
+              <th style={{ ...th, textAlign: "right" }}>Cash</th>
+              <th style={{ ...th, textAlign: "right" }}>QR</th>
+              <th style={{ ...th, textAlign: "right" }}>Online</th>
               <th style={{ ...th, textAlign: "right" }}>Total</th>
             </tr>
           </thead>
           <tbody>
-            {modes.map((m) => {
-              const s = slice(m);
-              return (
-                <tr key={m}>
-                  <td style={td}>
-                    <Pill mode={m} />
-                  </td>
-                  <td style={{ ...td, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                    {s.roomsAmt ? rupee(s.roomsAmt) : "—"}
-                  </td>
-                  <td style={{ ...td, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                    {s.foodAmt ? rupee(s.foodAmt) : "—"}
-                  </td>
-                  <td style={{ ...td, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                    {s.wsAmt ? rupee(s.wsAmt) : "—"}
-                  </td>
-                  <td style={{ ...td, textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>
-                    {s.total ? rupee(s.total) : "—"}
-                  </td>
-                </tr>
-              );
-            })}
+            {payRows.map((row) => (
+              <tr key={row.label}>
+                <td style={td}>{row.label}</td>
+                <td style={num}>{cellAmt(row.cash)}</td>
+                <td style={num}>{cellAmt(row.qr)}</td>
+                <td style={num}>{cellAmt(row.online)}</td>
+                <td style={{ ...num, fontWeight: 700 }}>
+                  {cellAmt(row.cash + row.qr + row.online)}
+                </td>
+              </tr>
+            ))}
             <tr>
-              <td style={{ ...td, fontWeight: 700 }}>Total</td>
-              <td style={{ ...td, textAlign: "right", fontWeight: 700 }}>
-                {rupee(take.roomsTotal)}
-              </td>
-              <td style={{ ...td, textAlign: "right", fontWeight: 700 }}>
-                {rupee(take.foodTotal)}
-              </td>
-              <td style={{ ...td, textAlign: "right", fontWeight: 700 }}>
-                {take.wsTotal ? rupee(take.wsTotal) : "—"}
-              </td>
-              <td style={{ ...td, textAlign: "right", fontWeight: 700 }}>
-                {rupee(take.roomsTotal + take.foodTotal + take.wsTotal)}
-              </td>
+              <td style={{ ...td, fontWeight: 800 }}>Total</td>
+              <td style={{ ...num, fontWeight: 800 }}>{rupee(payTotal.cash)}</td>
+              <td style={{ ...num, fontWeight: 800 }}>{rupee(payTotal.qr)}</td>
+              <td style={{ ...num, fontWeight: 800 }}>{cellAmt(payTotal.online)}</td>
+              <td style={{ ...num, fontWeight: 800 }}>{rupee(payTotal.all)}</td>
             </tr>
           </tbody>
         </table>
-      </Section>
-
-      <div style={{ textAlign: "center", marginTop: 28, marginBottom: 8 }}>
-        <div style={{ fontSize: 18, fontWeight: 700 }}>Daily balance sheet</div>
-        <div style={{ fontSize: 12, marginTop: 4 }}>
-          {sept(date)} 11:00 AM — {sept(next)} 11:00 AM
-        </div>
-        <div style={{ fontSize: 11, color: "#6f675c", marginTop: 4 }}>
-          Rooms on chart: {rooms.join(", ") || "—"}
-        </div>
-      </div>
-
-      <Section title="Cash">
-        <Line label="O/B" value={cashOb} />
-        <Line label="Sales +" value={take.roomsTotal} sign="+" />
-        <Line label="Food +" value={take.foodTotal} sign="+" />
-        <Line label="WS +" value={take.wsTotal} sign="+" />
-        <Line label="Bal received +" value={allRecv} sign="+" />
-        <Line label="Exp −" value={cashExp} sign="−" />
-        <Line label="QRS −" value={qrsIn} sign="−" />
-        <Line label="QRPK −" value={pkIn + otaIn} sign="−" />
-        <Line label="Online −" value={onlineIn} sign="−" />
-        <Line label="Balance −" value={take.due.rooms} sign="−" />
-        <Line label="C/B" value={cashCb} strong />
-        <p style={{ fontSize: 11, color: "#6f675c", marginTop: 6 }}>
-          Drawer: opening + cash in – cash exp. QR / online / udhaar sales cash book se nikal jaate hain.
+        <p style={{ fontSize: 11, color: "#6f675c", marginTop: 8 }}>
+          Cash in today {rupee(payTotal.cash)} · QR is Santosh QR + P.K. QR · Fab /
+          Bravistay sits in QR (P.K.).
         </p>
       </Section>
-
-      <Section title="Santosh QR (QRS)">
-        <Line label="O/B" value={qrOb} />
-        <Line label="QRS in +" value={qrsIn} sign="+" />
-        <Line label="Exp −" value={qrExp} sign="−" />
-        <Line label="C/B" value={qrCb} strong />
-      </Section>
-
-      <Section title="P.K. QR (QRPK)">
-        <Line label="O/B" value={pkOb} />
-        <Line label="QRPK in +" value={pkIn} sign="+" />
-        <Line label="Fab / Bravistay / Booking +" value={otaIn} sign="+" />
-        <Line label="Exp −" value={pkExp} sign="−" />
-        <Line label="C/B" value={pkCb} strong />
-      </Section>
-
-      <Section title="Online — Bravistay / Fab">
-        <Line label="O/B" value={onOb} />
-        <Line label="Online in +" value={take.online.rooms} sign="+" />
-        <Line label="Fab / Bravistay / Booking −" value={otaIn} sign="−" />
-        <Line label="Exp −" value={0} sign="−" />
-        <Line label="C/B" value={onCb} strong />
-      </Section>
-
-      <Section title="Balance (udhaar)">
-        <Line label="O/B" value={balOb} />
-        <Line label="New balance +" value={take.due.rooms} sign="+" />
-        <Line label="Received −" value={allRecv} sign="−" />
-        <Line label="C/B" value={balCb} strong />
-        <p style={{ fontSize: 11, color: "#6f675c", marginTop: 6 }}>
-          Kal 11:00 pe yeh C/B outstanding O/B banega.
-        </p>
-      </Section>
-    </div>
-  );
-}
-
-function SimpleList({
-  rows,
-  total,
-}: {
-  rows: { label: string; amount: number }[];
-  total: number;
-}) {
-  return (
-    <div>
-      {rows.length === 0 ? (
-        <div
-          style={{
-            padding: "8px 2px",
-            borderBottom: "1px solid #eadfcd",
-            color: "#6f675c",
-          }}
-        >
-          —
-        </div>
-      ) : (
-        rows.map((r, i) => (
-          <div
-            key={`${r.label}-${i}`}
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              padding: "6px 2px",
-              borderBottom: "1px solid #eadfcd",
-              fontSize: 12,
-            }}
-          >
-            <span>{r.label}</span>
-            <span style={{ fontVariantNumeric: "tabular-nums" }}>
-              {rupee(r.amount)}
-            </span>
-          </div>
-        ))
-      )}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          padding: "8px 2px 0",
-          fontWeight: 700,
-        }}
-      >
-        <span>Total</span>
-        <span style={{ fontVariantNumeric: "tabular-nums" }}>{rupee(total)}</span>
-      </div>
     </div>
   );
 }
