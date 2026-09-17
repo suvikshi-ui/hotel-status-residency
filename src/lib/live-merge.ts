@@ -146,7 +146,9 @@ export function mergeLiveSnapshot(
       deletedIds,
       sealKey.balance,
     ),
-    staff: mergeByKey((r) => r.id, b.staff, local.staff, cloud.staff),
+    staff: mergeByKey((r) => r.id, b.staff, local.staff, cloud.staff).filter(
+      (r) => !/^st-(0|1|2|3|4|5|6|7|8|9|10|11|12|13|14)$/.test(r.id),
+    ),
     advances: mergeByKey((r) => r.id, b.advances, local.advances, cloud.advances),
     ota: pick3(b.ota, local.ota, cloud.ota),
     janSales: pick3(b.janSales, local.janSales, cloud.janSales),

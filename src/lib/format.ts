@@ -1,4 +1,4 @@
-import { format, parseISO, isValid } from "date-fns";
+import { format, parseISO, isValid, subMonths, getDaysInMonth } from "date-fns";
 import type { PayMode } from "./types";
 
 export const inr = new Intl.NumberFormat("en-IN", {
@@ -36,6 +36,37 @@ export function formatDay(iso: string) {
   const d = parseISO(iso);
   if (!isValid(d)) return iso;
   return format(d, "EEE d MMM yyyy");
+}
+
+export function salaryPayDate(iso: string) {
+  const d = parseISO(iso);
+  if (!isValid(d)) return d;
+  return subMonths(d, 1);
+}
+
+/** Salary paid this month is for the previous month — Sept books → August salary. */
+export function salaryPayMonth(iso: string) {
+  const d = salaryPayDate(iso);
+  if (!isValid(d)) return iso;
+  return format(d, "MMMM yyyy");
+}
+
+export function salaryPayMonthName(iso: string) {
+  const d = salaryPayDate(iso);
+  if (!isValid(d)) return iso;
+  return format(d, "MMMM");
+}
+
+export function salaryPayMonthKey(iso: string) {
+  const d = salaryPayDate(iso);
+  if (!isValid(d)) return iso.slice(0, 7);
+  return format(d, "yyyy-MM");
+}
+
+export function salaryDaysInMonth(iso: string) {
+  const d = salaryPayDate(iso);
+  if (!isValid(d)) return 30;
+  return getDaysInMonth(d);
 }
 
 export function formatDayShort(iso: string) {

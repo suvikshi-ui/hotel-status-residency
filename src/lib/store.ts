@@ -186,12 +186,37 @@ function seedState(): Omit<
   };
 }
 
+function blankStaffRow(): StaffRow {
+  return {
+    id: "st-blank",
+    name: "",
+    salary: 0,
+    role: "Staff",
+    days: "30 DAYS",
+    absent: 0,
+    working: 0,
+    extra: 0,
+    advance: 0,
+    weekOff: 0,
+    total: 0,
+    status: "",
+    month: "2026-08",
+  };
+}
+
+const RETIRED_STAFF_IDS = new Set(
+  Array.from({ length: 15 }, (_, i) => `st-${i}`),
+);
+
 function normalizeStaff(rows: StaffRow[]): StaffRow[] {
-  return rows.map((r, i) => ({
-    ...r,
-    id: r.id || `st-${i}`,
-    extra: r.extra ?? 0,
-  }));
+  const next = rows
+    .filter((r) => !RETIRED_STAFF_IDS.has(r.id))
+    .map((r, i) => ({
+      ...r,
+      id: r.id || `st-${i}`,
+      extra: r.extra ?? 0,
+    }));
+  return next.length ? next : [blankStaffRow()];
 }
 
 function normalizeAdvances(rows: AdvanceRow[]): AdvanceRow[] {
@@ -588,6 +613,7 @@ export const useLedger = create<LedgerState>()(
           lockRev: parseLockRev(p.lockRev ?? cur.lockRev),
           sealedIds: mergeSealed(cur.sealedIds, p.sealedIds),
           deletedIds: mergeSealed(cur.deletedIds, p.deletedIds),
+          staff: normalizeStaff(p.staff ?? cur.staff),
         };
         set({
           ...next,

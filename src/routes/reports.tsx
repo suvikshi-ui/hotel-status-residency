@@ -19,7 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { buildDayTake } from "@/lib/day-report";
 import { sumByBucket, expenseBucket } from "@/lib/expense-tally";
-import { formatDay, formatDayShort, money, moneyCompact } from "@/lib/format";
+import { formatDay, formatDayShort, money, moneyCompact, salaryDaysInMonth, salaryPayMonth, salaryPayMonthName } from "@/lib/format";
 import {
   inventoryDifference,
   signedCount,
@@ -518,8 +518,11 @@ function InventoryReportPanel() {
 
 function SalaryReportPanel() {
   const hotel = useLedger((s) => s.hotel);
+  const date = useLedger((s) => s.selectedDate);
   const staff = useLedger((s) => s.staff);
-  const monthDays = 30;
+  const monthDays = salaryDaysInMonth(date);
+  const payMonth = salaryPayMonth(date);
+  const payName = salaryPayMonthName(date);
   const rows = staff.map((r) => {
     const { earned, payable } = staffPay(
       r.salary,
@@ -542,10 +545,10 @@ function SalaryReportPanel() {
             {hotel.name}
           </p>
           <h2 className="mt-1 font-display text-2xl font-semibold tracking-tight">
-            Staff salary report
+            Salary of {payName}
           </h2>
           <p className="mt-1 text-sm text-muted">
-            Basic ÷ {monthDays} × (working + extra) − advance. Edit names on Staff.
+            Payment of {payMonth}. Basic ÷ {monthDays} × (working + extra) − advance.
           </p>
         </div>
         <Button type="button" onClick={() => window.print()}>

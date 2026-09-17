@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatDay, money, uid } from "@/lib/format";
+import { formatDay, money, salaryDaysInMonth, salaryPayMonth, salaryPayMonthKey, salaryPayMonthName, uid } from "@/lib/format";
 import { ReportsLink } from "@/components/reports-link";
 import { escapeHtml, printDocument } from "@/lib/print-sheet";
 import { staffPay } from "@/lib/staff-pay";
@@ -32,7 +32,7 @@ function StaffPage() {
   const sealedIds = useLedger((s) => s.sealedIds);
   const { busy: saving, saveToServer } = useAccountSave();
   const [sheet, setSheet] = useState<Sheet>("salary");
-  const [monthDays, setMonthDays] = useState(30);
+  const [monthDays, setMonthDays] = useState(() => salaryDaysInMonth(date));
   const [draft, setDraft] = useState<StaffRow[]>(staff);
   const [advDraft, setAdvDraft] = useState<AdvanceRow[]>(advances);
 
@@ -42,6 +42,9 @@ function StaffPage() {
   useEffect(() => {
     setAdvDraft(advances);
   }, [advances]);
+  useEffect(() => {
+    setMonthDays(salaryDaysInMonth(date));
+  }, [date]);
 
   const rows = useMemo(
     () =>
@@ -69,6 +72,8 @@ function StaffPage() {
   const monthKey = date.slice(0, 7);
   const salaryFrozen = isSealed(sealedIds, sealKey.staffMonth(monthKey));
   const advFrozen = isSealed(sealedIds, sealKey.advanceMonth(monthKey));
+  const payMonth = salaryPayMonth(date);
+  const payName = salaryPayMonthName(date);
   const frozen = sheet === "salary" ? salaryFrozen : advFrozen;
 
   function addStaff() {
@@ -88,7 +93,7 @@ function StaffPage() {
         weekOff: 0,
         total: 0,
         status: "",
-        month: date.slice(0, 7),
+        month: salaryPayMonthKey(date),
       },
     ]);
   }
@@ -151,9 +156,9 @@ function StaffPage() {
     </table>`;
     toast.message("Opening print…");
     printDocument({
-      title: "Salary sheet",
+      title: `Salary of ${payName}`,
       heading: hotel.name,
-      sub: `${hotel.place} · Salary sheet · ${formatDay(date)}`,
+      sub: `${hotel.place} · Salary of ${payName} · Payment of ${payMonth}`,
       table: body,
     });
   }
@@ -201,7 +206,7 @@ function StaffPage() {
               {hotel.name}
             </h2>
             <p className="mt-1 text-sm text-muted">
-              {hotel.place} · {sheet === "salary" ? "Salary sheet" : "Advance sheet"} · {formatDay(date)}
+              {hotel.place} · {sheet === "salary" ? `Salary of ${payName} · Payment of ${payMonth}` : "Advance sheet"} · {formatDay(date)}
             </p>
           </div>
         </div>
@@ -213,10 +218,12 @@ function StaffPage() {
             Payroll
           </p>
           <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight">
-            Staff
+            {sheet === "salary" ? `Salary of ${payName}` : "Staff"}
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Salary sheet and advance sheet are separate
+            {sheet === "salary"
+              ? `Payment of ${payMonth}`
+              : "Salary sheet and advance sheet are separate"}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -242,7 +249,7 @@ function StaffPage() {
       <Tabs value={sheet} onValueChange={(v) => setSheet(v as Sheet)}>
         <TabsList className="grid w-full grid-cols-2 print:hidden" aria-label="Staff sheets">
           <TabsTrigger value="salary" className="w-full">
-            Salary sheet
+            Salary of {payName}
           </TabsTrigger>
           <TabsTrigger value="advance" className="w-full">
             Advance sheet
@@ -303,9 +310,10 @@ function StaffPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Salary sheet</CardTitle>
+              <CardTitle>Salary of {payName}</CardTitle>
               <p className="text-sm text-muted">
-                Basic ÷ {monthDays} × (working + extra) − advance = to pay
+                Payment of {payMonth}. Basic ÷ {monthDays} × (working + extra) −
+                advance = to pay
               </p>
             </CardHeader>
             <CardContent className="overflow-x-auto p-0">
