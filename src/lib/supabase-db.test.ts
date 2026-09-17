@@ -32,6 +32,18 @@ describe("cloud save", () => {
     );
   });
 
+  it("does not replace a restored JSON book with an empty account", () => {
+    assert.equal(
+      preferLocalOverCloud({
+        localSavedAt: 1_000,
+        cloudUpdatedAt: 9_000,
+        localScore: 777,
+        cloudScore: 0,
+      }),
+      true,
+    );
+  });
+
   it("keeps 1–5 Sep when 6–9 Sep is the current book", () => {
     const sixth = [{ id: "g6", date: "2026-09-06", name: "SEED" }];
     const first = [{ id: "g1", date: "2026-09-01", name: "OLD" }];

@@ -5,6 +5,7 @@ import { clearLocalLedgerCache } from "./ledger-cache";
 import { pullLockState } from "./pull-locks";
 import {
   claimAnonymousLedger,
+  ledgerActivityScore,
   pullLedger,
   pullLedgerStamp,
   pruneFromBase,
@@ -15,6 +16,7 @@ import {
 import { ledgerOwnerKey, useLedger } from "./store";
 import { isSupabaseConfigured } from "./supabase-config";
 import { isPermissionMessage } from "./cloud-errors";
+import { preferLocalOverCloud } from "./cloud-save";
 import {
   isDayLocked,
   locksEqual,
@@ -330,6 +332,19 @@ async function pollCloud(userId: string) {
     if (!pulled.ok || pulled.kind !== "data") return;
     if (locksDirty || hydrating || lastUserId !== userId) return;
     const local = snapshotFromStore();
+    const cloud = pulled.snapshot;
+    if (
+      preferLocalOverCloud({
+        localSavedAt: local.savedAt ?? 0,
+        cloudUpdatedAt: cloud.savedAt ?? 0,
+        localScore: ledgerActivityScore(local),
+        cloudScore: ledgerActivityScore(cloud),
+      })
+    ) {
+      if (stamp) lastCloudStamp = stamp;
+      if (hashOf(local) !== lastHash) void flush(userId);
+      return;
+    }
     const localChanged = hashOf(local) !== lastHash;
     const merged = mergeLiveSnapshot(lastPulled, local, pulled.snapshot);
     if (hashOf(merged) !== hashOf(local)) applyMerged(merged, local);
@@ -452,12 +467,15 @@ export async function hydrateFromCloud(userId: string): Promise<CloudPhase> {
   setPhase("loading");
   try {
     const pulled = await pullLedger(userId);
+    try {
+      await useLedger.persist.rehydrate();
+    } catch {
+      /* keep memory */
+    }
+    const local = snapshotFromStore();
+    const localScore = ledgerActivityScore(local);
+
     if (!pulled.ok) {
-      try {
-        await useLedger.persist.rehydrate();
-      } catch {
-        /* keep whatever is in memory */
-      }
       if (pulled.missingSchema) {
         setPhase("missing-schema", pulled.message);
         if (!warnedMissing) {
@@ -467,14 +485,28 @@ export async function hydrateFromCloud(userId: string): Promise<CloudPhase> {
         return "missing-schema";
       }
       setPhase("error", pulled.message);
-      toast.error(pulled.message || "Could not load cloud books.");
+      if (localScore === 0) toast.error(pulled.message || "Could not load cloud books.");
       return "error";
     }
 
-    clearLocalLedgerCache();
-
     if (pulled.kind === "data") {
       const cloud = pulled.snapshot;
+      const cloudScore = ledgerActivityScore(cloud);
+      const keepLocal =
+        localScore > 0 &&
+        preferLocalOverCloud({
+          localSavedAt: local.savedAt ?? 0,
+          cloudUpdatedAt: cloud.savedAt ?? 0,
+          localScore,
+          cloudScore,
+        });
+      if (keepLocal) {
+        rememberPulled(local, cloud.cloudUpdatedAt);
+        lastHash = hashOf(local);
+        setPhase(cloudScore > 0 ? "synced" : "error");
+        return cloudScore > 0 ? "synced" : "error";
+      }
+      clearLocalLedgerCache();
       useLedger.getState().applyCloudBooks({
         ...cloud,
         lockedDates: parseLockedDates(cloud.lockedDates),
@@ -485,6 +517,13 @@ export async function hydrateFromCloud(userId: string): Promise<CloudPhase> {
       claimAnonymousLedger(userId);
       rememberPulled(snapshotFromStore(), cloud.cloudUpdatedAt);
       lastHash = hashOf(snapshotFromStore());
+      setPhase("synced");
+      return "synced";
+    }
+
+    if (localScore > 0) {
+      rememberPulled(local, "");
+      lastHash = hashOf(local);
       setPhase("synced");
       return "synced";
     }
@@ -529,47 +568,58 @@ export async function retryCloudHydrate(userId: string) {
 export async function importBackupAndRefresh(
   userId: string,
   snap: LedgerSnapshot,
-): Promise<{ ok: true } | { ok: false; message: string }> {
+): Promise<{ ok: true; cloud: boolean; message?: string } | { ok: false; message: string }> {
   if (!isSupabaseConfigured()) {
     return { ok: false, message: "Sign in to import into the hotel account." };
   }
   hydrating = true;
   setPhase("saving");
   try {
+    useLedger.getState().applyCloudBooks({
+      ...snap,
+      lockedDates: parseLockedDates(snap.lockedDates),
+      lockRev: parseLockRev(snap.lockRev),
+      savedAt: Date.now(),
+    });
+    writeStoredLocks(ledgerOwnerKey(), parseLockedDates(snap.lockedDates));
+    rememberPulled(snapshotFromStore(), new Date().toISOString());
+    lastHash = hashOf(snapshotFromStore());
+
     const role = useLedger.getState().appRole;
     const pushed = await upsertLedgerFromBackup(userId, snap, role);
     if (!pushed.ok) {
       setPhase(pushed.missingSchema ? "missing-schema" : "error", pushed.message);
-      return { ok: false, message: pushed.message };
+      return { ok: true, cloud: false, message: pushed.message };
     }
     lastCloudStamp = "";
     lastPulled = null;
     const pulled = await pullLedger(userId);
     if (pulled.ok && pulled.kind === "data") {
-      clearLocalLedgerCache();
       const cloud = pulled.snapshot;
-      useLedger.getState().applyCloudBooks({
-        ...cloud,
-        lockedDates: parseLockedDates(cloud.lockedDates),
-        lockRev: parseLockRev(cloud.lockRev),
-        savedAt: cloud.savedAt ?? Date.now(),
-      });
-      writeStoredLocks(ledgerOwnerKey(), parseLockedDates(cloud.lockedDates));
-      claimAnonymousLedger(userId);
-      rememberPulled(snapshotFromStore(), cloud.cloudUpdatedAt);
-    } else {
-      useLedger.getState().applyCloudBooks({
-        ...snap,
-        lockedDates: parseLockedDates(snap.lockedDates),
-        lockRev: parseLockRev(snap.lockRev),
-        savedAt: Date.now(),
-      });
-      writeStoredLocks(ledgerOwnerKey(), parseLockedDates(snap.lockedDates));
-      rememberPulled(snapshotFromStore(), new Date().toISOString());
+      const local = snapshotFromStore();
+      if (
+        !preferLocalOverCloud({
+          localSavedAt: local.savedAt ?? 0,
+          cloudUpdatedAt: cloud.savedAt ?? 0,
+          localScore: ledgerActivityScore(local),
+          cloudScore: ledgerActivityScore(cloud),
+        })
+      ) {
+        clearLocalLedgerCache();
+        useLedger.getState().applyCloudBooks({
+          ...cloud,
+          lockedDates: parseLockedDates(cloud.lockedDates),
+          lockRev: parseLockRev(cloud.lockRev),
+          savedAt: cloud.savedAt ?? Date.now(),
+        });
+        writeStoredLocks(ledgerOwnerKey(), parseLockedDates(cloud.lockedDates));
+        claimAnonymousLedger(userId);
+        rememberPulled(snapshotFromStore(), cloud.cloudUpdatedAt);
+      }
     }
     lastHash = hashOf(snapshotFromStore());
     setPhase("synced");
-    return { ok: true };
+    return { ok: true, cloud: true };
   } catch (err) {
     const text = err instanceof Error ? err.message : "Could not import backup.";
     setPhase("error", text);
@@ -578,3 +628,4 @@ export async function importBackupAndRefresh(
     hydrating = false;
   }
 }
+

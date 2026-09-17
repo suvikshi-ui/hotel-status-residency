@@ -113,6 +113,12 @@ function BackupCard() {
                   toast.error(result.message || "Could not import backup");
                   return;
                 }
+                if (result.cloud === false) {
+                  toast.success(
+                    `Restored on this computer · ${n.guests} guests · ${n.dates[0] ?? "—"} to ${n.dates.at(-1) ?? "—"}. Open Daily register.`,
+                  );
+                  return;
+                }
                 toast.success(
                   `Imported to the account · ${n.guests} guests · ${n.dates[0] ?? "—"} to ${n.dates.at(-1) ?? "—"}. Every desk now matches.`,
                 );

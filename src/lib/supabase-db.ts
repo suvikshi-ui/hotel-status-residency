@@ -520,7 +520,9 @@ async function replaceRows(
     .from(table)
     .select(idField)
     .eq("user_id", userId);
-  if (selErr) return selErr;
+  if (selErr) {
+    if (!isSkippableSealError(selErr)) return selErr;
+  }
 
   const keep = new Set(rows.map((r) => str(r[idField])));
   const extra =
@@ -545,7 +547,7 @@ async function replaceRows(
   if (!rows.length) {
     if (prune === undefined && (existing ?? []).length) {
       const { error } = await sb.from(table).delete().eq("user_id", userId);
-      if (error) return error;
+      if (error && !isSkippableSealError(error)) return error;
     }
     return null;
   }
@@ -556,7 +558,7 @@ async function replaceRows(
     const { error } = await sb
       .from(table)
       .upsert(payload.slice(i, i + chunk), { onConflict: `user_id,${idField}` });
-    if (error) return error;
+    if (error && !isSkippableSealError(error)) return error;
   }
   return null;
 }
@@ -757,7 +759,7 @@ export async function pushLedger(
         replaceRows("inventory", userId, "id", inventory, prune?.inventory),
       ];
   const results = await Promise.all(writes);
-  const err = results.find((e) => e && !isMissingSchema(e));
+  const err = results.find((e) => e && !isMissingSchema(e) && !isSkippableSealError(e));
   if (err) {
     const mapped = asError(err);
     if (mapped.ok) {

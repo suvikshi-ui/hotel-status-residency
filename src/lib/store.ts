@@ -588,6 +588,13 @@ export const useLedger = create<LedgerState>()(
       name: LEDGER_STORAGE_KEY,
       skipHydration: true,
       partialize: (s) => ({
+        hotel: s.hotel,
+        opening: s.opening,
+        openingDate: s.openingDate,
+        lockedDates: s.lockedDates,
+        lockRev: s.lockRev,
+        sealedIds: s.sealedIds,
+        deletedIds: s.deletedIds,
         guests: s.guests,
         food: s.food,
         wholesale: s.wholesale,
@@ -607,12 +614,6 @@ export const useLedger = create<LedgerState>()(
       }),
       merge: (persisted, current) => {
         const disk = { ...((persisted ?? {}) as Partial<LedgerState>) };
-        delete disk.opening;
-        delete disk.openingDate;
-        delete disk.lockedDates;
-        delete disk.lockRev;
-        delete disk.sealedIds;
-        delete disk.deletedIds;
         return withBooks(mergeSnapshot(disk, current));
       },
     },
