@@ -212,26 +212,55 @@ export function DayChart({
   const qrsRecv = byMode(receipts, "QRS");
   const pkRecv = byMode(receipts, "QRPK");
   const onRecv = byMode(receipts, "ONLINE");
-  const qrRooms = take.santosh.rooms + take.pk.rooms;
-  const qrFood = take.santosh.food + take.pk.food;
-  const qrWs = take.santosh.ws + take.pk.ws;
-  const qrRecv = qrsRecv + pkRecv;
+  const qrsIn =
+    take.santosh.rooms + take.santosh.food + take.santosh.ws + qrsRecv;
+  const pkIn = take.pk.rooms + take.pk.food + take.pk.ws + pkRecv;
   const cashIn =
     take.cash.rooms + take.cash.food + take.cash.ws + cashRecv;
-  const qrIn = qrRooms + qrFood + qrWs + qrRecv;
   const onIn =
     take.online.rooms + take.online.food + take.online.ws + onRecv;
-  const payRows: { label: string; cash: number; qr: number; online: number }[] = [
-    { label: "Room sale", cash: take.cash.rooms, qr: qrRooms, online: take.online.rooms },
-    { label: "Food", cash: take.cash.food, qr: qrFood, online: take.online.food },
-    { label: "WS", cash: take.cash.ws, qr: qrWs, online: take.online.ws },
-    { label: "Balance received", cash: cashRecv, qr: qrRecv, online: onRecv },
+  const payRows: {
+    label: string;
+    cash: number;
+    qrs: number;
+    pk: number;
+    online: number;
+  }[] = [
+    {
+      label: "Room sale",
+      cash: take.cash.rooms,
+      qrs: take.santosh.rooms,
+      pk: take.pk.rooms,
+      online: take.online.rooms,
+    },
+    {
+      label: "Food",
+      cash: take.cash.food,
+      qrs: take.santosh.food,
+      pk: take.pk.food,
+      online: take.online.food,
+    },
+    {
+      label: "WS",
+      cash: take.cash.ws,
+      qrs: take.santosh.ws,
+      pk: take.pk.ws,
+      online: take.online.ws,
+    },
+    {
+      label: "Balance received",
+      cash: cashRecv,
+      qrs: qrsRecv,
+      pk: pkRecv,
+      online: onRecv,
+    },
   ];
   const payTotal = {
     cash: cashIn,
-    qr: qrIn,
+    qrs: qrsIn,
+    pk: pkIn,
     online: onIn,
-    all: cashIn + qrIn + onIn,
+    all: cashIn + qrsIn + pkIn + onIn,
   };
 
   return (
@@ -452,7 +481,8 @@ export function DayChart({
             <tr>
               <th style={th}>Particular</th>
               <th style={{ ...th, textAlign: "right" }}>Cash</th>
-              <th style={{ ...th, textAlign: "right" }}>QR</th>
+              <th style={{ ...th, textAlign: "right" }}>Santosh QR</th>
+              <th style={{ ...th, textAlign: "right" }}>P.K. QR</th>
               <th style={{ ...th, textAlign: "right" }}>Online</th>
               <th style={{ ...th, textAlign: "right" }}>Total</th>
             </tr>
@@ -462,25 +492,27 @@ export function DayChart({
               <tr key={row.label}>
                 <td style={td}>{row.label}</td>
                 <td style={num}>{cellAmt(row.cash)}</td>
-                <td style={num}>{cellAmt(row.qr)}</td>
+                <td style={num}>{cellAmt(row.qrs)}</td>
+                <td style={num}>{cellAmt(row.pk)}</td>
                 <td style={num}>{cellAmt(row.online)}</td>
                 <td style={{ ...num, fontWeight: 700 }}>
-                  {cellAmt(row.cash + row.qr + row.online)}
+                  {cellAmt(row.cash + row.qrs + row.pk + row.online)}
                 </td>
               </tr>
             ))}
             <tr>
               <td style={{ ...td, fontWeight: 800 }}>Total</td>
               <td style={{ ...num, fontWeight: 800 }}>{rupee(payTotal.cash)}</td>
-              <td style={{ ...num, fontWeight: 800 }}>{rupee(payTotal.qr)}</td>
+              <td style={{ ...num, fontWeight: 800 }}>{rupee(payTotal.qrs)}</td>
+              <td style={{ ...num, fontWeight: 800 }}>{rupee(payTotal.pk)}</td>
               <td style={{ ...num, fontWeight: 800 }}>{cellAmt(payTotal.online)}</td>
               <td style={{ ...num, fontWeight: 800 }}>{rupee(payTotal.all)}</td>
             </tr>
           </tbody>
         </table>
         <p style={{ fontSize: 11, color: "#6f675c", marginTop: 8 }}>
-          Cash in today {rupee(payTotal.cash)} · QR is Santosh QR + P.K. QR · Fab /
-          Bravistay sits in QR (P.K.).
+          Cash in today {rupee(payTotal.cash)} · Santosh QR and P.K. QR are separate ·
+          Fab / Bravistay sits in P.K. QR.
         </p>
       </Section>
     </div>
