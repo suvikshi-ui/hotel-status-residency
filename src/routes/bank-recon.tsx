@@ -43,8 +43,8 @@ function BankReconPage() {
   );
   const matched = lines.filter((l) => l.office);
   const unmatched = lines.filter((l) => !l.office);
-  const bankTotal = monthRows.reduce((s, r) => s + r.amount, 0);
-  const officeTotal = matched.reduce((s, l) => s + (l.office?.amount ?? 0), 0);
+  const debitTotal = monthRows.reduce((s, r) => s + r.debit, 0);
+  const creditTotal = monthRows.reduce((s, r) => s + r.credit, 0);
 
   function applyParsed(parsed: BankRow[]) {
     if (!parsed.length) {
@@ -142,9 +142,9 @@ function BankReconPage() {
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Uploaded" value={String(monthRows.length)} />
-        <Stat label="Bank total" value={money(bankTotal)} />
+        <Stat label="Debit" value={money(debitTotal)} />
+        <Stat label="Credit" value={money(creditTotal)} />
         <Stat label="Matched" value={String(matched.length)} />
-        <Stat label="Office matched" value={money(officeTotal)} />
       </div>
 
       <Card>
@@ -159,25 +159,27 @@ function BankReconPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="overflow-x-auto p-0">
-          <table className="w-full min-w-[64rem] text-left text-sm">
+          <table className="w-full min-w-[72rem] text-left text-sm">
             <thead className="text-xs uppercase tracking-wide text-muted">
-              <tr className="border-y border-border">
-                <th className="px-5 py-2 font-medium" colSpan={4}>
+              <tr className="border-y border-border bg-bg-warm/50">
+                <th className="px-5 py-2 font-medium" colSpan={5}>
                   Bank statement
                 </th>
-                <th className="px-3 py-2 font-medium" colSpan={4}>
+                <th className="px-3 py-2 font-medium" colSpan={5}>
                   Entry in office
                 </th>
               </tr>
               <tr className="border-b border-border">
                 <th className="px-5 py-2 font-medium">Date</th>
                 <th className="px-3 py-2 font-medium">Particular</th>
-                <th className="px-3 py-2 font-medium">Ref</th>
-                <th className="px-3 py-2 text-right font-medium">Amount</th>
+                <th className="px-3 py-2 font-medium">Reference no.</th>
+                <th className="px-3 py-2 text-right font-medium">Debit</th>
+                <th className="px-3 py-2 text-right font-medium">Credit</th>
                 <th className="px-3 py-2 font-medium">Office date</th>
-                <th className="px-3 py-2 font-medium">Name / source</th>
-                <th className="px-3 py-2 font-medium">Ref</th>
-                <th className="px-3 py-2 text-right font-medium">Amount</th>
+                <th className="px-3 py-2 font-medium">Office entry</th>
+                <th className="px-3 py-2 font-medium">Reference no.</th>
+                <th className="px-3 py-2 text-right font-medium">Debit</th>
+                <th className="px-3 py-2 text-right font-medium">Credit</th>
               </tr>
             </thead>
             <tbody>
@@ -191,7 +193,10 @@ function BankReconPage() {
                     {line.bank.ref || "—"}
                   </td>
                   <td className="px-3 py-2.5 text-right tabular">
-                    {money(line.bank.amount)}
+                    {line.bank.debit ? money(line.bank.debit) : "—"}
+                  </td>
+                  <td className="px-3 py-2.5 text-right tabular">
+                    {line.bank.credit ? money(line.bank.credit) : "—"}
                   </td>
                   {line.office ? (
                     <>
@@ -207,18 +212,35 @@ function BankReconPage() {
                       <td className="px-3 py-2.5 font-mono text-xs">
                         {line.office.ref}
                       </td>
+                      <td className="px-3 py-2.5 text-right tabular">—</td>
                       <td className="px-3 py-2.5 text-right tabular">
                         {money(line.office.amount)}
                       </td>
                     </>
                   ) : (
-                    <td className="px-3 py-2.5 text-muted" colSpan={4}>
+                    <td className="px-3 py-2.5 text-muted" colSpan={5}>
                       No office entry yet
                     </td>
                   )}
                 </tr>
               ))}
             </tbody>
+            {lines.length ? (
+              <tfoot>
+                <tr className="border-t border-border bg-bg-warm/40 font-medium">
+                  <td className="px-5 py-2.5" colSpan={3}>
+                    Total
+                  </td>
+                  <td className="px-3 py-2.5 text-right tabular">
+                    {money(debitTotal)}
+                  </td>
+                  <td className="px-3 py-2.5 text-right tabular">
+                    {money(creditTotal)}
+                  </td>
+                  <td colSpan={5} />
+                </tr>
+              </tfoot>
+            ) : null}
           </table>
           {lines.length === 0 ? (
             <p className="py-10 text-center text-sm text-muted">

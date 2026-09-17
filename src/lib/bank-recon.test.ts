@@ -1,36 +1,30 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  parseStatementText,
-  reconcileBank,
-  type BankRow,
-} from "./bank-recon.ts";
+import { parseStatementText, reconcileBank } from "./bank-recon.ts";
 import type { GuestEntry } from "./types.ts";
 
 describe("bank recon", () => {
-  it("reads a monthly csv and matches office payment reference", () => {
+  it("keeps debit and credit, skips closing balance", () => {
     const csv = [
-      "Date,Narration,Amount,Reference",
-      "17/09/2026,UPI/HDFC Hotel,1500,UPI1234567890",
-      "18/09/2026,NEFT salary,0,SKIP",
-      "18/09/2026,IMPS Flysky,2200,IMPS998877",
+      "Date,Narration,Debit,Credit,Balance,Reference",
+      "17/09/2026,UPI/HDFC Hotel,0,1500,45000,UPI1234567890",
+      "17/09/2026,Closing Balance,,,45000,",
+      "18/09/2026,NEFT rent,800,0,44200,NEFT44556677",
     ].join("\n");
     const bank = parseStatementText(csv);
     assert.equal(bank.length, 2);
-    assert.equal(bank[0]?.date, "2026-09-17");
-    assert.equal(bank[0]?.ref, "UPI1234567890");
+    assert.equal(bank[0]?.credit, 1500);
+    assert.equal(bank[0]?.debit, 0);
+    assert.equal(bank[1]?.debit, 800);
+    assert.equal(bank[1]?.credit, 0);
+    assert.equal(bank.some((r) => /closing/i.test(r.particular)), false);
+  });
+
+  it("matches office payment reference on the credit", () => {
+    const bank = parseStatementText(
+      "Date,Particulars,Credit,Ref\n17-09-2026,IMPS Flysky,2200,IMPS998877",
+    );
     const guests: GuestEntry[] = [
-      {
-        id: "g1",
-        date: "2026-09-16",
-        slNo: 1,
-        name: "RAMESH",
-        roomNo: "101",
-        mode: "ONLINE",
-        amount: 1500,
-        payRefNo: "upi-1234567890",
-        gst: true,
-      },
       {
         id: "g2",
         date: "2026-09-18",
@@ -43,10 +37,9 @@ describe("bank recon", () => {
         gst: true,
       },
     ];
-    const lines = reconcileBank(bank as BankRow[], guests);
-    assert.equal(lines[0]?.office?.name, "RAMESH");
-    assert.equal(lines[0]?.office?.date, "2026-09-16");
-    assert.equal(lines[1]?.office?.name, "SITA");
+    const lines = reconcileBank(bank, guests);
+    assert.equal(lines[0]?.office?.name, "SITA");
+    assert.equal(lines[0]?.bank.credit, 2200);
   });
 
   it("leaves unmatched bank rows empty on the office side", () => {
