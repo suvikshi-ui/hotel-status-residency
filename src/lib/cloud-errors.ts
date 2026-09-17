@@ -41,5 +41,14 @@ export function isSkippableSealError(error: {
   code?: string;
   message?: string;
 } | null): boolean {
+  if (!error) return false;
+  const m = (error.message ?? "").toLowerCase();
+  if (
+    /\b(guests|food|wholesale|expenses|balance_received|ledger_meta|rooms|staff|advances)\b/.test(
+      m,
+    )
+  ) {
+    return false;
+  }
   return isMissingSchema(error) || isPermissionDenied(error);
 }

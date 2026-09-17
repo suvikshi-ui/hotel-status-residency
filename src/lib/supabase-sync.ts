@@ -630,10 +630,30 @@ export async function importBackupAndRefresh(
       setPhase(pushed.missingSchema ? "missing-schema" : "error", pushed.message);
       return { ok: false, message: pushed.message };
     }
-    const savedAt = Date.now() + 2_000;
-    useLedger.setState({ savedAt });
+    const pulled = await pullLedger(userId);
+    if (!pulled.ok || pulled.kind !== "data") {
+      setPhase("error", pushed.ok ? "Server ने JSON वापस नहीं दिया।" : "Save failed");
+      return {
+        ok: false,
+        message: `JSON server पर confirm नहीं हुआ. File में ${local.guests.length} guests.`,
+      };
+    }
+    const serverGuests = pulled.snapshot.guests.length;
+    if (local.guests.length && serverGuests < Math.max(1, Math.floor(local.guests.length * 0.8))) {
+      setPhase("error", "Server copy is thinner than the JSON file");
+      return {
+        ok: false,
+        message: `Server पर ${serverGuests} guests, file में ${local.guests.length}. Account में सेव नहीं हुआ.`,
+      };
+    }
+    useLedger.getState().applyCloudBooks({
+      ...pulled.snapshot,
+      lockedDates: parseLockedDates(pulled.snapshot.lockedDates),
+      lockRev: parseLockRev(pulled.snapshot.lockRev),
+      savedAt: Date.now() + 2_000,
+    });
     claimAnonymousLedger(userId);
-    const stamp = (await pullLedgerStamp(userId)) || new Date().toISOString();
+    const stamp = pulled.snapshot.cloudUpdatedAt || (await pullLedgerStamp(userId)) || new Date().toISOString();
     rememberPulled(snapshotFromStore(), stamp);
     lastHash = hashOf(snapshotFromStore());
     lastCloudStamp = stamp;

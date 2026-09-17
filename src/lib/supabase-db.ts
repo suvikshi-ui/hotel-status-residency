@@ -340,6 +340,81 @@ function modeFromDb(row: Record<string, unknown>): ModeAmount {
   };
 }
 
+export function booksFromHotel(hotel: unknown): Partial<LedgerSnapshot> | null {
+  if (!hotel || typeof hotel !== "object") return null;
+  const raw = (hotel as { _books?: unknown })._books;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const b = raw as Record<string, unknown>;
+  const guests = Array.isArray(b.guests) ? (b.guests as GuestEntry[]) : [];
+  const food = Array.isArray(b.food) ? (b.food as ModeAmount[]) : [];
+  const wholesale = Array.isArray(b.wholesale) ? (b.wholesale as ModeAmount[]) : [];
+  const expenses = Array.isArray(b.expenses) ? (b.expenses as NamedAmount[]) : [];
+  const balReceived = Array.isArray(b.balReceived)
+    ? (b.balReceived as NamedAmount[])
+    : [];
+  const staff = Array.isArray(b.staff) ? (b.staff as StaffRow[]) : [];
+  const advances = Array.isArray(b.advances) ? (b.advances as AdvanceRow[]) : [];
+  const rooms = Array.isArray(b.rooms) ? (b.rooms as RoomDef[]) : [];
+  if (
+    !guests.length &&
+    !food.length &&
+    !wholesale.length &&
+    !expenses.length &&
+    !balReceived.length
+  ) {
+    return null;
+  }
+  return {
+    guests,
+    food,
+    wholesale,
+    expenses,
+    balReceived,
+    staff,
+    advances,
+    rooms,
+    savedAt: num(b.savedAt) || undefined,
+  };
+}
+
+function overlayBooks(snapshot: LedgerSnapshot, hotelRaw: unknown): LedgerSnapshot {
+  const books = booksFromHotel(hotelRaw);
+  if (!books) return snapshot;
+  const next = { ...snapshot };
+  if ((books.guests?.length ?? 0) > snapshot.guests.length) next.guests = books.guests ?? snapshot.guests;
+  if ((books.food?.length ?? 0) > snapshot.food.length) next.food = books.food ?? snapshot.food;
+  if ((books.wholesale?.length ?? 0) > snapshot.wholesale.length) {
+    next.wholesale = books.wholesale ?? snapshot.wholesale;
+  }
+  if ((books.expenses?.length ?? 0) > snapshot.expenses.length) {
+    next.expenses = books.expenses ?? snapshot.expenses;
+  }
+  if ((books.balReceived?.length ?? 0) > snapshot.balReceived.length) {
+    next.balReceived = books.balReceived ?? snapshot.balReceived;
+  }
+  if ((books.staff?.length ?? 0) > snapshot.staff.length) next.staff = books.staff ?? snapshot.staff;
+  if ((books.advances?.length ?? 0) > snapshot.advances.length) {
+    next.advances = books.advances ?? snapshot.advances;
+  }
+  if ((books.rooms?.length ?? 0) > snapshot.rooms.length) next.rooms = books.rooms ?? snapshot.rooms;
+  if ((books.savedAt ?? 0) > (snapshot.savedAt ?? 0)) next.savedAt = books.savedAt;
+  return next;
+}
+
+function booksForHotel(snap: LedgerSnapshot) {
+  return {
+    guests: snap.guests,
+    food: snap.food,
+    wholesale: snap.wholesale,
+    expenses: snap.expenses,
+    balReceived: snap.balReceived,
+    staff: snap.staff,
+    advances: snap.advances,
+    rooms: snap.rooms,
+    savedAt: snap.savedAt ?? Date.now(),
+  };
+}
+
 export async function pullLedgerStamp(userId: string): Promise<string | null> {
   const sb = getSupabase();
   const { data, error } = await sb
@@ -411,7 +486,7 @@ export async function pullLedger(userId: string): Promise<CloudPull> {
 
   const row = meta.data as Record<string, unknown>;
   const hotelRaw = row.hotel;
-  const snapshot: LedgerSnapshot = {
+  let snapshot: LedgerSnapshot = {
     hotel: hotelFromCloud(hotelRaw, {} as HotelInfo),
     opening: (row.opening ?? {}) as OpeningBalances,
     rooms: (rooms.data ?? []).map((r) => ({
@@ -539,6 +614,12 @@ export async function pullLedger(userId: string): Promise<CloudPull> {
     deletedIds,
     sealKey.complaint,
   );
+  snapshot.guests = withGuestGst(
+    snapshot.guests,
+    gstIdsFromHotel(hotelRaw),
+    gstBillsFromHotel(hotelRaw),
+  );
+  snapshot = overlayBooks(snapshot, hotelRaw);
   snapshot.guests = withGuestGst(
     snapshot.guests,
     gstIdsFromHotel(hotelRaw),
@@ -799,20 +880,15 @@ export async function pushLedger(
         replaceRows("inventory", userId, "id", inventory, prune?.inventory),
       ];
   const results = await Promise.all(writes);
-  const err = results.find((e) => e && !isMissingSchema(e) && !isSkippableSealError(e));
-  if (err) {
-    const mapped = asError(err);
-    if (mapped.ok) {
-      return { ok: false, missingSchema: false, message: "Unknown error" };
-    }
-    return {
-      ok: false,
-      missingSchema: mapped.missingSchema,
-      message: mapped.message,
-    };
-  }
+  const tableErr = results.find((e) => e && !isMissingSchema(e) && !isSkippableSealError(e));
 
   if (hkOnly) {
+    if (tableErr) {
+      const mapped = asError(tableErr);
+      return mapped.ok
+        ? { ok: false, missingSchema: false, message: "Unknown error" }
+        : { ok: false, missingSchema: mapped.missingSchema, message: mapped.message };
+    }
     await pushSheetSeals(userId, snap.sealedIds);
     return { ok: true };
   }
@@ -820,16 +896,19 @@ export async function pushLedger(
   const sb = getSupabase();
   const metaRow = {
     user_id: userId,
-    hotel: hotelForCloud(
-      snap.hotel,
-      snap.lockedDates ?? {},
-      snap.lockRev ?? {},
-      snap.sealedIds ?? {},
-      snap.deletedIds ?? {},
-      snap.reminders ?? [],
-      gstBillsFromGuests(snap.guests),
-      snap.bankRows ?? [],
-    ),
+    hotel: {
+      ...hotelForCloud(
+        snap.hotel,
+        snap.lockedDates ?? {},
+        snap.lockRev ?? {},
+        snap.sealedIds ?? {},
+        snap.deletedIds ?? {},
+        snap.reminders ?? [],
+        gstBillsFromGuests(snap.guests),
+        snap.bankRows ?? [],
+      ),
+      _books: booksForHotel(snap),
+    },
     opening: snap.opening,
     opening_date: snap.openingDate,
     selected_date: snap.selectedDate,

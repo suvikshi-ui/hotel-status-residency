@@ -127,7 +127,10 @@ describe("optional sheet seals", () => {
 
   it("still fails a real guests permission error via the same helper only for seals", () => {
     assert.equal(
-      isMissingSchema({ code: "42501", message: "permission denied for table guests" }),
+      isSkippableSealError({
+        code: "42501",
+        message: "permission denied for table guests",
+      }),
       false,
     );
   });
