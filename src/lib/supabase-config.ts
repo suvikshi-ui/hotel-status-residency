@@ -33,6 +33,9 @@ export const SUPABASE_SQL_EDITOR = SUPABASE_PROJECT_ID
   ? `https://supabase.com/dashboard/project/${SUPABASE_PROJECT_ID}/sql/new`
   : "https://supabase.com/dashboard";
 
+export const DESK_SAVE_SQL_FILE =
+  "https://github.com/suvikshi-ui/hotel-status-residency/blob/main/supabase/migrations/0009_desk_can_save.sql";
+
 export const SUPABASE_TABLE_EDITOR = SUPABASE_PROJECT_ID
   ? `https://supabase.com/dashboard/project/${SUPABASE_PROJECT_ID}/editor`
   : "https://supabase.com/dashboard";

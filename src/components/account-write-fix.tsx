@@ -1,6 +1,6 @@
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { SUPABASE_SQL_EDITOR } from "@/lib/supabase-config";
+import { SUPABASE_SQL_EDITOR, DESK_SAVE_SQL_FILE } from "@/lib/supabase-config";
 import { useCloudSync } from "@/lib/supabase-sync";
 import { isPermissionMessage } from "@/lib/cloud-errors";
 import { copyText, downloadText } from "@/lib/copy-text";
@@ -20,10 +20,13 @@ export function AccountWriteFix() {
 
   return (
     <div className="rounded-lg border border-due/40 bg-card px-4 py-3 text-sm">
-      <p className="font-medium">This login cannot write the hotel account yet.</p>
+      <p className="font-medium">
+        Account cannot write yet
+        {cloud.message ? ` — ${cloud.message}` : ""}.
+      </p>
       <p className="mt-1 text-muted">
-        Copy the SQL below, paste it in the SQL editor, press Run, then press Save
-        cube again. One run is enough for every desk.
+        Open the SQL file, copy all, paste in the SQL editor, press Run, then
+        Save cube. One run is enough for every desk.
       </p>
       <textarea
         readOnly
@@ -44,6 +47,11 @@ export function AccountWriteFix() {
           }}
         >
           Download SQL
+        </Button>
+        <Button type="button" variant="outline" asChild>
+          <a href={DESK_SAVE_SQL_FILE} target="_blank" rel="noreferrer">
+            Open SQL file
+          </a>
         </Button>
         <Button type="button" variant="outline" asChild>
           <a href={SUPABASE_SQL_EDITOR} target="_blank" rel="noreferrer">

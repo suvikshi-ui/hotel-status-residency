@@ -1,4 +1,4 @@
--- Fix: permission denied for table ledger_meta
+function e(e){let t=document.createElement(`textarea`);t.value=e,t.setAttribute(`readonly`,``),t.style.position=`fixed`,t.style.top=`0`,t.style.left=`0`,t.style.width=`1px`,t.style.height=`1px`,t.style.opacity=`0`,document.body.appendChild(t),t.focus(),t.select(),t.setSelectionRange(0,e.length);let n=!1;try{n=document.execCommand(`copy`)}catch{n=!1}return document.body.removeChild(t),n}function t(e,t){let n=new Blob([t],{type:`text/plain;charset=utf-8`}),r=URL.createObjectURL(n),i=document.createElement(`a`);i.href=r,i.download=e,i.click(),URL.revokeObjectURL(r)}var n=`-- Fix: permission denied for table ledger_meta
 -- Grant first (this is the error on the hotel desk), then let any
 -- signed-in hotel login write the books.
 
@@ -75,3 +75,4 @@ begin
     );
   end loop;
 end $$;
+`;export{e as n,t as r,n as t};
