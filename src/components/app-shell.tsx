@@ -2,7 +2,6 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   BookOpen,
-  Building2,
   CircleUser,
   LayoutDashboard,
   Layers,
@@ -28,7 +27,6 @@ const NAV = [
   { to: "/", label: "Overview", icon: LayoutDashboard },
   { to: "/register", label: "Register", icon: BookOpen },
   { to: "/balance", label: "Balance", icon: Scale },
-  { to: "/rooms", label: "Rooms", icon: Building2 },
   { to: "/complaints", label: "Complaints", icon: MessageSquareWarning },
   { to: "/expenses", label: "Expenses", icon: Receipt },
   { to: "/staff", label: "Staff", icon: Users },
