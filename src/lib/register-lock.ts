@@ -122,12 +122,14 @@ export function hotelForCloud(
   sealedIds: SealedIds = {},
   deletedIds: SealedIds = {},
   reminders: HotelReminder[] = [],
+  gstGuestIds: string[] = [],
 ): HotelInfo & {
   _lockedDates: Record<string, true>;
   _lockRev: Record<string, number>;
   _sealedIds: SealedIds;
   _deletedIds: SealedIds;
   _reminders: HotelReminder[];
+  _gstGuestIds: string[];
 } {
   return {
     ...hotel,
@@ -136,6 +138,7 @@ export function hotelForCloud(
     _sealedIds: parseSealedIds(sealedIds),
     _deletedIds: parseSealedIds(deletedIds),
     _reminders: reminders,
+    _gstGuestIds: gstGuestIds,
   };
 }
 

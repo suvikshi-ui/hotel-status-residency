@@ -34,6 +34,7 @@ type PendingPost = {
   mode: PayMode;
   source: string | null;
   amount: number;
+  gst: boolean;
 };
 
 export function GuestForm({
@@ -58,6 +59,7 @@ export function GuestForm({
   const [mode, setMode] = useState<PayMode>("CASH");
   const [amount, setAmount] = useState("1500");
   const [source, setSource] = useState("");
+  const [gst, setGst] = useState(false);
   const [dup, setDup] = useState<GuestEntry | null>(null);
   const pending = useRef<PendingPost | null>(null);
   const isEdit = Boolean(editing);
@@ -69,6 +71,7 @@ export function GuestForm({
     setMode(editing.mode);
     setAmount(String(editing.amount));
     setSource(editing.source ?? "");
+    setGst(Boolean(editing.gst));
     cardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     nameRef.current?.focus();
   }, [editing]);
@@ -76,6 +79,7 @@ export function GuestForm({
   function resetAdd() {
     setName("");
     setSource("");
+    setGst(false);
     setAmount("1500");
     setMode("CASH");
     setRoomNo(rooms[0]?.no ?? "101");
@@ -88,6 +92,7 @@ export function GuestForm({
     toast.success(`Posted ${payload.name} · Room ${payload.roomNo} · ${formatDay(date)}`);
     setName("");
     setSource("");
+    setGst(false);
     pending.current = null;
     setDup(null);
     nameRef.current?.focus();
@@ -134,6 +139,7 @@ export function GuestForm({
       mode,
       source: source.trim() || null,
       amount: amt,
+      gst,
     };
     const onDate = editing?.date ?? date;
     const hit = findDuplicateOnDate(guests, onDate, payload, editing?.id);
@@ -190,7 +196,7 @@ export function GuestForm({
       </div>
       <CardContent className="p-5">
         <form onSubmit={submit} className="flex flex-col gap-4">
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
             <div className="col-span-2 grid gap-1.5 lg:col-span-1">
               <Label htmlFor="g-name">Name</Label>
               <Input
@@ -261,12 +267,28 @@ export function GuestForm({
                 ))}
               </datalist>
             </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="g-gst">Invoice</Label>
+              <label
+                htmlFor="g-gst"
+                className="flex h-11 cursor-pointer items-center gap-2 rounded-md border border-border bg-card px-3 text-sm"
+              >
+                <input
+                  id="g-gst"
+                  type="checkbox"
+                  className="size-4 accent-primary"
+                  checked={gst}
+                  onChange={(e) => setGst(e.target.checked)}
+                />
+                GST
+              </label>
+            </div>
           </div>
           <div className="flex flex-col-reverse items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs text-muted">
               {isEdit
-                ? "Change name, room, mode, amount or source, then save."
-                : "Name, room, payment mode, amount and source — posted to the selected date. Form stays open for the next guest."}
+                ? "Change name, room, mode, amount, source or GST, then save."
+                : "Default invoice is Non GST. Tick GST to put this bill in the GST column on Invoice."}
             </p>
             <div className="flex flex-col gap-2 sm:flex-row">
               {isEdit ? (
@@ -323,6 +345,8 @@ export function GuestForm({
             <dd className="tabular font-medium">{money(dup.amount)}</dd>
             <dt className="text-muted">Source</dt>
             <dd>{dup.source || "—"}</dd>
+            <dt className="text-muted">Invoice</dt>
+            <dd>{dup.gst ? "GST" : "Non GST"}</dd>
             <dt className="text-muted">Check-in</dt>
             <dd className="tabular">
               {formatDayShort(dup.checkIn || dup.date)}

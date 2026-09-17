@@ -214,6 +214,7 @@ function RegisterPage() {
                 <th className="px-3 py-2 font-medium">Mode</th>
                 <th className="px-3 py-2 text-right font-medium">Amount</th>
                 <th className="px-3 py-2 font-medium">Source</th>
+                <th className="px-3 py-2 font-medium">Invoice</th>
                 <th className="px-3 py-2 font-medium">Check-in</th>
                 <th className="px-3 py-2 font-medium">Check-out</th>
                 <th className="px-3 py-2 font-medium">Stay</th>
@@ -238,6 +239,11 @@ function RegisterPage() {
                     {money(g.amount)}
                   </td>
                   <td className="px-3 py-2.5 text-muted">{g.source || "—"}</td>
+                  <td className="px-3 py-2.5">
+                    <Badge variant={g.gst ? "ok" : "muted"}>
+                      {g.gst ? "GST" : "Non GST"}
+                    </Badge>
+                  </td>
                   <td className="px-3 py-2.5 tabular text-muted">
                     {formatDayShort(dates.checkIn)}
                     {g.inTime ? ` · ${g.inTime}` : ""}

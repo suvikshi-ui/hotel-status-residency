@@ -2,6 +2,11 @@ import type { PostgrestError } from "@supabase/supabase-js";
 import { normalizeComplaints, type RoomComplaint } from "./complaints";
 import { normalizeInventory, type InventoryItem } from "./inventory";
 import {
+  gstIdsFromGuests,
+  gstIdsFromHotel,
+  withGuestGst,
+} from "./invoice";
+import {
   normalizeReminders,
   remindersFromHotel,
   type HotelReminder,
@@ -202,7 +207,10 @@ export function snapshotFromUnknown(
       no: str(r.no),
       floor: floorOf(r.floor),
     })),
-    guests: (p.guests ?? fallback.guests) as GuestEntry[],
+    guests: withGuestGst(
+      (p.guests ?? fallback.guests) as GuestEntry[],
+      gstIdsFromHotel(p.hotel),
+    ),
     food: (p.food ?? fallback.food) as ModeAmount[],
     wholesale: (p.wholesale ?? fallback.wholesale) as ModeAmount[],
     expenses: (p.expenses ?? fallback.expenses) as NamedAmount[],
@@ -416,6 +424,7 @@ export async function pullLedger(userId: string): Promise<CloudPull> {
         time: r.time == null ? null : str(r.time),
         coDate: nullableDate(r.co_date),
         source: r.source == null ? null : str(r.source),
+        gst: false,
       };
     }),
     food: (food.data ?? []).map((r) => modeFromDb(r as Record<string, unknown>)),
@@ -516,6 +525,7 @@ export async function pullLedger(userId: string): Promise<CloudPull> {
     deletedIds,
     sealKey.complaint,
   );
+  snapshot.guests = withGuestGst(snapshot.guests, gstIdsFromHotel(hotelRaw));
 
   return { ok: true, kind: "data", snapshot };
 }
@@ -799,6 +809,7 @@ export async function pushLedger(
       snap.sealedIds ?? {},
       snap.deletedIds ?? {},
       snap.reminders ?? [],
+      gstIdsFromGuests(snap.guests),
     ),
     opening: snap.opening,
     opening_date: snap.openingDate,

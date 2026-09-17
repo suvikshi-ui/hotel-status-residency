@@ -90,14 +90,16 @@ export function applyGuestPatch(
   const oldKey = stayKey(prev);
   const shareSource = Object.prototype.hasOwnProperty.call(patch, "source");
   const shareName = Object.prototype.hasOwnProperty.call(patch, "name");
+  const shareGst = Object.prototype.hasOwnProperty.call(patch, "gst");
   return guests.map((g) => {
     if (g.id === id) return { ...g, ...patch };
-    if (!shareSource && !shareName) return g;
+    if (!shareSource && !shareName && !shareGst) return g;
     if (stayKey(g) !== oldKey) return g;
     return {
       ...g,
       ...(shareSource ? { source: patch.source ?? null } : {}),
       ...(shareName && patch.name ? { name: patch.name } : {}),
+      ...(shareGst ? { gst: Boolean(patch.gst) } : {}),
     };
   });
 }

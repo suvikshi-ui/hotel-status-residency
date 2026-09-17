@@ -4,6 +4,7 @@ import {
   parseLockRev,
   parseLockedDates,
 } from "./register-lock.ts";
+import { mergeGuestGst } from "./invoice.ts";
 import { mergeSealed, parseSealedIds, dropDeletedRows, sealKey } from "./sheet-seal.ts";
 import type { LedgerSnapshot } from "./supabase-db.ts";
 
@@ -117,10 +118,14 @@ export function mergeLiveSnapshot(
     hotel: pick3(b.hotel, local.hotel, cloud.hotel),
     opening: pick3(b.opening, local.opening, cloud.opening),
     rooms: mergeByKey((r) => r.no, b.rooms, local.rooms, cloud.rooms),
-    guests: dropDeletedRows(
-      mergeByKey((r) => r.id, b.guests, local.guests, cloud.guests),
-      deletedIds,
-      sealKey.guest,
+    guests: mergeGuestGst(
+      dropDeletedRows(
+        mergeByKey((r) => r.id, b.guests, local.guests, cloud.guests),
+        deletedIds,
+        sealKey.guest,
+      ),
+      local.guests,
+      cloud.guests,
     ),
     food: dropDeletedRows(
       mergeByKey((r) => r.id, b.food, local.food, cloud.food),

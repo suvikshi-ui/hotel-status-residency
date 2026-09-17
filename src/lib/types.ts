@@ -17,6 +17,7 @@ export interface GuestEntry {
   time?: string | null;
   coDate?: string | null;
   source?: string | null;
+  gst?: boolean;
 }
 
 export interface ModeAmount {
