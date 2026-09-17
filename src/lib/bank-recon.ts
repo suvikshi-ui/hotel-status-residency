@@ -12,6 +12,8 @@ export interface BankRow {
   ref: string;
   dc: string;
   month: string;
+  headers: string[];
+  cells: string[];
 }
 
 export interface OfficeHit {
@@ -56,37 +58,53 @@ export function normalizeBankRows(raw: unknown): BankRow[] {
   for (const row of raw) {
     if (!row || typeof row !== "object") continue;
     const r = row as Record<string, unknown>;
-    const dateRaw = asText(r.dateRaw) || asText(r.date);
+    const cells = Array.isArray(r.cells)
+      ? r.cells.map((c) => asText(c))
+      : [];
+    const headers = Array.isArray(r.headers)
+      ? r.headers.map((c) => asText(c))
+      : [];
+    const dateRaw = asText(r.dateRaw) || asText(r.date) || cells[0] || "";
+    const parsed = parseLooseDate(dateRaw);
     const date =
       typeof r.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r.date.slice(0, 10))
         ? r.date.slice(0, 10)
-        : parseLooseDate(dateRaw);
-    const particular = asText(r.particular);
-    if (!date || isBalanceLine(particular) || isBalanceLine(dateRaw)) continue;
+        : parsed;
+    const month = asText(r.month) || (date ? date.slice(0, 7) : "");
+    if (!cells.some(Boolean) && !asText(r.particular) && !dateRaw) continue;
     const split = debitCreditOf(r);
-    if (!split.debit && !split.credit) continue;
-    const ref = asText(r.ref);
-    const id = asText(r.id) || uid("bk");
     const next: BankRow = {
-      id,
-      date,
-      dateRaw: dateRaw || date,
-      particular,
+      id: asText(r.id) || uid("bk"),
+      date: date || (month ? `${month}-01` : ""),
+      dateRaw,
+      particular: asText(r.particular),
       debit: split.debit,
       credit: split.credit,
       amount: split.credit || split.debit,
-      ref,
-      dc: asText(r.dc) || (split.debit && !split.credit ? "D" : split.credit ? "C" : ""),
-      month: date.slice(0, 7),
+      ref: asText(r.ref),
+      dc: asText(r.dc),
+      month,
+      headers,
+      cells: cells.length ? cells : fallbackCells(r),
     };
+    if (!next.date && !next.cells.some(Boolean)) continue;
     const key = bankKey(next);
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(next);
   }
-  return out.sort(
-    (a, b) => a.date.localeCompare(b.date) || a.particular.localeCompare(b.particular),
-  );
+  return out;
+}
+
+function fallbackCells(r: Record<string, unknown>) {
+  return [
+    asText(r.dateRaw) || asText(r.date),
+    asText(r.particular),
+    asText(r.ref),
+    asText(r.dc),
+    asText(r.debit),
+    asText(r.credit),
+  ];
 }
 
 function debitCreditOf(r: Record<string, unknown>) {
@@ -104,8 +122,9 @@ function num(v: unknown) {
   return Number.isFinite(n) ? n : 0;
 }
 
-export function bankKey(row: Pick<BankRow, "date" | "debit" | "credit" | "ref" | "particular">) {
-  return `${row.date}|${row.debit}|${row.credit}|${normalizeRef(row.ref)}|${asText(row.particular).slice(0, 24).toLowerCase()}`;
+export function bankKey(row: Pick<BankRow, "month" | "cells" | "date" | "ref" | "particular">) {
+  if (row.cells?.length) return `${row.month}|${row.cells.join("\t")}`;
+  return `${row.month}|${row.date}|${row.ref}|${row.particular}`;
 }
 
 export function mergeBankRows(current: BankRow[], incoming: BankRow[], month?: string) {
@@ -159,9 +178,10 @@ function pickOffice(
   offices: OfficeHit[],
   used: Set<string>,
 ): OfficeHit | null {
-  if (!asText(bank.ref)) return null;
+  const ref = asText(bank.ref) || cellByHeader(bank, REF_HEAD);
+  if (!ref) return null;
   const hits = offices.filter(
-    (o) => !used.has(o.id + o.ref) && refsMatch(bank.ref, o.ref),
+    (o) => !used.has(o.id + o.ref) && refsMatch(ref, o.ref),
   );
   if (!hits.length) return null;
   const bankAmt = signedAmount(bank);
@@ -186,30 +206,33 @@ export function refsMatch(a: string, b: string) {
   return false;
 }
 
-const DATE_HEAD = /^(txn |value |posting |tran )?date|txn.?dt|value.?dt/i;
+function cellByHeader(row: BankRow, pattern: RegExp) {
+  const i = row.headers.findIndex((h) => pattern.test(h));
+  return i >= 0 ? asText(row.cells[i]) : "";
+}
+
+const DATE_HEAD = /date|txn.?dt|value.?dt/i;
 const NARR_HEAD = /narrat|desc|particular/i;
 const CREDIT_HEAD = /^(credit|cr|deposit|cr amount|amount credited)$/i;
 const DEBIT_HEAD = /^(debit|dr|withdrawal|wdl|dr amount|amount debited)$/i;
-const REF_HEAD =
-  /ch\.?\s*\/?\s*ref|^ref$|ref\.?\s*no|cheque|chq|reference/i;
+const REF_HEAD = /ch\.?\s*\/?\s*ref|^ref$|ref\.?\s*no|cheque|chq|reference/i;
 const DC_HEAD = /^(d\/c|dr\/cr|type)$/i;
-const SKIP_HEAD = /closing|opening|available|running|^balance$/i;
 
-export function parseStatementText(text: string): BankRow[] {
+export function parseStatementText(text: string, month = ""): BankRow[] {
   const raw = asText(text).replace(/^\uFEFF/, "");
   if (!raw) return [];
   const lines = raw.split(/\r?\n/).map((l) => asText(l)).filter(Boolean);
   if (!lines.length) return [];
-  const header = findHeader(lines);
-  const body = header ? lines.slice(header.index + 1) : lines;
-  const delim = header?.delim ?? guessDelim(lines[0] ?? "");
-  const mapped = header?.mapped ?? positionalMap(splitRow(lines[0] ?? "", delim).length);
+  const grid = findGrid(lines);
   return normalizeBankRows(
-    body.map((line) => {
+    grid.body.map((line) => {
       try {
-        const cells = splitRow(line, delim);
-        if (!header && !looksLikeTxnRow(cells)) return null;
-        return rowFromCells(cells, mapped);
+        const cells = padCells(
+          splitRow(line, grid.delim).map((c) => asText(c)),
+          grid.headers.length,
+        );
+        if (!cells.some(Boolean)) return null;
+        return rowFromGrid(grid.headers, cells, month);
       } catch {
         return null;
       }
@@ -217,33 +240,61 @@ export function parseStatementText(text: string): BankRow[] {
   );
 }
 
-function looksLikeTxnRow(cells: string[]) {
-  return cells.length >= 4 && Boolean(parseLooseDate(asText(cells[0])));
-}
-
-function positionalMap(width: number) {
-  return {
-    date: 0,
-    particular: width > 1 ? 1 : -1,
-    ref: width > 2 ? 2 : -1,
-    debit: width > 3 ? 3 : -1,
-    credit: width > 4 ? 4 : -1,
-    amount: -1,
-    dc: -1,
-  };
-}
-
-function findHeader(lines: string[]) {
+function findGrid(lines: string[]) {
   const limit = Math.min(lines.length, 40);
   for (let i = 0; i < limit; i++) {
     const delim = guessDelim(lines[i] ?? "");
-    const cells = splitRow(lines[i] ?? "", delim).map((c) => asText(c));
-    const mapped = mapHeaders(cells);
-    if (mapped.date >= 0 && (mapped.credit >= 0 || mapped.debit >= 0 || mapped.dc >= 0)) {
-      return { index: i, delim, mapped };
+    const headers = splitRow(lines[i] ?? "", delim).map((c) => asText(c));
+    if (headers.length >= 2 && headers.some((h) => DATE_HEAD.test(h) || NARR_HEAD.test(h) || REF_HEAD.test(h))) {
+      return { index: i, delim, headers, body: lines.slice(i + 1) };
     }
   }
-  return null;
+  const delim = guessDelim(lines[0] ?? "");
+  const first = splitRow(lines[0] ?? "", delim);
+  if (first.length >= 3 && delim !== "") {
+    return {
+      index: 0,
+      delim,
+      headers: first.map((c, i) => asText(c) || `Col ${i + 1}`),
+      body: lines.slice(1),
+    };
+  }
+  return {
+    index: -1,
+    delim: "\t",
+    headers: ["Statement"],
+    body: lines,
+  };
+}
+
+function rowFromGrid(headers: string[], cells: string[], month: string): Partial<BankRow> {
+  const mapped = mapHeaders(headers);
+  const dateRaw = mapped.date >= 0 ? cells[mapped.date] ?? "" : cells[0] ?? "";
+  const date = parseLooseDate(dateRaw);
+  const particular = mapped.particular >= 0 ? cells[mapped.particular] ?? "" : "";
+  const ref = mapped.ref >= 0 ? cells[mapped.ref] ?? "" : "";
+  const debit = mapped.debit >= 0 ? parseAmount(cells[mapped.debit] ?? "") : 0;
+  const credit = mapped.credit >= 0 ? parseAmount(cells[mapped.credit] ?? "") : 0;
+  const dc = mapped.dc >= 0 ? cells[mapped.dc] ?? "" : "";
+  const stamp = month || date.slice(0, 7);
+  return {
+    date: date || (stamp ? `${stamp}-01` : ""),
+    dateRaw,
+    particular,
+    ref,
+    debit,
+    credit,
+    amount: credit || debit,
+    dc,
+    month: stamp,
+    headers,
+    cells,
+  };
+}
+
+function padCells(cells: string[], width: number) {
+  if (cells.length >= width) return cells;
+  return [...cells, ...Array.from({ length: width - cells.length }, () => "")];
 }
 
 function guessDelim(header: string) {
@@ -253,10 +304,11 @@ function guessDelim(header: string) {
     { d: ";", n: (header.match(/;/g) ?? []).length },
     { d: "|", n: (header.match(/\|/g) ?? []).length },
   ].sort((a, b) => b.n - a.n);
-  return counts[0] && counts[0].n > 0 ? counts[0].d : ",";
+  return counts[0] && counts[0].n > 0 ? counts[0].d : "";
 }
 
 function splitRow(line: string, delim: string) {
+  if (!delim) return [line];
   const out: string[] = [];
   let cur = "";
   let q = false;
@@ -281,14 +333,12 @@ function mapHeaders(cells: string[]) {
   const mapped = {
     date: -1,
     particular: -1,
-    amount: -1,
     credit: -1,
     debit: -1,
     ref: -1,
     dc: -1,
   };
   cells.forEach((cell, i) => {
-    if (SKIP_HEAD.test(cell)) return;
     if (mapped.date < 0 && DATE_HEAD.test(cell)) mapped.date = i;
     else if (mapped.ref < 0 && REF_HEAD.test(cell)) mapped.ref = i;
     else if (mapped.dc < 0 && DC_HEAD.test(cell)) mapped.dc = i;
@@ -297,86 +347,6 @@ function mapHeaders(cells: string[]) {
     else if (mapped.credit < 0 && CREDIT_HEAD.test(cell)) mapped.credit = i;
   });
   return mapped;
-}
-
-function cellAt(cells: string[], index: number) {
-  if (index < 0 || index >= cells.length) return "";
-  return asText(cells[index]);
-}
-
-function rowFromCells(
-  cells: string[],
-  mapped: ReturnType<typeof mapHeaders>,
-): Partial<BankRow> | null {
-  const dateRaw = cellAt(cells, mapped.date);
-  const date = parseLooseDate(dateRaw);
-  if (!date) return null;
-  const particular = mapped.particular >= 0 ? cellAt(cells, mapped.particular) : "";
-  if (isBalanceLine(particular) || isBalanceLine(dateRaw)) return null;
-  const dc = mapped.dc >= 0 ? cellAt(cells, mapped.dc) : "";
-  let debit = mapped.debit >= 0 ? parseAmount(cellAt(cells, mapped.debit)) : 0;
-  let credit = mapped.credit >= 0 ? parseAmount(cellAt(cells, mapped.credit)) : 0;
-  if (!debit && !credit && mapped.amount >= 0) {
-    const amount = parseAmount(cellAt(cells, mapped.amount));
-    const side = dcOf({ debit: 0, credit: 0, dc });
-    if (side === "D") debit = Math.abs(amount);
-    else if (side === "C") credit = Math.abs(amount);
-  }
-  if (!debit && !credit) return null;
-  return {
-    date,
-    dateRaw,
-    particular,
-    debit,
-    credit,
-    amount: credit || debit,
-    ref: cleanRefCell(cellAt(cells, mapped.ref)),
-    dc: dc || (debit && !credit ? "D" : "C"),
-  };
-}
-
-function isBalanceLine(text: string) {
-  const t = asText(text);
-  return (
-    /\b(opening|closing|available)\s+balance\b/i.test(t) ||
-    /\bbalance\s*(b\/f|c\/f|bd|cd|brought|carried)\b/i.test(t) ||
-    /\b(brought|carried)\s+forward\b/i.test(t) ||
-    /^(opening|closing|available|balance|total)\b/i.test(t)
-  );
-}
-
-export function dcOf(row: Pick<BankRow, "debit" | "credit"> & { dc?: string }) {
-  const d = asText(row.dc).toUpperCase();
-  if (d.startsWith("D")) return "D";
-  if (d.startsWith("C")) return "C";
-  if (row.debit && !row.credit) return "D";
-  if (row.credit && !row.debit) return "C";
-  if (row.debit && row.credit) return row.debit >= row.credit ? "D" : "C";
-  return "";
-}
-
-export function extractRef(text: string) {
-  const t = asText(text).replace(/\s+/g, " ");
-  if (!t) return "";
-  const labeled = t.match(
-    /\b(?:UPI|IMPS|NEFT|RTGS|NACH|ACH|IFT|INFT|UTR|RRN)(?:[\s/.:-]{0,3}(?:DR|CR|P2A|P2P|INFT))?[\s/.:-]{0,3}([A-Z0-9]{8,})\b/i,
-  );
-  if (labeled?.[1]) return labeled[1];
-  const tagged = t.match(
-    /\b(?:CHQ|CHEQUE|CH\.?|REF(?:ERENCE)?(?:\s*NO\.?)?)[\s/.:-]*([A-Z0-9]{4,})\b/i,
-  );
-  if (tagged?.[1]) return tagged[1];
-  const longNum = t.match(/\b(\d{12,22})\b/);
-  if (longNum?.[1]) return longNum[1];
-  const bankCode = t.match(/\b([A-Z]{4}[A-Z0-9]{6,})\b/i);
-  if (bankCode?.[1]) return bankCode[1];
-  return "";
-}
-
-function cleanRefCell(raw: unknown) {
-  const t = asText(raw);
-  if (!t || /^(0+|-+|na|n\/a|\.)$/i.test(t)) return "";
-  return t;
 }
 
 function parseAmount(raw: string) {
@@ -419,6 +389,40 @@ function ymd(y?: string, m?: string, d?: string) {
   if (Number(month) < 1 || Number(month) > 12) return "";
   if (Number(day) < 1 || Number(day) > 31) return "";
   return `${y}-${month}-${day}`;
+}
+
+export function dcOf(row: Pick<BankRow, "debit" | "credit"> & { dc?: string }) {
+  const d = asText(row.dc).toUpperCase();
+  if (d.startsWith("D")) return "D";
+  if (d.startsWith("C")) return "C";
+  if (row.debit && !row.credit) return "D";
+  if (row.credit && !row.debit) return "C";
+  if (row.debit && row.credit) return row.debit >= row.credit ? "D" : "C";
+  return "";
+}
+
+export function extractRef(text: string) {
+  const t = asText(text).replace(/\s+/g, " ");
+  if (!t) return "";
+  const labeled = t.match(
+    /\b(?:UPI|IMPS|NEFT|RTGS|NACH|ACH|IFT|INFT|UTR|RRN)(?:[\s/.:-]{0,3}(?:DR|CR|P2A|P2P|INFT))?[\s/.:-]{0,3}([A-Z0-9]{8,})\b/i,
+  );
+  if (labeled?.[1]) return labeled[1];
+  const tagged = t.match(
+    /\b(?:CHQ|CHEQUE|CH\.?|REF(?:ERENCE)?(?:\s*NO\.?)?)[\s/.:-]*([A-Z0-9]{4,})\b/i,
+  );
+  if (tagged?.[1]) return tagged[1];
+  const longNum = t.match(/\b(\d{12,22})\b/);
+  if (longNum?.[1]) return longNum[1];
+  const bankCode = t.match(/\b([A-Z]{4}[A-Z0-9]{6,})\b/i);
+  if (bankCode?.[1]) return bankCode[1];
+  return "";
+}
+
+export function statementCsv(headers: string[], rows: string[][]) {
+  const esc = (s: string) =>
+    /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  return [headers, ...rows].map((r) => r.map(esc).join(",")).join("\n");
 }
 
 function linesFromPdfItems(items: unknown[]) {

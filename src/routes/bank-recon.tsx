@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Landmark, Upload } from "lucide-react";
+import { Download, Landmark, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,14 +9,14 @@ import { Input } from "@/components/ui/input";
 import { SaveCube, useAccountSave } from "@/components/save-cube";
 import { useGate } from "@/components/security-gate";
 import {
-  dcOf,
   mergeBankRows,
   parseStatementText,
   reconcileBank,
+  statementCsv,
   statementTextFromPdf,
   type BankRow,
 } from "@/lib/bank-recon";
-import { formatDayShort, money } from "@/lib/format";
+import { formatDayShort } from "@/lib/format";
 import { useLedger } from "@/lib/store";
 
 export const Route = createFileRoute("/bank-recon")({
@@ -42,28 +42,24 @@ function BankReconPage() {
     () => reconcileBank(monthRows, guests),
     [monthRows, guests],
   );
+  const headers = monthRows[0]?.headers?.filter(Boolean) ?? [];
   const matched = lines.filter((l) => l.office);
   const unmatched = lines.filter((l) => !l.office);
-  const debitTotal = monthRows.reduce((s, r) => s + r.debit, 0);
-  const creditTotal = monthRows.reduce((s, r) => s + r.credit, 0);
 
   function applyParsed(parsed: BankRow[]) {
     if (!parsed.length) {
       toast.error("No statement rows found in that file");
       return;
     }
-    const months = [...new Set(parsed.map((r) => r.month))];
     gate(
       () => {
-        const kept = bankRows.filter((r) => !months.includes(r.month));
-        setBankRows(mergeBankRows(kept, parsed));
-        toast.success(
-          `Uploaded ${parsed.length} bank rows · ${matchedLabel(months)}`,
-        );
+        const kept = bankRows.filter((r) => r.month !== month);
+        setBankRows(mergeBankRows(kept, parsed, month));
+        toast.success(`Uploaded ${parsed.length} rows as printed`);
       },
       {
         title: "Upload this bank statement?",
-        message: `${parsed.length} rows will replace ${matchedLabel(months)}.`,
+        message: `${parsed.length} rows will replace ${month}, as printed.`,
         confirmLabel: "Upload",
       },
     );
@@ -79,7 +75,7 @@ function BankReconPage() {
       } else {
         text = await file.text();
       }
-      applyParsed(parseStatementText(text));
+      applyParsed(parseStatementText(text, month));
     } catch (err) {
       const msg = err instanceof Error && err.message
         ? err.message
@@ -89,6 +85,25 @@ function BankReconPage() {
       setBusy(false);
       if (fileRef.current) fileRef.current.value = "";
     }
+  }
+
+  function downloadStatement() {
+    if (!monthRows.length) {
+      toast.error("No statement to download");
+      return;
+    }
+    const cols = headers.length ? headers : ["Statement"];
+    const csv = statementCsv(
+      cols,
+      monthRows.map((r) => (r.cells.length ? r.cells : [r.dateRaw, r.particular, r.ref])),
+    );
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `bank-statement-${month}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   return (
@@ -102,8 +117,8 @@ function BankReconPage() {
             Bank recon
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Upload only Date, Narration, Ch./Ref. no., D/C, Amount Debited
-            and Amount Credited — as printed on the statement.
+            Bank statement is uploaded and downloaded as printed. No columns are
+            changed.
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
@@ -140,15 +155,23 @@ function BankReconPage() {
             <Upload className="size-4" />
             {busy ? "Reading…" : "Upload statement"}
           </Button>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={!monthRows.length}
+            onClick={downloadStatement}
+          >
+            <Download className="size-4" />
+            Download
+          </Button>
           <SaveCube busy={saving} onSave={() => void saveToServer()} />
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         <Stat label="Uploaded" value={String(monthRows.length)} />
-        <Stat label="Debit" value={money(debitTotal)} />
-        <Stat label="Credit" value={money(creditTotal)} />
         <Stat label="Matched" value={String(matched.length)} />
+        <Stat label="Later" value={String(unmatched.length)} />
       </div>
 
       <Card>
@@ -163,47 +186,38 @@ function BankReconPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="overflow-x-auto p-0">
-          <table className="w-full min-w-[70rem] text-left text-sm">
+          <table className="w-full min-w-[64rem] text-left text-sm">
             <thead className="text-xs uppercase tracking-wide text-muted">
               <tr className="border-y border-border bg-bg-warm/50">
-                <th className="px-5 py-2 font-medium" colSpan={7}>
+                <th
+                  className="px-5 py-2 font-medium"
+                  colSpan={Math.max(headers.length, 1)}
+                >
                   Bank statement
                 </th>
-                <th className="px-3 py-2 font-medium" colSpan={2}>
+                <th className="px-3 py-2 font-medium" colSpan={3}>
                   Entry in office
                 </th>
               </tr>
               <tr className="border-b border-border">
-                <th className="px-5 py-2 font-medium">Date</th>
-                <th className="px-3 py-2 font-medium">Narration</th>
-                <th className="px-3 py-2 font-medium">Ch./Ref. no.</th>
-                <th className="px-3 py-2 font-medium">D/C</th>
-                <th className="px-3 py-2 text-right font-medium">Amount Debited</th>
-                <th className="px-3 py-2 text-right font-medium">Amount Credited</th>
+                {(headers.length ? headers : ["Statement"]).map((h) => (
+                  <th key={h} className="px-3 py-2 font-medium first:px-5">
+                    {h}
+                  </th>
+                ))}
                 <th className="px-3 py-2 font-medium">Yes/No</th>
                 <th className="px-3 py-2 font-medium">Office date</th>
                 <th className="px-3 py-2 font-medium">Office entry</th>
               </tr>
             </thead>
             <tbody>
-              {lines.map((line) => {
-                const side = dcOf(line.bank);
-                return (
+              {lines.map((line) => (
                 <tr key={line.bank.id} className="border-b border-border/70">
-                  <td className="px-5 py-2.5 tabular">
-                    {line.bank.dateRaw || formatDayShort(line.bank.date)}
-                  </td>
-                  <td className="px-3 py-2.5">{line.bank.particular || "—"}</td>
-                  <td className="px-3 py-2.5 font-mono text-xs">
-                    {line.bank.ref || "—"}
-                  </td>
-                  <td className="px-3 py-2.5 font-medium">{side || "—"}</td>
-                  <td className="px-3 py-2.5 text-right tabular">
-                    {line.bank.debit ? money(line.bank.debit) : "—"}
-                  </td>
-                  <td className="px-3 py-2.5 text-right tabular">
-                    {line.bank.credit ? money(line.bank.credit) : "—"}
-                  </td>
+                  {(headers.length ? headers : ["Statement"]).map((h, i) => (
+                    <td key={h} className="px-3 py-2.5 first:px-5">
+                      {line.bank.cells[i] || "—"}
+                    </td>
+                  ))}
                   <td className="px-3 py-2.5">
                     <Badge variant={line.office ? "ok" : "muted"}>
                       {line.office ? "Yes" : "No"}
@@ -227,25 +241,8 @@ function BankReconPage() {
                     </td>
                   )}
                 </tr>
-                );
-              })}
+              ))}
             </tbody>
-            {lines.length ? (
-              <tfoot>
-                <tr className="border-t border-border bg-bg-warm/40 font-medium">
-                  <td className="px-5 py-2.5" colSpan={4}>
-                    Total
-                  </td>
-                  <td className="px-3 py-2.5 text-right tabular">
-                    {money(debitTotal)}
-                  </td>
-                  <td className="px-3 py-2.5 text-right tabular">
-                    {money(creditTotal)}
-                  </td>
-                  <td colSpan={3} />
-                </tr>
-              </tfoot>
-            ) : null}
           </table>
           {lines.length === 0 ? (
             <p className="py-10 text-center text-sm text-muted">
@@ -267,8 +264,4 @@ function Stat({ label, value }: { label: string; value: string }) {
       </div>
     </Card>
   );
-}
-
-function matchedLabel(months: string[]) {
-  return months.join(", ") || "statement";
 }
