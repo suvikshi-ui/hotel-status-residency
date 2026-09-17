@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { SaveCube, useAccountSave } from "@/components/save-cube";
 import { useGate } from "@/components/security-gate";
 import {
@@ -30,6 +31,7 @@ function BankReconPage() {
   const { gate } = useGate();
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  const [password, setPassword] = useState("");
   const month = date.slice(0, 7);
   const monthRows = useMemo(
     () => bankRows.filter((r) => r.month === month),
@@ -72,7 +74,7 @@ function BankReconPage() {
       const name = file.name.toLowerCase();
       let text = "";
       if (name.endsWith(".pdf") || file.type === "application/pdf") {
-        text = await statementTextFromPdf(await file.arrayBuffer());
+        text = await statementTextFromPdf(await file.arrayBuffer(), password);
       } else {
         text = await file.text();
       }
@@ -100,7 +102,21 @@ function BankReconPage() {
             fill the office entry date automatically.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="grid gap-1.5">
+            <span className="text-xs font-medium text-muted">
+              Statement password
+            </span>
+            <Input
+              type="password"
+              autoComplete="off"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="If the file is locked"
+              className="w-44"
+              aria-label="Statement password"
+            />
+          </label>
           <input
             ref={fileRef}
             type="file"

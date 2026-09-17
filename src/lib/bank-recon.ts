@@ -267,31 +267,54 @@ function ymd(y?: string, m?: string, d?: string) {
   return `${y}-${month}-${day}`;
 }
 
-export async function statementTextFromPdf(data: ArrayBuffer): Promise<string> {
+export async function statementTextFromPdf(
+  data: ArrayBuffer,
+  password = "",
+): Promise<string> {
   const pdfjs = await import("pdfjs-dist");
   const worker = await import("pdfjs-dist/build/pdf.worker.min.mjs?url");
   pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
-  const doc = await pdfjs.getDocument({ data }).promise;
-  const pages: string[] = [];
-  for (let i = 1; i <= doc.numPages; i++) {
-    const page = await doc.getPage(i);
-    const content = await page.getTextContent();
-    const lines: string[] = [];
-    let y = Number.NaN;
-    let buf: string[] = [];
-    for (const item of content.items) {
-      if (!("str" in item)) continue;
-      const ty = Math.round(((item as { transform?: number[] }).transform?.[5] ?? 0) * 4) / 4;
-      if (Number.isFinite(y) && Math.abs(ty - y) > 2) {
-        lines.push(buf.join(" "));
-        buf = [];
+  try {
+    const doc = await pdfjs.getDocument({
+      data,
+      password: password || undefined,
+    }).promise;
+    const pages: string[] = [];
+    for (let i = 1; i <= doc.numPages; i++) {
+      const page = await doc.getPage(i);
+      const content = await page.getTextContent();
+      const lines: string[] = [];
+      let y = Number.NaN;
+      let buf: string[] = [];
+      for (const item of content.items) {
+        if (!("str" in item)) continue;
+        const ty = Math.round(((item as { transform?: number[] }).transform?.[5] ?? 0) * 4) / 4;
+        if (Number.isFinite(y) && Math.abs(ty - y) > 2) {
+          lines.push(buf.join(" "));
+          buf = [];
+        }
+        y = ty;
+        const str = (item as { str?: string }).str ?? "";
+        if (str.trim()) buf.push(str);
       }
-      y = ty;
-      const str = (item as { str?: string }).str ?? "";
-      if (str.trim()) buf.push(str);
+      if (buf.length) lines.push(buf.join(" "));
+      pages.push(lines.join("\n"));
     }
-    if (buf.length) lines.push(buf.join(" "));
-    pages.push(lines.join("\n"));
+    return pages.join("\n");
+  } catch (err) {
+    const name = err && typeof err === "object" && "name" in err
+      ? String((err as { name?: string }).name)
+      : "";
+    const code = err && typeof err === "object" && "code" in err
+      ? (err as { code?: unknown }).code
+      : "";
+    if (name === "PasswordException" || code === 1 || code === 2) {
+      throw new Error(
+        password
+          ? "Wrong statement password"
+          : "This statement is locked. Enter the password, then upload.",
+      );
+    }
+    throw err;
   }
-  return pages.join("\n");
 }
