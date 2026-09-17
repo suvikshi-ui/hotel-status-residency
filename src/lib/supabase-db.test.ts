@@ -44,6 +44,30 @@ describe("cloud save", () => {
     );
   });
 
+  it("keeps a fuller JSON restore even when the account stamp is newer", () => {
+    assert.equal(
+      preferLocalOverCloud({
+        localSavedAt: 1_000,
+        cloudUpdatedAt: 9_000,
+        localScore: 492,
+        cloudScore: 120,
+      }),
+      true,
+    );
+  });
+
+  it("keeps an equally full local book instead of wiping it", () => {
+    assert.equal(
+      preferLocalOverCloud({
+        localSavedAt: 1_000,
+        cloudUpdatedAt: 1_100,
+        localScore: 492,
+        cloudScore: 492,
+      }),
+      true,
+    );
+  });
+
   it("does not drop a restored JSON book for a thinner newer account", () => {
     assert.equal(
       preferLocalOverCloud({

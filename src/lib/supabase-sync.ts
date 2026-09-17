@@ -521,8 +521,22 @@ export async function hydrateFromCloud(userId: string): Promise<CloudPhase> {
       if (keepLocal) {
         rememberPulled(local, cloud.cloudUpdatedAt);
         lastHash = hashOf(local);
-        setPhase(cloudScore > 0 ? "synced" : "error");
-        return cloudScore > 0 ? "synced" : "error";
+        setPhase("synced");
+        if (localScore > cloudScore) {
+          hydrating = false;
+          await pushLedger(
+            userId,
+            { ...local, savedAt: Date.now() + 2_000 },
+            undefined,
+            useLedger.getState().appRole,
+            undefined,
+          );
+          useLedger.setState({ savedAt: Date.now() + 2_000 });
+          lastHash = hashOf(snapshotFromStore());
+          const stamp = (await pullLedgerStamp(userId)) || cloud.cloudUpdatedAt;
+          rememberPulled(snapshotFromStore(), stamp);
+        }
+        return "synced";
       }
       clearLocalLedgerCache();
       useLedger.getState().applyCloudBooks({
@@ -616,9 +630,13 @@ export async function importBackupAndRefresh(
       setPhase(pushed.missingSchema ? "missing-schema" : "error", pushed.message);
       return { ok: false, message: pushed.message };
     }
+    const savedAt = Date.now() + 2_000;
+    useLedger.setState({ savedAt });
     claimAnonymousLedger(userId);
-    lastCloudStamp = "";
+    const stamp = (await pullLedgerStamp(userId)) || new Date().toISOString();
+    rememberPulled(snapshotFromStore(), stamp);
     lastHash = hashOf(snapshotFromStore());
+    lastCloudStamp = stamp;
     locksDirty = false;
     setPhase("synced");
     return { ok: true, cloud: true };
