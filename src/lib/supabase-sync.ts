@@ -384,20 +384,24 @@ export async function saveAccountNow(): Promise<
   for (let i = 0; i < 40 && hydrating; i++) {
     await new Promise((r) => setTimeout(r, 50));
   }
-  lastHash = "";
-  locksDirty = true;
-  await flush(userId);
-  for (let i = 0; i < 8; i++) {
-    if (inFlight) await inFlight;
-    else if (queued) await flush(userId);
-    else break;
+  const local = snapshotFromStore();
+  setPhase("saving");
+  const result = await pushLedger(
+    userId,
+    local,
+    undefined,
+    useLedger.getState().appRole,
+    undefined,
+  );
+  if (!result.ok) {
+    setPhase(result.missingSchema ? "missing-schema" : "error", result.message);
+    return { ok: false, message: result.message };
   }
-  if (phase === "synced" || phase === "migrated") return { ok: true };
-  const raw = message || "Could not save to the hotel account.";
-  if (isPermissionMessage(raw)) {
-    return { ok: false, message: raw };
-  }
-  return { ok: false, message: raw };
+  rememberPulled(snapshotFromStore(), new Date().toISOString());
+  lastHash = hashOf(snapshotFromStore());
+  setPhase("synced");
+  locksDirty = false;
+  return { ok: true };
 }
 
 export function requestCloudSave() {

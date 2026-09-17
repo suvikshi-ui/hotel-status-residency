@@ -35,7 +35,7 @@ import { DUE_PAY_MODES, formatDayShort, MODE_LABEL, money, stayStamp } from "@/l
 import { useLedger, useDayBooks } from "@/lib/store";
 import { useGate } from "@/components/security-gate";
 import { SaveCube, useAccountSave } from "@/components/save-cube";
-import { isSealed, sealKey, unsealedKeys } from "@/lib/sheet-seal";
+import { isSealed, sealKey } from "@/lib/sheet-seal";
 import type { PayMode } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -54,7 +54,7 @@ function BalancePage() {
   const addBalReceived = useLedger((s) => s.addBalReceived);
   const removeBalReceived = useLedger((s) => s.removeBalReceived);
   const sealedIds = useLedger((s) => s.sealedIds);
-  const { busy: saving, sealAndSave } = useAccountSave();
+  const { busy: saving, saveToServer } = useAccountSave();
   const { gate } = useGate();
   const [q, setQ] = useState("");
   const [onlyOpen, setOnlyOpen] = useState(true);
@@ -102,8 +102,6 @@ function BalancePage() {
     .reduce((s, r) => s + r.amount, 0);
   const otherTotal = otherRows.reduce((s, r) => s + r.amount, 0);
   const todayReceipts = receipts.filter((r) => r.date === date);
-  const balanceKeys = todayReceipts.map((r) => sealKey.balance(r.id));
-  const pendingSave = unsealedKeys(balanceKeys, sealedIds).length > 0;
 
   function collectFrom(account: DueAccount, mode: PayMode, amount: number) {
     gate(
@@ -154,21 +152,10 @@ function BalancePage() {
           Balance
         </h1>
         <p className="mt-1 text-sm text-muted">
-          Collect, then press Save at the top. After save that collection will
-          not change.
+          Collect dues, then press Save to send the books to the server.
         </p>
       </div>
-      <SaveCube
-        hasEntries={todayReceipts.length > 0}
-        pending={pendingSave}
-        busy={saving}
-        onSave={() =>
-          sealAndSave(
-            balanceKeys,
-            "Account saved — today's collections will not change",
-          )
-        }
-      />
+      <SaveCube busy={saving} onSave={() => void saveToServer()} />
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

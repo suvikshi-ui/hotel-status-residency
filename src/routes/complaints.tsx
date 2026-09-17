@@ -26,7 +26,7 @@ import { useLedger } from "@/lib/store";
 import type { RoomDef } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { SaveCube, useAccountSave } from "@/components/save-cube";
-import { isSealed, sealKey, unsealedKeys } from "@/lib/sheet-seal";
+import { isSealed, sealKey } from "@/lib/sheet-seal";
 
 export const Route = createFileRoute("/complaints")({
   component: ComplaintsPage,
@@ -51,7 +51,7 @@ function ComplaintsPage() {
   const complaints = useLedger((s) => s.complaints);
   const setComplaints = useLedger((s) => s.setComplaints);
   const sealedIds = useLedger((s) => s.sealedIds);
-  const { busy: saving, sealAndSave } = useAccountSave();
+  const { busy: saving, saveToServer } = useAccountSave();
   const role = useLedger((s) => s.appRole);
   const { gate } = useGate();
   const [open, setOpen] = useState<{
@@ -63,8 +63,6 @@ function ComplaintsPage() {
 
   const openCount = complaints.filter((c) => c.level !== "green").length;
   const redCount = complaints.filter((c) => c.level === "red").length;
-  const complaintKeys = complaints.map((c) => sealKey.complaint(c.id));
-  const pendingSave = unsealedKeys(complaintKeys, sealedIds).length > 0;
 
   const byFloor = useMemo(
     () =>
@@ -142,21 +140,10 @@ function ComplaintsPage() {
           Complaints
         </h1>
         <p className="mt-1 text-sm text-muted">
-          Log a cube, then press Save at the top. After save that cube does not
-          change. A new empty cube stays in front for the next entry.
+          Log a cube, then press Save to send the books to the server.
         </p>
       </div>
-      <SaveCube
-        hasEntries={complaints.length > 0}
-        pending={pendingSave}
-        busy={saving}
-        onSave={() =>
-          sealAndSave(
-            complaintKeys,
-            "Account saved — these cubes will not change",
-          )
-        }
-      />
+      <SaveCube busy={saving} onSave={() => void saveToServer()} />
       </div>
 
       <div className="grid grid-cols-3 gap-3">

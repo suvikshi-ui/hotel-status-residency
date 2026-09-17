@@ -20,7 +20,7 @@ import { isDayLocked } from "@/lib/register-lock";
 import { requestCloudPullNow } from "@/lib/supabase-sync";
 import { SaveCube, useAccountSave } from "@/components/save-cube";
 import { AccountWriteFix } from "@/components/account-write-fix";
-import { isSealed, sealKey, unsealedKeys } from "@/lib/sheet-seal";
+import { isSealed, sealKey } from "@/lib/sheet-seal";
 
 export const Route = createFileRoute("/register")({ component: RegisterPage });
 
@@ -43,17 +43,9 @@ function RegisterPage() {
   const lockRegister = useLedger((s) => s.lockRegister);
   const unlockRegister = useLedger((s) => s.unlockRegister);
   const sealedIds = useLedger((s) => s.sealedIds);
-  const { busy: saving, sealAndSave } = useAccountSave();
+  const { busy: saving, saveToServer } = useAccountSave();
   const { gate, hasCode } = useGate();
   const locked = isDayLocked(lockedDates, date);
-  const dayKeys = [
-    ...guests.map((g) => sealKey.guest(g.id)),
-    ...food.map((f) => sealKey.food(f.id)),
-    ...ws.map((w) => sealKey.wholesale(w.id)),
-    ...expenses.map((e) => sealKey.expense(e.id)),
-    ...receipts.map((r) => sealKey.balance(r.id)),
-  ];
-  const pendingSave = !locked && unsealedKeys(dayKeys, sealedIds).length > 0;
   const [q, setQ] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -90,22 +82,11 @@ function RegisterPage() {
           {formatDay(date)}
         </p>
         <p className="mt-1 text-sm text-muted">
-          {guests.length} postings · {money(take.roomsTotal)} room revenue ·
-          Save cube at the top — after save, that day's entries will not change
+          {guests.length} postings · {money(take.roomsTotal)} room revenue
         </p>
         </div>
         <div className="flex flex-wrap gap-2 print:hidden">
-          <SaveCube
-            hasEntries={dayKeys.length > 0}
-            pending={pendingSave}
-            busy={saving}
-            onSave={() =>
-              sealAndSave(
-                dayKeys,
-                "Account saved — today's entries will not change",
-              )
-            }
-          />
+          <SaveCube busy={saving} onSave={() => void saveToServer()} />
           {locked ? (
             <Button
               type="button"

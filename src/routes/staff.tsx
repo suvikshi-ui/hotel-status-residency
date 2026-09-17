@@ -8,13 +8,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useGate } from "@/components/security-gate";
 import { formatDay, money, uid } from "@/lib/format";
+import { ReportsLink } from "@/components/reports-link";
 import { escapeHtml, printDocument } from "@/lib/print-sheet";
 import { staffPay } from "@/lib/staff-pay";
 import { useLedger } from "@/lib/store";
 import { HotelLogo } from "@/components/hotel-logo";
-import { ReportsLink } from "@/components/reports-link";
 import { SaveCube, useAccountSave } from "@/components/save-cube";
 import { isSealed, sealKey } from "@/lib/sheet-seal";
 import type { AdvanceRow, StaffRow } from "@/lib/types";
@@ -31,9 +30,7 @@ function StaffPage() {
   const setStaff = useLedger((s) => s.setStaff);
   const setAdvances = useLedger((s) => s.setAdvances);
   const sealedIds = useLedger((s) => s.sealedIds);
-  const sealEntries = useLedger((s) => s.sealEntries);
-  const { busy: saving, saveAfter } = useAccountSave();
-  const { gate } = useGate();
+  const { busy: saving, saveToServer } = useAccountSave();
   const [sheet, setSheet] = useState<Sheet>("salary");
   const [monthDays, setMonthDays] = useState(30);
   const [draft, setDraft] = useState<StaffRow[]>(staff);
@@ -202,45 +199,18 @@ function StaffPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <SaveCube
-            hasEntries={sheet === "salary" ? draft.length > 0 : advDraft.length > 0}
-            pending={!frozen}
             busy={saving}
             onSave={() => {
               if (sheet === "salary") {
-                gate(
-                  () => {
-                    const next = rows.map(({ earned, payable, ...r }) => ({
-                      ...r,
-                      total: payable,
-                    }));
-                    setStaff(next);
-                    sealEntries([sealKey.staffMonth(monthKey)]);
-                    void saveAfter(
-                      "Account saved — salary sheet will not change",
-                    );
-                  },
-                  {
-                    title: "Are you sure?",
-                    message: "Save salary sheet? After this it will not change.",
-                    confirmLabel: "Save",
-                  },
-                );
+                const next = rows.map(({ earned, payable, ...r }) => ({
+                  ...r,
+                  total: payable,
+                }));
+                setStaff(next);
               } else {
-                gate(
-                  () => {
-                    setAdvances(advDraft);
-                    sealEntries([sealKey.advanceMonth(monthKey)]);
-                    void saveAfter(
-                      "Account saved — advance sheet will not change",
-                    );
-                  },
-                  {
-                    title: "Are you sure?",
-                    message: "Save advances? After this they will not change.",
-                    confirmLabel: "Save",
-                  },
-                );
+                setAdvances(advDraft);
               }
+              void saveToServer();
             }}
           />
           <ReportsLink view={sheet === "advance" ? "advance" : "salary"} />

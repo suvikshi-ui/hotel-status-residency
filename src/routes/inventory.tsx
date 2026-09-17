@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useGate } from "@/components/security-gate";
 import { uid } from "@/lib/format";
 import {
   emptyInventoryItem,
@@ -41,10 +40,8 @@ function InventoryPage() {
   const inventory = useLedger((s) => s.inventory);
   const setInventory = useLedger((s) => s.setInventory);
   const sealedIds = useLedger((s) => s.sealedIds);
-  const sealEntries = useLedger((s) => s.sealEntries);
-  const { busy: saving, saveAfter } = useAccountSave();
+  const { busy: saving, saveToServer } = useAccountSave();
   const role = useLedger((s) => s.appRole);
-  const { gate } = useGate();
   const manage = canManageCatalog(role);
   const [draft, setDraft] = useState<InventoryItem[]>(inventory);
   const [newName, setNewName] = useState("");
@@ -54,10 +51,8 @@ function InventoryPage() {
   }, [inventory]);
 
   const rows = useMemo(() => normalizeInventory(draft), [draft]);
-  const dirty = JSON.stringify(rows) !== JSON.stringify(inventory);
   const monthKey = date.slice(0, 7);
   const frozen = isSealed(sealedIds, sealKey.inventoryMonth(monthKey));
-  const pendingSave = !frozen && (dirty || rows.length > 0);
   const lastTotal = rows.reduce((s, r) => s + r.lastMonth, 0);
   const thisTotal = rows.reduce((s, r) => s + r.thisMonth, 0);
   const diffTotal = thisTotal - lastTotal;
@@ -95,22 +90,8 @@ function InventoryPage() {
 
   function save() {
     if (frozen) return;
-    const go = () => {
-      setInventory(rows);
-      sealEntries([sealKey.inventoryMonth(monthKey)]);
-      void saveAfter(
-        "Account saved — this month's inventory will not change",
-      );
-    };
-    if (!manage) {
-      go();
-      return;
-    }
-    gate(go, {
-      title: "Are you sure?",
-      message: "Save this month's inventory check?",
-      confirmLabel: "Save",
-    });
+    setInventory(rows);
+    void saveToServer();
   }
 
   function printSheet() {
@@ -168,12 +149,7 @@ function InventoryPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2 print:hidden">
-          <SaveCube
-            hasEntries={rows.length > 0}
-            pending={pendingSave}
-            busy={saving}
-            onSave={save}
-          />
+          <SaveCube busy={saving} onSave={save} />
           <ReportsLink view="inventory" />
           <Button variant="outline" onClick={printSheet}>
             <Printer className="size-4" />
