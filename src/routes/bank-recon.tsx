@@ -108,8 +108,8 @@ function BankReconPage() {
             Bank recon
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Upload, check the chart, then download Date, Narration, Ch./Ref.
-            no., Withdrawal and Deposit.
+            Journal list from the uploaded statement: Date, Narration,
+            Ch./Ref. no., Withdrawal, Deposit.
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
@@ -162,7 +162,9 @@ function BankReconPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Landmark className="size-4" />
-            {monthRows.length ? `${monthRows.length} rows` : "Chart"}
+            {monthRows.length
+              ? `Journal entries · ${monthRows.length}`
+              : "Journal entries"}
           </CardTitle>
         </CardHeader>
         <CardContent className="overflow-x-auto p-0">

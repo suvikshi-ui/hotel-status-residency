@@ -71,6 +71,22 @@ describe("bank recon", () => {
     assert.equal(bank[0]?.cells.includes("20000"), false);
   });
 
+  it("keeps the full journal list including continuation lines", () => {
+    const text = [
+      "Tran Date,Transaction Remarks,Chq/Ref No.,Withdrawal Amount,Deposit Amount,Balance",
+      "17/09/2026,UPI-RAMESH,412345678901,0.00,1800.00,20000",
+      "18/09/2026,NEFT FLYSKY,NEFT998877,500.00,0.00,19500",
+      "   HOTEL PAYMENT",
+      "30/09/2026,Closing Balance,,,,21500",
+    ].join("\n");
+    const bank = parseStatementText(text, "2026-09");
+    assert.equal(bank.length, 2);
+    assert.equal(bank[0]?.particular, "UPI-RAMESH");
+    assert.match(bank[1]?.particular ?? "", /NEFT FLYSKY/);
+    assert.match(bank[1]?.particular ?? "", /HOTEL PAYMENT/);
+    assert.equal(bank[1]?.debit, 500);
+  });
+
   it("pulls UPI/IMPS numbers out of narration", () => {
     assert.equal(extractRef("TO TRANSFER UPI/DR/412345678901/RAMESH/SBIN"), "412345678901");
   });

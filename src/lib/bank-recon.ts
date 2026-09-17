@@ -225,24 +225,47 @@ export function parseStatementText(text: string, month = ""): BankRow[] {
   const lines = raw.split(/\r?\n/).map((l) => asText(l)).filter(Boolean);
   if (!lines.length) return [];
   const grid = findGrid(lines);
-  return normalizeBankRows(
-    (grid ? grid.body : lines).map((line) => {
-      try {
-        if (isJunkLine(line)) return null;
-        if (grid) {
-          const cells = padCells(
-            splitRow(line, grid.delim).map((c) => asText(c)),
-            grid.headers.length,
-          );
-          if (!cells.some(Boolean)) return null;
-          return slimRow(rowFromGrid(grid.headers, cells, month));
+  const parsed: Partial<BankRow>[] = [];
+  for (const line of grid ? grid.body : lines) {
+    try {
+      if (isBalanceLine(line)) continue;
+      if (grid) {
+        const cells = padCells(
+          splitRow(line, grid.delim).map((c) => asText(c)),
+          grid.headers.length,
+        );
+        if (!cells.some(Boolean)) continue;
+        const row = rowFromGrid(grid.headers, cells, month);
+        if (row) {
+          parsed.push(row);
+          continue;
         }
-        return slimRow(rowFromLoose(line, month));
-      } catch {
-        return null;
+        const last = parsed[parsed.length - 1];
+        if (last && cells.some(Boolean) && !isJunkLine(cells.join(" "))) {
+          last.particular = asText(`${last.particular ?? ""} ${cells.filter(Boolean).join(" ")}`);
+        }
+        continue;
       }
-    }),
-  );
+      if (isHeaderish(line)) continue;
+      const row = rowFromLoose(line, month);
+      if (row) {
+        parsed.push(row);
+        continue;
+      }
+      const last = parsed[parsed.length - 1];
+      if (last && !isJunkLine(line)) {
+        last.particular = asText(`${last.particular ?? ""} ${line}`);
+      }
+    } catch {
+      continue;
+    }
+  }
+  return normalizeBankRows(parsed.map((row) => slimRow(row)));
+}
+
+function isHeaderish(line: string) {
+  const mapped = mapHeaders(splitRow(line, guessDelim(line) || "\t").map((c) => asText(c)));
+  return mapped.date >= 0 && (mapped.debit >= 0 || mapped.credit >= 0 || mapped.particular >= 0);
 }
 
 function findGrid(lines: string[]) {
@@ -272,7 +295,7 @@ function rowFromGrid(headers: string[], cells: string[], month: string): Partial
   const creditRaw = mapped.credit >= 0 ? cells[mapped.credit] ?? "" : "";
   const debit = parseAmount(debitRaw);
   const credit = parseAmount(creditRaw);
-  if (!debit && !credit) return null;
+  if (!dateRaw && !particular) return null;
   const stamp = month || date.slice(0, 7);
   return {
     date,
@@ -302,48 +325,57 @@ function rowFromLoose(line: string, month: string): Partial<BankRow> | null {
   const dateRaw = (line.match(
     /\b(?:\d{1,2}[\s\-\/.](?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[\s\-\/.,]+\d{2,4}|\d{4}[\/\-.]\d{1,2}[\/\-.]\d{1,2}|\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4})\b/i,
   ) ?? [""])[0];
-  const amounts = [...line.matchAll(/(?:\u20B9\s*)?(\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|\d+\.\d{1,2})/g)];
-  if (!amounts.length) return null;
-  const txn = amounts.length >= 2 ? amounts.slice(0, -1) : amounts;
-  const values = txn.map((m) => parseAmount(m[0] ?? "")).filter((n) => n);
-  let debit = 0;
-  let credit = 0;
-  if (values.length >= 2) {
-    debit = values[0] ?? 0;
-    credit = values[1] ?? 0;
-  } else if (/\b(dr|debit|wdl|withdrawal)\b/i.test(line)) {
-    debit = values[0] ?? 0;
-  } else {
-    credit = values[0] ?? 0;
+  const amounts = [
+    ...line.matchAll(
+      /(?:\u20B9\s*)?(\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|\d+\.\d{1,2})/g,
+    ),
+  ];
+  const txn = amounts.length >= 3 ? amounts.slice(-3, -1) : amounts.slice(-2);
+  const debit = parseAmount(txn[0]?.[0] ?? "");
+  const credit = parseAmount(txn[1]?.[0] ?? (txn.length === 1 ? txn[0]?.[0] ?? "" : ""));
+  let withdrawal = debit;
+  let deposit = credit;
+  if (txn.length === 1) {
+    if (/\b(dr|debit|wdl|withdrawal)\b/i.test(line)) {
+      withdrawal = parseAmount(txn[0]?.[0] ?? "");
+      deposit = 0;
+    } else {
+      withdrawal = 0;
+      deposit = parseAmount(txn[0]?.[0] ?? "");
+    }
   }
-  if (!debit && !credit) return null;
-  const ref = extractRef(line);
+  const ref = mappedRefFromLine(line, dateRaw);
   let particular = line;
   if (dateRaw) particular = particular.replace(dateRaw, "");
   for (const m of amounts) particular = particular.replace(m[0] ?? "", "");
   if (ref) particular = particular.replace(ref, "");
   particular = particular.replace(/\b(dr|cr|debit|credit)\b/gi, "").replace(/\s+/g, " ").trim();
-  if (isJunkLine(particular) || isBalanceLine(particular)) return null;
+  if (isBalanceLine(particular)) return null;
   const stamp = month || date.slice(0, 7);
   return {
     date,
     dateRaw,
     particular,
     ref,
-    debit,
-    credit,
-    amount: credit || debit,
-    dc: debit && !credit ? "D" : "C",
+    debit: withdrawal,
+    credit: deposit,
+    amount: deposit || withdrawal,
+    dc: withdrawal && !deposit ? "D" : deposit ? "C" : "",
     month: stamp,
     headers: CLEAN_HEADERS,
     cells: [
       dateRaw,
       particular,
       ref,
-      debit ? String(debit) : "",
-      credit ? String(credit) : "",
+      withdrawal ? String(withdrawal) : "",
+      deposit ? String(deposit) : "",
     ],
   };
+}
+
+function mappedRefFromLine(line: string, dateRaw: string) {
+  const withoutDate = dateRaw ? line.replace(dateRaw, "") : line;
+  return extractRef(withoutDate);
 }
 
 function slimRow(row: Partial<BankRow> | null): Partial<BankRow> | null {
