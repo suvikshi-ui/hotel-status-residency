@@ -363,10 +363,16 @@ export async function saveAccountNow(): Promise<
     else break;
   }
   if (phase === "synced" || phase === "migrated") return { ok: true };
-  return {
-    ok: false,
-    message: message || "Could not save to the hotel account.",
-  };
+  const raw = message || "Could not save to the hotel account.";
+  const m = raw.toLowerCase();
+  if (m.includes("permission denied") || m.includes("row-level security")) {
+    return {
+      ok: false,
+      message:
+        "Save cube could not write the hotel account (permission). Entries stay frozen on this desk. Open Profile → copy table SQL, run it, then press Save again.",
+    };
+  }
+  return { ok: false, message: raw };
 }
 
 export function requestCloudSave() {

@@ -3,6 +3,7 @@ import { normalizeComplaints, type RoomComplaint } from "./complaints";
 import { normalizeInventory, type InventoryItem } from "./inventory";
 import { MODES, uid } from "./format";
 import { getSupabase } from "./supabase";
+import { isMissingSchema, isSkippableSealError } from "./cloud-errors";
 import {
   hotelForCloud,
   hotelFromCloud,
@@ -117,19 +118,7 @@ function floorOf(v: unknown): RoomDef["floor"] {
   return (FLOORS as string[]).includes(f) ? (f as RoomDef["floor"]) : "Ground";
 }
 
-export function isMissingSchema(error: {
-  code?: string;
-  message?: string;
-} | null): boolean {
-  if (!error) return false;
-  const m = (error.message ?? "").toLowerCase();
-  return (
-    error.code === "PGRST205" ||
-    error.code === "42P01" ||
-    m.includes("schema cache") ||
-    (m.includes("could not find the table") && m.includes("public."))
-  );
-}
+export { isMissingSchema, isSkippableSealError } from "./cloud-errors";
 
 function isMissingColumn(
   error: { code?: string; message?: string } | null,
@@ -375,7 +364,7 @@ export async function pullLedger(userId: string): Promise<CloudPull> {
   if (inventory.error && !isMissingSchema(inventory.error)) {
     return asError(inventory.error);
   }
-  if (seals.error && !isMissingSchema(seals.error)) {
+  if (seals.error && !isSkippableSealError(seals.error)) {
     return asError(seals.error);
   }
   if (firstErr) return asError(firstErr);
@@ -459,7 +448,7 @@ export async function pullLedger(userId: string): Promise<CloudPull> {
     lockRev: lockRevFromMeta(row),
     sealedIds: mergeSealed(
       sealedFromHotel(hotelRaw),
-      isMissingSchema(seals.error)
+      isSkippableSealError(seals.error)
         ? {}
         : parseSealedIds((seals.data ?? []).map((r) => str((r as { id?: unknown }).id))),
     ),
@@ -626,7 +615,7 @@ async function pushSheetSeals(
     ids.map((id) => ({ user_id: userId, id })),
     { onConflict: "user_id,id" },
   );
-  if (error && !isMissingSchema(error)) return error;
+  if (error && !isSkippableSealError(error)) return error;
   return null;
 }
 

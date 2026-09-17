@@ -5,6 +5,7 @@ import {
   mergeRowsByDate,
   preferLocalOverCloud,
 } from "./cloud-save.ts";
+import { isMissingSchema, isSkippableSealError } from "./cloud-errors.ts";
 
 describe("cloud save", () => {
   it("keeps a just-saved local book instead of an older cloud copy", () => {
@@ -42,5 +43,44 @@ describe("cloud save", () => {
 
   it("picks the earlier opening date", () => {
     assert.equal(earlierDate("2026-09-06", "2026-09-01"), "2026-09-01");
+  });
+});
+
+describe("optional sheet seals", () => {
+  it("treats a missing sheet_seals table as skippable", () => {
+    assert.equal(
+      isMissingSchema({ code: "PGRST205", message: "Could not find the table" }),
+      true,
+    );
+    assert.equal(
+      isSkippableSealError({
+        code: "PGRST205",
+        message: "Could not find the table public.sheet_seals in the schema cache",
+      }),
+      true,
+    );
+  });
+
+  it("does not fail register save when sheet_seals is permission denied", () => {
+    assert.equal(
+      isSkippableSealError({
+        code: "42501",
+        message: "permission denied for table sheet_seals",
+      }),
+      true,
+    );
+    assert.equal(
+      isSkippableSealError({
+        message: "new row violates row-level security policy for table \"sheet_seals\"",
+      }),
+      true,
+    );
+  });
+
+  it("still fails a real guests permission error via the same helper only for seals", () => {
+    assert.equal(
+      isMissingSchema({ code: "42501", message: "permission denied for table guests" }),
+      false,
+    );
   });
 });

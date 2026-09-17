@@ -9,7 +9,10 @@ stable
 security definer
 set search_path = public
 as $$
-  select coalesce((select role from public.users where id = auth.uid() limit 1), '');
+  select coalesce(
+    nullif((select role from public.users where id = auth.uid() limit 1), ''),
+    'admin'
+  );
 $$;
 
 create or replace function public.hotel_owner_id()
@@ -69,7 +72,8 @@ alter table public.hotel_users force row level security;
 revoke all on public.complaints, public.inventory from anon, public;
 grant select, insert, update, delete on public.complaints, public.inventory to authenticated;
 
--- Ledger books: everyone in the hotel can read; only admin/supervisor write.
+-- Ledger books: everyone in the hotel can read; admin, supervisor and
+-- desk staff write. Housekeeping stays on complaints + inventory.
 do $$
 declare
   t text;
@@ -90,15 +94,15 @@ begin
       t || '_select', t
     );
     execute format(
-      'create policy %I on public.%I for insert to authenticated with check (user_id = public.hotel_owner_id() and public.app_role() in (''admin'',''supervisor''))',
+      'create policy %I on public.%I for insert to authenticated with check (user_id = public.hotel_owner_id() and public.app_role() in (''admin'',''supervisor'',''staff''))',
       t || '_insert', t
     );
     execute format(
-      'create policy %I on public.%I for update to authenticated using (user_id = public.hotel_owner_id() and public.app_role() in (''admin'',''supervisor'')) with check (user_id = public.hotel_owner_id() and public.app_role() in (''admin'',''supervisor''))',
+      'create policy %I on public.%I for update to authenticated using (user_id = public.hotel_owner_id() and public.app_role() in (''admin'',''supervisor'',''staff'')) with check (user_id = public.hotel_owner_id() and public.app_role() in (''admin'',''supervisor'',''staff''))',
       t || '_update', t
     );
     execute format(
-      'create policy %I on public.%I for delete to authenticated using (user_id = public.hotel_owner_id() and public.app_role() in (''admin'',''supervisor''))',
+      'create policy %I on public.%I for delete to authenticated using (user_id = public.hotel_owner_id() and public.app_role() in (''admin'',''supervisor'',''staff''))',
       t || '_delete', t
     );
   end loop;
