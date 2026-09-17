@@ -10,7 +10,6 @@ import {
   pullLedgerStamp,
   pruneFromBase,
   pushLedger,
-  upsertLedgerFromBackup,
   type LedgerSnapshot,
 } from "./supabase-db";
 import { ledgerOwnerKey, useLedger } from "./store";
@@ -601,42 +600,26 @@ export async function importBackupAndRefresh(
       savedAt: Date.now(),
     });
     writeStoredLocks(ledgerOwnerKey(), parseLockedDates(snap.lockedDates));
-    rememberPulled(snapshotFromStore(), new Date().toISOString());
-    lastHash = hashOf(snapshotFromStore());
+    const local = snapshotFromStore();
+    rememberPulled(local, new Date().toISOString());
+    lastHash = hashOf(local);
+    lastUserId = userId;
 
-    const role = useLedger.getState().appRole;
-    const pushed = await upsertLedgerFromBackup(userId, snap, role);
+    const pushed = await pushLedger(
+      userId,
+      { ...local, savedAt: local.savedAt ?? Date.now() },
+      undefined,
+      useLedger.getState().appRole,
+      undefined,
+    );
     if (!pushed.ok) {
       setPhase(pushed.missingSchema ? "missing-schema" : "error", pushed.message);
-      return { ok: true, cloud: false, message: pushed.message };
+      return { ok: false, message: pushed.message };
     }
+    claimAnonymousLedger(userId);
     lastCloudStamp = "";
-    lastPulled = null;
-    const pulled = await pullLedger(userId);
-    if (pulled.ok && pulled.kind === "data") {
-      const cloud = pulled.snapshot;
-      const local = snapshotFromStore();
-      if (
-        !preferLocalOverCloud({
-          localSavedAt: local.savedAt ?? 0,
-          cloudUpdatedAt: cloud.savedAt ?? 0,
-          localScore: ledgerActivityScore(local),
-          cloudScore: ledgerActivityScore(cloud),
-        })
-      ) {
-        clearLocalLedgerCache();
-        useLedger.getState().applyCloudBooks({
-          ...cloud,
-          lockedDates: parseLockedDates(cloud.lockedDates),
-          lockRev: parseLockRev(cloud.lockRev),
-          savedAt: cloud.savedAt ?? Date.now(),
-        });
-        writeStoredLocks(ledgerOwnerKey(), parseLockedDates(cloud.lockedDates));
-        claimAnonymousLedger(userId);
-        rememberPulled(snapshotFromStore(), cloud.cloudUpdatedAt);
-      }
-    }
     lastHash = hashOf(snapshotFromStore());
+    locksDirty = false;
     setPhase("synced");
     return { ok: true, cloud: true };
   } catch (err) {

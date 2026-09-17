@@ -15,6 +15,7 @@ import { useLedger } from "@/lib/store";
 import { HotelLogo } from "@/components/hotel-logo";
 import { CloudSchemaSetup } from "@/components/cloud-schema-setup";
 import { useStaffSession } from "@/lib/supabase-auth";
+import { SaveCube, useAccountSave } from "@/components/save-cube";
 import { useCloudSync, importBackupAndRefresh, saveAccountNow } from "@/lib/supabase-sync";
 import {
   backupCounts,
@@ -75,6 +76,7 @@ function BackupCard() {
   const { gate } = useGate();
   const guests = useLedger((s) => s.guests.length);
   const { user } = useStaffSession();
+  const { busy: saving, saveToServer } = useAccountSave();
   const [busy, setBusy] = useState<"file" | "import" | null>(null);
   const ownerId = user?.ownerId || user?.id || null;
 
@@ -116,17 +118,11 @@ function BackupCard() {
             void importBackupAndRefresh(ownerId, tables)
               .then((result) => {
                 if (!result.ok) {
-                  toast.error(result.message || "Could not import backup");
-                  return;
-                }
-                if (result.cloud === false) {
-                  toast.success(
-                    `Restored on this computer · ${n.guests} guests · ${n.dates[0] ?? "—"} to ${n.dates.at(-1) ?? "—"}. Open Daily register.`,
-                  );
+                  toast.error(result.message || "JSON account में सेव नहीं हुआ");
                   return;
                 }
                 toast.success(
-                  `Imported to the account · ${n.guests} guests · ${n.dates[0] ?? "—"} to ${n.dates.at(-1) ?? "—"}. Every desk now matches.`,
+                  `JSON account में सेव हो गया · ${n.guests} guests · ${n.dates[0] ?? "—"} to ${n.dates.at(-1) ?? "—"}. Refresh के बाद भी यही रहेगा.`,
                 );
               })
               .catch((err) => {
@@ -136,7 +132,7 @@ function BackupCard() {
           },
           {
             title: "Import this backup into the hotel account?",
-            message: `Rows in the file are added or updated in Supabase (${n.guests} guests, ${n.food} food, ${n.expenses} expenses). Existing rows keep their id — no duplicates. Then this computer reloads the account copy.`,
+            message: `This JSON will save into the hotel account (${n.guests} guests, ${n.food} food, ${n.expenses} expenses). After that, refresh will keep this copy.`,
             confirmLabel: "Import",
           },
         );
@@ -153,10 +149,9 @@ function BackupCard() {
       <CardHeader>
         <CardTitle>Backup</CardTitle>
         <p className="text-sm text-muted">
-          Download every table as a JSON file. Save file first writes the live
-          books to the hotel account, then downloads that same copy. Import puts
-          each table into the hotel account — existing rows update, new rows
-          add, nothing is duplicated — then all desks refresh from that copy.
+          Download JSON, import JSON, or Save to send the live books to the
+          hotel account. Import JSON सेव करके account में चढ़ा देता है —
+          refresh के बाद पुराना डेटा वापस नहीं आएगा.
         </p>
       </CardHeader>
       <CardContent className="flex flex-wrap items-center gap-3">
@@ -171,8 +166,12 @@ function BackupCard() {
           onClick={() => fileRef.current?.click()}
         >
           {busy === "import" ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
-          {busy === "import" ? "Importing…" : "Import backup"}
+          {busy === "import" ? "Saving to account…" : "Import JSON"}
         </Button>
+        <SaveCube
+          busy={saving || Boolean(busy)}
+          onSave={() => void saveToServer()}
+        />
         <input
           ref={fileRef}
           type="file"
