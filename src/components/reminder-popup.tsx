@@ -14,6 +14,7 @@ import {
   markReminderSeen,
   readSeenReminders,
   reminderSeenKey,
+  REPEAT_LABEL,
   todayIso,
 } from "@/lib/reminders";
 import { useLedger } from "@/lib/store";
@@ -45,12 +46,9 @@ export function ReminderPopup() {
             This is your reminder
           </DialogTitle>
           <DialogDescription>
-            {current ? formatDay(today) : ""}
-            {current?.repeat === "yearly"
-              ? " · yearly"
-              : current
-                ? " · monthly"
-                : ""}
+            {current
+              ? `${formatDay(today)} · ${REPEAT_LABEL[current.repeat]}`
+              : ""}
           </DialogDescription>
         </DialogHeader>
         <p className="text-base leading-relaxed text-fg">{current?.note}</p>

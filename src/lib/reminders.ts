@@ -1,6 +1,29 @@
 import { getDaysInMonth, isValid, parseISO } from "date-fns";
 
-export type ReminderRepeat = "monthly" | "yearly";
+export const REMINDER_REPEATS = [
+  "monthly",
+  "quarterly",
+  "half",
+  "yearly",
+  "manual",
+] as const;
+
+export type ReminderRepeat = (typeof REMINDER_REPEATS)[number];
+
+export const REPEAT_LABEL: Record<ReminderRepeat, string> = {
+  monthly: "Monthly",
+  quarterly: "Quarterly",
+  half: "Half year",
+  yearly: "Yearly",
+  manual: "Manual",
+};
+
+const REPEAT_MONTHS: Record<Exclude<ReminderRepeat, "manual">, number> = {
+  monthly: 1,
+  quarterly: 3,
+  half: 6,
+  yearly: 12,
+};
 
 export interface HotelReminder {
   id: string;
@@ -12,7 +35,9 @@ export interface HotelReminder {
 export const REMINDER_SEEN_KEY = "hsr-reminder-seen-v1";
 
 export function parseRepeat(value: unknown): ReminderRepeat {
-  return value === "yearly" ? "yearly" : "monthly";
+  return REMINDER_REPEATS.includes(value as ReminderRepeat)
+    ? (value as ReminderRepeat)
+    : "monthly";
 }
 
 export function normalizeReminders(raw: unknown): HotelReminder[] {
@@ -49,14 +74,20 @@ export function todayIso(): string {
   }).format(new Date());
 }
 
+function monthsApart(from: Date, to: Date) {
+  return (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth());
+}
+
 export function reminderIsDue(row: HotelReminder, iso: string): boolean {
-  if (!iso || iso < row.date) return false;
+  if (!iso) return false;
   const day = parseISO(iso);
   const start = parseISO(row.date);
   if (!isValid(day) || !isValid(start)) return false;
-  if (row.repeat === "yearly") {
-    return day.getMonth() === start.getMonth() && day.getDate() === start.getDate();
-  }
+  if (row.repeat === "manual") return iso === row.date;
+  if (iso < row.date) return false;
+  const gap = monthsApart(start, day);
+  const every = REPEAT_MONTHS[row.repeat];
+  if (gap < 0 || gap % every !== 0) return false;
   const target = Math.min(start.getDate(), getDaysInMonth(day));
   return day.getDate() === target;
 }

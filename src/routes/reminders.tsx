@@ -19,6 +19,8 @@ import { formatDay, uid } from "@/lib/format";
 import {
   parseRepeat,
   reminderIsDue,
+  REPEAT_LABEL,
+  REMINDER_REPEATS,
   todayIso,
   type HotelReminder,
   type ReminderRepeat,
@@ -63,7 +65,7 @@ function RemindersPage() {
       },
       {
         title: "Save this reminder?",
-        message: `${text} · ${formatDay(date)} · ${repeat}`,
+        message: `${text} · ${formatDay(date)} · ${REPEAT_LABEL[repeat]}`,
         confirmLabel: "Save",
       },
     );
@@ -97,6 +99,7 @@ function RemindersPage() {
           </h1>
           <p className="mt-1 text-sm text-muted">
             On that date the website will pop up: this is your reminder.
+            Monthly, quarterly, half year, yearly, or one manual date.
           </p>
         </div>
         <SaveCube busy={saving} onSave={() => void saveToServer()} />
@@ -106,12 +109,12 @@ function RemindersPage() {
         <CardHeader>
           <CardTitle>New reminder</CardTitle>
           <p className="text-sm text-muted">
-            Description, date, then monthly or yearly.
+            Description, then how often. Manual needs its own date.
           </p>
         </CardHeader>
         <CardContent>
           <form
-            className="grid gap-3 lg:grid-cols-[1fr_11rem_10rem_auto]"
+            className="grid gap-3 lg:grid-cols-[1fr_11rem_11rem_auto]"
             onSubmit={(e) => {
               e.preventDefault();
               addRow();
@@ -127,15 +130,6 @@ function RemindersPage() {
               />
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="reminder-date">Date</Label>
-              <Input
-                id="reminder-date"
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-              />
-            </div>
-            <div className="grid gap-1.5">
               <Label>Repeat</Label>
               <Select
                 value={repeat}
@@ -145,10 +139,24 @@ function RemindersPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="monthly">Monthly</SelectItem>
-                  <SelectItem value="yearly">Yearly</SelectItem>
+                  {REMINDER_REPEATS.map((kind) => (
+                    <SelectItem key={kind} value={kind}>
+                      {REPEAT_LABEL[kind]}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="reminder-date">
+                {repeat === "manual" ? "Date" : "Start date"}
+              </Label>
+              <Input
+                id="reminder-date"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
             </div>
             <div className="flex items-end">
               <Button type="submit" className="w-full">
@@ -187,7 +195,7 @@ function RemindersPage() {
                     <td className="px-3 py-2.5 tabular text-muted">
                       {formatDay(r.date)}
                     </td>
-                    <td className="px-3 py-2.5 capitalize">{r.repeat}</td>
+                    <td className="px-3 py-2.5">{REPEAT_LABEL[r.repeat]}</td>
                     <td className="px-3 py-2.5 text-right">
                       <Button
                         variant="ghost"
