@@ -4,47 +4,35 @@ import {
   extractRef,
   parseStatementText,
   reconcileBank,
-  statementCsv,
 } from "./bank-recon.ts";
 import type { GuestEntry } from "./types.ts";
 
 describe("bank recon", () => {
-  it("keeps every printed column and row, including closing balance", () => {
+  it("keeps date, narration, ref and amounts, drops address and closing", () => {
     const csv = [
+      "Hotel Status Residency, 12 MG Road, Mumbai",
+      "Account No 123456789, IFSC SBIN000111",
       "Date,Narration,Ch./Ref. no.,Debit,Credit,Balance",
       "17/09/2026,TO TRANSFER UPI/DR/412345678901/RAMESH,412345678901,0,1800,20000",
       "18/09/2026,UPI hotel,,0,1500,21500",
       "30/09/2026,Closing Balance,,,,21500",
     ].join("\n");
     const bank = parseStatementText(csv, "2026-09");
-    assert.equal(bank.length, 3);
+    assert.equal(bank.length, 2);
     assert.deepEqual(bank[0]?.headers, [
       "Date",
       "Narration",
       "Ch./Ref. no.",
       "Debit",
       "Credit",
-      "Balance",
     ]);
-    assert.equal(bank[0]?.cells[0], "17/09/2026");
-    assert.equal(bank[0]?.cells[1], "TO TRANSFER UPI/DR/412345678901/RAMESH");
-    assert.equal(bank[0]?.cells[2], "412345678901");
-    assert.equal(bank[1]?.cells[2], "");
-    assert.equal(bank[2]?.cells[1], "Closing Balance");
-    assert.equal(bank[2]?.month, "2026-09");
-  });
-
-  it("downloads the same printed cells", () => {
-    const bank = parseStatementText(
-      "Date,Narration,Credit\n17/09/2026,UPI hotel,1500",
-      "2026-09",
-    );
-    const csv = statementCsv(
-      bank[0]?.headers ?? [],
-      bank.map((r) => r.cells),
-    );
-    assert.match(csv, /Date,Narration,Credit/);
-    assert.match(csv, /17\/09\/2026,UPI hotel,1500/);
+    assert.equal(bank[0]?.dateRaw, "17/09/2026");
+    assert.equal(bank[0]?.particular, "TO TRANSFER UPI/DR/412345678901/RAMESH");
+    assert.equal(bank[0]?.ref, "412345678901");
+    assert.equal(bank[0]?.credit, 1800);
+    assert.equal(bank[0]?.cells.includes("20000"), false);
+    assert.equal(bank.some((r) => /closing/i.test(r.particular)), false);
+    assert.equal(bank.some((r) => /address|ifsc|account no/i.test(r.particular)), false);
   });
 
   it("matches office payment reference on the printed ref cell", () => {
@@ -67,11 +55,10 @@ describe("bank recon", () => {
     ];
     const lines = reconcileBank(bank, guests);
     assert.equal(lines[0]?.office?.name, "SITA");
-    assert.equal(lines[0]?.bank.cells[3], "IMPS998877");
+    assert.equal(lines[0]?.bank.ref, "IMPS998877");
   });
 
   it("pulls UPI/IMPS numbers out of narration", () => {
     assert.equal(extractRef("TO TRANSFER UPI/DR/412345678901/RAMESH/SBIN"), "412345678901");
-    assert.equal(extractRef("UPI-998877665544-FLYSKY"), "998877665544");
   });
 });

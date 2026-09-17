@@ -16,7 +16,7 @@ import {
   statementTextFromPdf,
   type BankRow,
 } from "@/lib/bank-recon";
-import { formatDayShort } from "@/lib/format";
+import { formatDayShort, money } from "@/lib/format";
 import { useLedger } from "@/lib/store";
 
 export const Route = createFileRoute("/bank-recon")({
@@ -42,7 +42,6 @@ function BankReconPage() {
     () => reconcileBank(monthRows, guests),
     [monthRows, guests],
   );
-  const headers = monthRows[0]?.headers?.filter(Boolean) ?? [];
   const matched = lines.filter((l) => l.office);
   const unmatched = lines.filter((l) => !l.office);
 
@@ -92,10 +91,15 @@ function BankReconPage() {
       toast.error("No statement to download");
       return;
     }
-    const cols = headers.length ? headers : ["Statement"];
     const csv = statementCsv(
-      cols,
-      monthRows.map((r) => (r.cells.length ? r.cells : [r.dateRaw, r.particular, r.ref])),
+      ["Date", "Narration", "Ch./Ref. no.", "Debit", "Credit"],
+      monthRows.map((r) => [
+        r.dateRaw || r.cells[0] || "",
+        r.particular || r.cells[1] || "",
+        r.ref || r.cells[2] || "",
+        r.debit ? String(r.debit) : "",
+        r.credit ? String(r.credit) : "",
+      ]),
     );
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -117,8 +121,8 @@ function BankReconPage() {
             Bank recon
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Bank statement is uploaded and downloaded as printed. No columns are
-            changed.
+            Date, Narration, Ch./Ref. no., Debit and Credit only. Address and
+            closing balance are not uploaded.
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
@@ -189,10 +193,7 @@ function BankReconPage() {
           <table className="w-full min-w-[64rem] text-left text-sm">
             <thead className="text-xs uppercase tracking-wide text-muted">
               <tr className="border-y border-border bg-bg-warm/50">
-                <th
-                  className="px-5 py-2 font-medium"
-                  colSpan={Math.max(headers.length, 1)}
-                >
+                <th className="px-5 py-2 font-medium" colSpan={5}>
                   Bank statement
                 </th>
                 <th className="px-3 py-2 font-medium" colSpan={3}>
@@ -200,11 +201,11 @@ function BankReconPage() {
                 </th>
               </tr>
               <tr className="border-b border-border">
-                {(headers.length ? headers : ["Statement"]).map((h) => (
-                  <th key={h} className="px-3 py-2 font-medium first:px-5">
-                    {h}
-                  </th>
-                ))}
+                <th className="px-5 py-2 font-medium">Date</th>
+                <th className="px-3 py-2 font-medium">Narration</th>
+                <th className="px-3 py-2 font-medium">Ch./Ref. no.</th>
+                <th className="px-3 py-2 text-right font-medium">Debit</th>
+                <th className="px-3 py-2 text-right font-medium">Credit</th>
                 <th className="px-3 py-2 font-medium">Yes/No</th>
                 <th className="px-3 py-2 font-medium">Office date</th>
                 <th className="px-3 py-2 font-medium">Office entry</th>
@@ -213,11 +214,21 @@ function BankReconPage() {
             <tbody>
               {lines.map((line) => (
                 <tr key={line.bank.id} className="border-b border-border/70">
-                  {(headers.length ? headers : ["Statement"]).map((h, i) => (
-                    <td key={h} className="px-3 py-2.5 first:px-5">
-                      {line.bank.cells[i] || "—"}
-                    </td>
-                  ))}
+                  <td className="px-5 py-2.5 tabular">
+                    {line.bank.dateRaw || line.bank.cells[0] || "—"}
+                  </td>
+                  <td className="px-3 py-2.5">
+                    {line.bank.particular || line.bank.cells[1] || "—"}
+                  </td>
+                  <td className="px-3 py-2.5 font-mono text-xs">
+                    {line.bank.ref || line.bank.cells[2] || "—"}
+                  </td>
+                  <td className="px-3 py-2.5 text-right tabular">
+                    {line.bank.debit ? money(line.bank.debit) : "—"}
+                  </td>
+                  <td className="px-3 py-2.5 text-right tabular">
+                    {line.bank.credit ? money(line.bank.credit) : "—"}
+                  </td>
                   <td className="px-3 py-2.5">
                     <Badge variant={line.office ? "ok" : "muted"}>
                       {line.office ? "Yes" : "No"}

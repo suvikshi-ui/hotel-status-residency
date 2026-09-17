@@ -217,6 +217,7 @@ const CREDIT_HEAD = /^(credit|cr|deposit|cr amount|amount credited)$/i;
 const DEBIT_HEAD = /^(debit|dr|withdrawal|wdl|dr amount|amount debited)$/i;
 const REF_HEAD = /ch\.?\s*\/?\s*ref|^ref$|ref\.?\s*no|cheque|chq|reference/i;
 const DC_HEAD = /^(d\/c|dr\/cr|type)$/i;
+const CLEAN_HEADERS = ["Date", "Narration", "Ch./Ref. no.", "Debit", "Credit"];
 
 export function parseStatementText(text: string, month = ""): BankRow[] {
   const raw = asText(text).replace(/^\uFEFF/, "");
@@ -225,14 +226,18 @@ export function parseStatementText(text: string, month = ""): BankRow[] {
   if (!lines.length) return [];
   const grid = findGrid(lines);
   return normalizeBankRows(
-    grid.body.map((line) => {
+    (grid ? grid.body : lines).map((line) => {
       try {
-        const cells = padCells(
-          splitRow(line, grid.delim).map((c) => asText(c)),
-          grid.headers.length,
-        );
-        if (!cells.some(Boolean)) return null;
-        return rowFromGrid(grid.headers, cells, month);
+        if (isJunkLine(line)) return null;
+        if (grid) {
+          const cells = padCells(
+            splitRow(line, grid.delim).map((c) => asText(c)),
+            grid.headers.length,
+          );
+          if (!cells.some(Boolean)) return null;
+          return slimRow(rowFromGrid(grid.headers, cells, month));
+        }
+        return slimRow(rowFromLoose(line, month));
       } catch {
         return null;
       }
@@ -241,55 +246,139 @@ export function parseStatementText(text: string, month = ""): BankRow[] {
 }
 
 function findGrid(lines: string[]) {
-  const limit = Math.min(lines.length, 40);
+  const limit = Math.min(lines.length, 50);
   for (let i = 0; i < limit; i++) {
+    if (isJunkLine(lines[i] ?? "")) continue;
     const delim = guessDelim(lines[i] ?? "");
+    if (!delim) continue;
     const headers = splitRow(lines[i] ?? "", delim).map((c) => asText(c));
-    if (headers.length >= 2 && headers.some((h) => DATE_HEAD.test(h) || NARR_HEAD.test(h) || REF_HEAD.test(h))) {
+    const mapped = mapHeaders(headers);
+    if (mapped.date >= 0 && (mapped.debit >= 0 || mapped.credit >= 0 || mapped.particular >= 0)) {
       return { index: i, delim, headers, body: lines.slice(i + 1) };
     }
   }
-  const delim = guessDelim(lines[0] ?? "");
-  const first = splitRow(lines[0] ?? "", delim);
-  if (first.length >= 3 && delim !== "") {
-    return {
-      index: 0,
-      delim,
-      headers: first.map((c, i) => asText(c) || `Col ${i + 1}`),
-      body: lines.slice(1),
-    };
-  }
-  return {
-    index: -1,
-    delim: "\t",
-    headers: ["Statement"],
-    body: lines,
-  };
+  return null;
 }
 
-function rowFromGrid(headers: string[], cells: string[], month: string): Partial<BankRow> {
+function rowFromGrid(headers: string[], cells: string[], month: string): Partial<BankRow> | null {
   const mapped = mapHeaders(headers);
-  const dateRaw = mapped.date >= 0 ? cells[mapped.date] ?? "" : cells[0] ?? "";
+  const dateRaw = mapped.date >= 0 ? cells[mapped.date] ?? "" : "";
   const date = parseLooseDate(dateRaw);
+  if (!date) return null;
   const particular = mapped.particular >= 0 ? cells[mapped.particular] ?? "" : "";
+  if (isJunkLine(particular) || isBalanceLine(particular)) return null;
   const ref = mapped.ref >= 0 ? cells[mapped.ref] ?? "" : "";
-  const debit = mapped.debit >= 0 ? parseAmount(cells[mapped.debit] ?? "") : 0;
-  const credit = mapped.credit >= 0 ? parseAmount(cells[mapped.credit] ?? "") : 0;
-  const dc = mapped.dc >= 0 ? cells[mapped.dc] ?? "" : "";
+  const debitRaw = mapped.debit >= 0 ? cells[mapped.debit] ?? "" : "";
+  const creditRaw = mapped.credit >= 0 ? cells[mapped.credit] ?? "" : "";
+  const debit = parseAmount(debitRaw);
+  const credit = parseAmount(creditRaw);
+  if (!debit && !credit) return null;
   const stamp = month || date.slice(0, 7);
   return {
-    date: date || (stamp ? `${stamp}-01` : ""),
+    date,
     dateRaw,
     particular,
     ref,
     debit,
     credit,
     amount: credit || debit,
-    dc,
+    dc: debit && !credit ? "D" : credit ? "C" : "",
     month: stamp,
-    headers,
-    cells,
+    headers: CLEAN_HEADERS,
+    cells: [
+      dateRaw,
+      particular,
+      ref,
+      debit ? debitRaw || String(debit) : "",
+      credit ? creditRaw || String(credit) : "",
+    ],
   };
+}
+
+function rowFromLoose(line: string, month: string): Partial<BankRow> | null {
+  if (isBalanceLine(line) || isJunkLine(line)) return null;
+  const date = parseLooseDate(line);
+  if (!date) return null;
+  const dateRaw = (line.match(
+    /\b(?:\d{1,2}[\s\-\/.](?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[\s\-\/.,]+\d{2,4}|\d{4}[\/\-.]\d{1,2}[\/\-.]\d{1,2}|\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4})\b/i,
+  ) ?? [""])[0];
+  const amounts = [...line.matchAll(/(?:\u20B9\s*)?(\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|\d+\.\d{1,2})/g)];
+  if (!amounts.length) return null;
+  const txn = amounts.length >= 2 ? amounts.slice(0, -1) : amounts;
+  const values = txn.map((m) => parseAmount(m[0] ?? "")).filter((n) => n);
+  let debit = 0;
+  let credit = 0;
+  if (values.length >= 2) {
+    debit = values[0] ?? 0;
+    credit = values[1] ?? 0;
+  } else if (/\b(dr|debit|wdl|withdrawal)\b/i.test(line)) {
+    debit = values[0] ?? 0;
+  } else {
+    credit = values[0] ?? 0;
+  }
+  if (!debit && !credit) return null;
+  const ref = extractRef(line);
+  let particular = line;
+  if (dateRaw) particular = particular.replace(dateRaw, "");
+  for (const m of amounts) particular = particular.replace(m[0] ?? "", "");
+  if (ref) particular = particular.replace(ref, "");
+  particular = particular.replace(/\b(dr|cr|debit|credit)\b/gi, "").replace(/\s+/g, " ").trim();
+  if (isJunkLine(particular) || isBalanceLine(particular)) return null;
+  const stamp = month || date.slice(0, 7);
+  return {
+    date,
+    dateRaw,
+    particular,
+    ref,
+    debit,
+    credit,
+    amount: credit || debit,
+    dc: debit && !credit ? "D" : "C",
+    month: stamp,
+    headers: CLEAN_HEADERS,
+    cells: [
+      dateRaw,
+      particular,
+      ref,
+      debit ? String(debit) : "",
+      credit ? String(credit) : "",
+    ],
+  };
+}
+
+function slimRow(row: Partial<BankRow> | null): Partial<BankRow> | null {
+  if (!row) return null;
+  return {
+    ...row,
+    headers: CLEAN_HEADERS,
+    cells: [
+      asText(row.dateRaw),
+      asText(row.particular),
+      asText(row.ref),
+      row.debit ? asText(row.cells?.[3]) || String(row.debit) : "",
+      row.credit ? asText(row.cells?.[4]) || String(row.credit) : "",
+    ],
+  };
+}
+
+function isBalanceLine(text: string) {
+  const t = asText(text);
+  return (
+    /\b(opening|closing)\s+balance\b/i.test(t) ||
+    /\bbalance\s*(b\/f|c\/f|bd|cd|brought|carried)\b/i.test(t) ||
+    /\b(brought|carried)\s+forward\b/i.test(t) ||
+    /^(opening|closing|available|balance|total)\b/i.test(t)
+  );
+}
+
+function isJunkLine(text: string) {
+  const t = asText(text);
+  if (!t) return true;
+  return (
+    /\b(address|ifsc|branch|customer|page\s*\d|statement of|gstin|cin\b|email|e-mail|phone|mobile|pincode|pin code|account\s*(no|number|name)|registered office)\b/i.test(
+      t,
+    ) || isBalanceLine(t)
+  );
 }
 
 function padCells(cells: string[], width: number) {
