@@ -3,6 +3,8 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useLedger } from "@/lib/store";
 import { saveAccountNow } from "@/lib/supabase-sync";
+import { isPermissionMessage } from "@/lib/cloud-errors";
+import { copyDeskSaveSql } from "@/components/account-write-fix";
 
 export function SaveCube({
   pending,
@@ -54,7 +56,12 @@ export function useAccountSave() {
     try {
       const result = await saveAccountNow();
       if (result.ok) toast.success(okMessage);
-      else toast.error(result.message);
+      else if (isPermissionMessage(result.message)) {
+        void copyDeskSaveSql();
+        toast.error(
+          "Account write is blocked. SQL copied — paste in the SQL editor, press Run, then Save again.",
+        );
+      } else toast.error(result.message);
     } finally {
       setBusy(false);
     }

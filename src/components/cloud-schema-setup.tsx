@@ -10,6 +10,7 @@ import rlsSql from "../../supabase/migrations/0005_rls_strong.sql?raw";
 import locksSql from "../../supabase/migrations/0006_opening_locks.sql?raw";
 import sealsSql from "../../supabase/migrations/0007_sheet_seals.sql?raw";
 import staffSaveSql from "../../supabase/migrations/0008_staff_register_save.sql?raw";
+import deskSaveSql from "../../supabase/migrations/0009_desk_can_save.sql?raw";
 
 export function CloudSchemaSetup({ userId }: { userId?: string | null }) {
   const [retrying, setRetrying] = useState(false);
@@ -20,7 +21,7 @@ export function CloudSchemaSetup({ userId }: { userId?: string | null }) {
         type="button"
         onClick={() => {
           void navigator.clipboard.writeText(
-            `${ledgerSql}\n\n${usersSql}\n\n${appUsersSql}\n\n${rlsSql}\n\n${locksSql}\n\n${sealsSql}\n\n${staffSaveSql}`,
+            `${ledgerSql}\n\n${usersSql}\n\n${appUsersSql}\n\n${rlsSql}\n\n${locksSql}\n\n${sealsSql}\n\n${staffSaveSql}\n\n${deskSaveSql}`,
           ).then(
             () =>
               toast.success(

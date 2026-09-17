@@ -19,6 +19,7 @@ import { useLedger } from "@/lib/store";
 import { isDayLocked } from "@/lib/register-lock";
 import { requestCloudPullNow } from "@/lib/supabase-sync";
 import { SaveCube, useAccountSave } from "@/components/save-cube";
+import { AccountWriteFix } from "@/components/account-write-fix";
 import { isSealed, sealKey, unsealedKeys } from "@/lib/sheet-seal";
 
 export const Route = createFileRoute("/register")({ component: RegisterPage });
@@ -76,6 +77,7 @@ function RegisterPage() {
 
   return (
     <div className="flex flex-col gap-5">
+        <AccountWriteFix />
         <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
         <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">

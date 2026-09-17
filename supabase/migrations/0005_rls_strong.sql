@@ -94,15 +94,15 @@ begin
       t || '_select', t
     );
     execute format(
-      'create policy %I on public.%I for insert to authenticated with check (user_id = public.hotel_owner_id() and public.app_role() in (''admin'',''supervisor'',''staff''))',
+      'create policy %I on public.%I for insert to authenticated with check (user_id = public.hotel_owner_id() or user_id = auth.uid())',
       t || '_insert', t
     );
     execute format(
-      'create policy %I on public.%I for update to authenticated using (user_id = public.hotel_owner_id() and public.app_role() in (''admin'',''supervisor'',''staff'')) with check (user_id = public.hotel_owner_id() and public.app_role() in (''admin'',''supervisor'',''staff''))',
+      'create policy %I on public.%I for update to authenticated using (user_id = public.hotel_owner_id() or user_id = auth.uid()) with check (user_id = public.hotel_owner_id() or user_id = auth.uid())',
       t || '_update', t
     );
     execute format(
-      'create policy %I on public.%I for delete to authenticated using (user_id = public.hotel_owner_id() and public.app_role() in (''admin'',''supervisor'',''staff''))',
+      'create policy %I on public.%I for delete to authenticated using (user_id = public.hotel_owner_id() or user_id = auth.uid())',
       t || '_delete', t
     );
   end loop;
