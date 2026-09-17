@@ -164,10 +164,10 @@ function pickOffice(
 
 const DATE_HEAD = /^(txn |value |posting )?date|txn.?dt/i;
 const NARR_HEAD = /narrat|desc|particular|remark|detail|info/i;
-const CREDIT_HEAD = /^(credit|cr|deposit|cr amount)$/i;
-const DEBIT_HEAD = /^(debit|dr|withdrawal|wdl|dr amount)$/i;
-const REF_HEAD = /ref|cheque|chq|utr|txn.?id|transaction.?id|payment.?ref|rrn/i;
-const SKIP_HEAD = /balance|closing|opening|available/;
+const CREDIT_HEAD = /^(credit|cr|deposit|cr amount|amount credited)$/i;
+const DEBIT_HEAD = /^(debit|dr|withdrawal|wdl|dr amount|amount debited)$/i;
+const REF_HEAD = /ch\.?\s*\/?\s*ref|cheque|chq|utr|txn.?id|transaction.?id|payment.?ref|rrn|reference/i;
+const SKIP_HEAD = /closing|opening|available|running|^balance$/i;
 
 export function parseStatementText(text: string): BankRow[] {
   const raw = text.replace(/^\uFEFF/, "").trim();
@@ -298,9 +298,19 @@ function sideOf(text: string): "debit" | "credit" | "" {
 }
 
 function isBalanceLine(text: string) {
-  return /\b(opening|closing)\b|\bbalance\s*(b\/f|c\/f|bd|cd|brought|carried)?\b/i.test(
-    text,
+  return (
+    /\b(opening|closing|available)\s+balance\b/i.test(text) ||
+    /\bbalance\s*(b\/f|c\/f|bd|cd|brought|carried)\b/i.test(text) ||
+    /\b(brought|carried)\s+forward\b/i.test(text) ||
+    /^(opening|closing|available|balance|total)\b/i.test(text.trim())
   );
+}
+
+export function dcOf(row: Pick<BankRow, "debit" | "credit">) {
+  if (row.debit && !row.credit) return "D";
+  if (row.credit && !row.debit) return "C";
+  if (row.debit && row.credit) return row.debit >= row.credit ? "D" : "C";
+  return "";
 }
 
 function extractRef(text: string) {

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { SaveCube, useAccountSave } from "@/components/save-cube";
 import { useGate } from "@/components/security-gate";
 import {
+  dcOf,
   mergeBankRows,
   parseStatementText,
   reconcileBank,
@@ -98,8 +99,8 @@ function BankReconPage() {
             Bank recon
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Upload the monthly bank statement. Matching payment reference numbers
-            fill the office entry date automatically.
+            Upload only Date, Narration, Ch./Ref. no., Debit and Credit.
+            Closing balance is not uploaded.
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
@@ -159,31 +160,32 @@ function BankReconPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="overflow-x-auto p-0">
-          <table className="w-full min-w-[72rem] text-left text-sm">
+          <table className="w-full min-w-[70rem] text-left text-sm">
             <thead className="text-xs uppercase tracking-wide text-muted">
               <tr className="border-y border-border bg-bg-warm/50">
-                <th className="px-5 py-2 font-medium" colSpan={5}>
+                <th className="px-5 py-2 font-medium" colSpan={7}>
                   Bank statement
                 </th>
-                <th className="px-3 py-2 font-medium" colSpan={5}>
+                <th className="px-3 py-2 font-medium" colSpan={2}>
                   Entry in office
                 </th>
               </tr>
               <tr className="border-b border-border">
                 <th className="px-5 py-2 font-medium">Date</th>
-                <th className="px-3 py-2 font-medium">Particular</th>
-                <th className="px-3 py-2 font-medium">Reference no.</th>
-                <th className="px-3 py-2 text-right font-medium">Debit</th>
-                <th className="px-3 py-2 text-right font-medium">Credit</th>
+                <th className="px-3 py-2 font-medium">Narration</th>
+                <th className="px-3 py-2 font-medium">Ch./Ref. no.</th>
+                <th className="px-3 py-2 font-medium">D/C</th>
+                <th className="px-3 py-2 text-right font-medium">Amount Debited</th>
+                <th className="px-3 py-2 text-right font-medium">Amount Credited</th>
+                <th className="px-3 py-2 font-medium">Yes/No</th>
                 <th className="px-3 py-2 font-medium">Office date</th>
                 <th className="px-3 py-2 font-medium">Office entry</th>
-                <th className="px-3 py-2 font-medium">Reference no.</th>
-                <th className="px-3 py-2 text-right font-medium">Debit</th>
-                <th className="px-3 py-2 text-right font-medium">Credit</th>
               </tr>
             </thead>
             <tbody>
-              {lines.map((line) => (
+              {lines.map((line) => {
+                const side = dcOf(line.bank);
+                return (
                 <tr key={line.bank.id} className="border-b border-border/70">
                   <td className="px-5 py-2.5 tabular text-muted">
                     {formatDayShort(line.bank.date)}
@@ -192,11 +194,17 @@ function BankReconPage() {
                   <td className="px-3 py-2.5 font-mono text-xs">
                     {line.bank.ref || "—"}
                   </td>
+                  <td className="px-3 py-2.5 font-medium">{side || "—"}</td>
                   <td className="px-3 py-2.5 text-right tabular">
                     {line.bank.debit ? money(line.bank.debit) : "—"}
                   </td>
                   <td className="px-3 py-2.5 text-right tabular">
                     {line.bank.credit ? money(line.bank.credit) : "—"}
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <Badge variant={line.office ? "ok" : "muted"}>
+                      {line.office ? "Yes" : "No"}
+                    </Badge>
                   </td>
                   {line.office ? (
                     <>
@@ -206,29 +214,23 @@ function BankReconPage() {
                       <td className="px-3 py-2.5">
                         <div className="font-medium">{line.office.name}</div>
                         <div className="text-xs text-muted">
-                          {line.office.source || "Office entry"}
+                          {line.office.source || line.office.ref}
                         </div>
-                      </td>
-                      <td className="px-3 py-2.5 font-mono text-xs">
-                        {line.office.ref}
-                      </td>
-                      <td className="px-3 py-2.5 text-right tabular">—</td>
-                      <td className="px-3 py-2.5 text-right tabular">
-                        {money(line.office.amount)}
                       </td>
                     </>
                   ) : (
-                    <td className="px-3 py-2.5 text-muted" colSpan={5}>
-                      No office entry yet
+                    <td className="px-3 py-2.5 text-muted" colSpan={2}>
+                      —
                     </td>
                   )}
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
             {lines.length ? (
               <tfoot>
                 <tr className="border-t border-border bg-bg-warm/40 font-medium">
-                  <td className="px-5 py-2.5" colSpan={3}>
+                  <td className="px-5 py-2.5" colSpan={4}>
                     Total
                   </td>
                   <td className="px-3 py-2.5 text-right tabular">
@@ -237,7 +239,7 @@ function BankReconPage() {
                   <td className="px-3 py-2.5 text-right tabular">
                     {money(creditTotal)}
                   </td>
-                  <td colSpan={5} />
+                  <td colSpan={3} />
                 </tr>
               </tfoot>
             ) : null}

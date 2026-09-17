@@ -20,6 +20,20 @@ describe("bank recon", () => {
     assert.equal(bank.some((r) => /closing/i.test(r.particular)), false);
   });
 
+  it("does not upload opening or closing balance rows", () => {
+    const csv = [
+      "Date,Narration,Ch./Ref. no.,Debit,Credit,Closing Balance",
+      "01/09/2026,Opening Balance,,, ,12000",
+      "02/09/2026,UPI hotel,UPI1111222233,0,1500,13500",
+      "30/09/2026,Closing Balance,,,,13500",
+    ].join("\n");
+    const bank = parseStatementText(csv);
+    assert.equal(bank.length, 1);
+    assert.equal(bank[0]?.particular, "UPI hotel");
+    assert.equal(bank[0]?.ref, "UPI1111222233");
+    assert.equal(bank[0]?.credit, 1500);
+  });
+
   it("matches office payment reference on the credit", () => {
     const bank = parseStatementText(
       "Date,Particulars,Credit,Ref\n17-09-2026,IMPS Flysky,2200,IMPS998877",
