@@ -9,6 +9,7 @@ import {
   sealedFromHotel,
   unsealedKeys,
   withSealed,
+  omitSealed,
 } from "./sheet-seal.ts";
 
 describe("sheet seals", () => {
@@ -42,5 +43,10 @@ describe("sheet seals", () => {
     assert.equal(sealedFromHotel({ name: "HSR" }), undefined);
     assert.deepEqual(mergeSealed({ a: true }, { b: true }), { a: true, b: true });
     assert.deepEqual(parseSealedIds(["guest:g-1", ""]), { "guest:g-1": true });
+  });
+
+  it("clears tombstones for rows brought back by a JSON backup", () => {
+    const gone = withSealed({}, [sealKey.guest("g6"), sealKey.food("f1")]);
+    assert.deepEqual(omitSealed(gone, [sealKey.guest("g6")]), { "food:f1": true });
   });
 });

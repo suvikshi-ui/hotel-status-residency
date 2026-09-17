@@ -17,6 +17,7 @@ import {
 } from "./register-lock";
 import {
   mergeSealed,
+  omitSealed,
   parseSealedIds,
   sealedFromHotel,
   deletedFromHotel,
@@ -212,6 +213,9 @@ export function snapshotFromUnknown(
     lockedDates,
     lockRev,
     sealedIds: mergeSealed(sealedFromHotel(p.hotel), parseSealedIds(p.sealedIds)),
+    deletedIds: parseSealedIds(
+      (p as { deletedIds?: unknown }).deletedIds ?? deletedFromHotel(p.hotel),
+    ),
     inventory: normalizeInventory(
       (p as { inventory?: InventoryItem[] }).inventory ?? fallback.inventory,
     ),
@@ -847,9 +851,15 @@ export async function upsertLedgerFromBackup(
       rev: lockRevFromHotel(hotelRaw) ?? {},
     },
   );
-  const gone = mergeSealed(
-    parseSealedIds(snap.deletedIds),
-    deletedFromHotel(hotelRaw),
+  const gone = omitSealed(
+    mergeSealed(parseSealedIds(snap.deletedIds), deletedFromHotel(hotelRaw)),
+    [
+      ...snap.guests.map((row) => sealKey.guest(row.id)),
+      ...snap.food.map((row) => sealKey.food(row.id)),
+      ...snap.wholesale.map((row) => sealKey.wholesale(row.id)),
+      ...snap.expenses.map((row) => sealKey.expense(row.id)),
+      ...snap.balReceived.map((row) => sealKey.balance(row.id)),
+    ],
   );
   const seals = mergeSealed(
     parseSealedIds(snap.sealedIds),

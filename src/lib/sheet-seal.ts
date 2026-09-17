@@ -46,6 +46,14 @@ export function withSealed(sealed: SealedIds | undefined, keys: string[]): Seale
   return next;
 }
 
+export function omitSealed(sealed: SealedIds | undefined, keys: string[]): SealedIds {
+  const next = { ...(sealed ?? {}) };
+  for (const key of keys) {
+    if (key) delete next[key];
+  }
+  return next;
+}
+
 export function unsealedKeys(keys: string[], sealed: SealedIds | undefined) {
   return keys.filter((key) => key && !sealed?.[key]);
 }
