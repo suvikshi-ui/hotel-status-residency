@@ -104,6 +104,7 @@ function ModeLineCard({
               <ModeBadge mode={r.mode} />
               <div className="flex items-center gap-1">
                 <span className="tabular text-sm font-medium">{money(r.amount)}</span>
+                {addDisabled ? null : (
                 <Button
                   variant="outline"
                   size="sm"
@@ -114,6 +115,7 @@ function ModeLineCard({
                   <Trash2 className="size-4" />
                   Delete
                 </Button>
+                )}
               </div>
             </li>
           ))}
@@ -227,6 +229,7 @@ function ExpenseLineCard({
               </div>
               <div className="flex items-center gap-1">
                 <span className="tabular text-sm font-medium">{money(r.amount)}</span>
+                {addDisabled ? null : (
                 <Button
                   variant="outline"
                   size="sm"
@@ -237,6 +240,7 @@ function ExpenseLineCard({
                   <Trash2 className="size-4" />
                   Delete
                 </Button>
+                )}
               </div>
             </li>
           ))}
@@ -254,9 +258,11 @@ function ExpenseLineCard({
 function ReceiptList({
   rows,
   onRemove,
+  locked,
 }: {
   rows: NamedAmount[];
   onRemove: (id: string) => void;
+  locked?: boolean;
 }) {
   if (rows.length === 0) {
     return <p className="text-sm text-muted">No collections today.</p>;
@@ -273,6 +279,7 @@ function ReceiptList({
           </div>
           <div className="flex items-center gap-1">
             <span className="tabular text-sm font-medium">{money(r.amount)}</span>
+            {locked ? null : (
             <Button
               variant="outline"
               size="sm"
@@ -283,6 +290,7 @@ function ReceiptList({
               <Trash2 className="size-4" />
               Delete
             </Button>
+            )}
           </div>
         </li>
       ))}
@@ -505,6 +513,7 @@ export function RegisterLines() {
             <Button type="submit">Collect from source</Button>
             <ReceiptList
               rows={dueRows}
+              locked={locked}
               onRemove={(id) =>
                 gate(() => removeBal(id, { bypass: true }), {
                   title: "Delete this collection?",
@@ -582,6 +591,7 @@ export function RegisterLines() {
             <Button type="submit">Collect online</Button>
             <ReceiptList
               rows={otaRows}
+              locked={locked}
               onRemove={(id) =>
                 gate(() => removeBal(id, { bypass: true }), {
                   title: "Delete this collection?",

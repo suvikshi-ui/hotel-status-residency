@@ -51,6 +51,10 @@ function RegisterPage() {
     setEditingId(null);
   }, [date]);
 
+  useEffect(() => {
+    if (locked) setEditingId(null);
+  }, [locked]);
+
   const editing = allGuests.find((g) => g.id === editingId) ?? null;
 
   const filtered = useMemo(() => {
@@ -81,7 +85,7 @@ function RegisterPage() {
         </p>
         <p className="mt-1 text-sm text-muted">
           {guests.length} postings · {money(take.roomsTotal)} room revenue ·
-          Edit / Delete need the security code. Then press Save.
+          Edit / Delete when unlocked. Lock hides them. Then press Save.
         </p>
         </div>
         <div className="flex flex-wrap gap-2 print:hidden">
@@ -247,6 +251,8 @@ function RegisterPage() {
                   <td className="px-3 py-2">
                     {g.stay === "out" ? (
                       <Badge variant="muted">Out</Badge>
+                    ) : locked ? (
+                      <Badge variant="muted">Continue</Badge>
                     ) : (
                       <Button
                         type="button"
@@ -269,6 +275,7 @@ function RegisterPage() {
                     )}
                   </td>
                   <td className="px-3 py-2.5 text-right">
+                    {locked ? null : (
                     <div className="flex justify-end gap-1 print:hidden">
                       <Button
                         variant="outline"
@@ -312,6 +319,7 @@ function RegisterPage() {
                         Delete
                       </Button>
                     </div>
+                    )}
                   </td>
                 </tr>
                 );
