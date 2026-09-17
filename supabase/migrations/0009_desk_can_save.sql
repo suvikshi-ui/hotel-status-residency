@@ -1,7 +1,12 @@
 -- Fix: permission denied for table ledger_meta
 -- Do not read public.users.owner_id — that column is missing on this hotel.
 
+-- Fix: permission denied for table rooms / ledger_meta
+-- GRANT ALL first. Do not touch public.users.owner_id.
+
 grant usage on schema public to authenticated;
+grant select, insert, update, delete on all tables in schema public to authenticated;
+grant usage, select on all sequences in schema public to authenticated;
 
 do $$
 declare t text;
