@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { parseStatementText, reconcileBank } from "./bank-recon.ts";
+import { extractRef, parseStatementText, reconcileBank } from "./bank-recon.ts";
 import type { GuestEntry } from "./types.ts";
 
 describe("bank recon", () => {
@@ -32,6 +32,24 @@ describe("bank recon", () => {
     assert.equal(bank[0]?.particular, "UPI hotel");
     assert.equal(bank[0]?.ref, "UPI1111222233");
     assert.equal(bank[0]?.credit, 1500);
+  });
+
+  it("reads Ch./Ref. no. when the header is below the title", () => {
+    const csv = [
+      "Account Statement September 2026",
+      "Hotel Status Residency",
+      "Date,Narration,Ch./Ref. no.,Withdrawal,Deposit,Balance",
+      "17/09/2026,TO TRANSFER UPI/DR/412345678901/RAMESH,412345678901,0,1800,20000",
+    ].join("\n");
+    const bank = parseStatementText(csv);
+    assert.equal(bank.length, 1);
+    assert.equal(bank[0]?.ref, "412345678901");
+  });
+
+  it("pulls UPI/IMPS numbers out of narration", () => {
+    assert.equal(extractRef("TO TRANSFER UPI/DR/412345678901/RAMESH/SBIN"), "412345678901");
+    assert.equal(extractRef("UPI-998877665544-FLYSKY"), "998877665544");
+    assert.equal(extractRef("IMPS/P2A/IMPS99887766/SITA"), "IMPS99887766");
   });
 
   it("matches office payment reference on the credit", () => {
