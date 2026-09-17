@@ -23,6 +23,7 @@ export type BackupTables = {
   lockRev?: unknown;
   inventory?: unknown[];
   complaints?: unknown[];
+  reminders?: unknown[];
   sealedIds?: unknown;
   savedAt?: number;
 };

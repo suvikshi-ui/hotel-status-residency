@@ -105,6 +105,7 @@ function snapshotFromStore(): LedgerSnapshot {
     deletedIds: s.deletedIds ?? {},
     inventory: s.inventory,
     complaints: s.complaints,
+    reminders: s.reminders,
     savedAt: s.savedAt,
   };
 }
@@ -163,6 +164,7 @@ function applyMerged(merged: LedgerSnapshot, previous: LedgerSnapshot) {
     deletedIds: merged.deletedIds ?? {},
     inventory: merged.inventory,
     complaints: merged.complaints,
+    reminders: merged.reminders,
     savedAt: merged.savedAt,
   });
   writeStoredLocks(ledgerOwnerKey(), merged.lockedDates ?? {});

@@ -1,6 +1,8 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
+  BarChart3,
+  Bell,
   BookOpen,
   CircleUser,
   LayoutDashboard,
@@ -11,7 +13,6 @@ import {
   Receipt,
   Scale,
   Users,
-  BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -22,12 +23,14 @@ import { useLedger } from "@/lib/store";
 import { bottomNavPaths, canOpenPath, ROLE_LABEL } from "@/lib/roles";
 import { useStaffSession } from "@/lib/supabase-auth";
 import { useCloudSync } from "@/lib/supabase-sync";
+import { ReminderPopup } from "@/components/reminder-popup";
 
 const NAV = [
   { to: "/", label: "Overview", icon: LayoutDashboard },
   { to: "/register", label: "Register", icon: BookOpen },
   { to: "/balance", label: "Balance", icon: Scale },
   { to: "/complaints", label: "Complaints", icon: MessageSquareWarning },
+  { to: "/reminders", label: "Reminder", icon: Bell },
   { to: "/expenses", label: "Expenses", icon: Receipt },
   { to: "/staff", label: "Staff", icon: Users },
   { to: "/inventory", label: "Inventory", icon: Layers },
@@ -277,6 +280,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </Sheet>
         )}
       </nav>
+      <ReminderPopup />
     </div>
   );
 }

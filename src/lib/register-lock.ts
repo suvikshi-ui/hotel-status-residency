@@ -1,6 +1,7 @@
 import type { HotelInfo } from "./types";
 import type { SealedIds } from "./sheet-seal.ts";
 import { parseSealedIds } from "./sheet-seal.ts";
+import type { HotelReminder } from "./reminders.ts";
 
 export type LockState = {
   locked: Record<string, true>;
@@ -120,11 +121,13 @@ export function hotelForCloud(
   lockRev: Record<string, number> = {},
   sealedIds: SealedIds = {},
   deletedIds: SealedIds = {},
+  reminders: HotelReminder[] = [],
 ): HotelInfo & {
   _lockedDates: Record<string, true>;
   _lockRev: Record<string, number>;
   _sealedIds: SealedIds;
   _deletedIds: SealedIds;
+  _reminders: HotelReminder[];
 } {
   return {
     ...hotel,
@@ -132,6 +135,7 @@ export function hotelForCloud(
     _lockRev: lockRev,
     _sealedIds: parseSealedIds(sealedIds),
     _deletedIds: parseSealedIds(deletedIds),
+    _reminders: reminders,
   };
 }
 

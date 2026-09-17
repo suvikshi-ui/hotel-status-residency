@@ -37,6 +37,7 @@ function snapshotNow(): LedgerSnapshot {
       s.lockRev ?? {},
       s.sealedIds ?? {},
       s.deletedIds ?? {},
+      s.reminders ?? [],
     ),
     opening: s.opening,
     rooms: s.rooms,
@@ -60,6 +61,7 @@ function snapshotNow(): LedgerSnapshot {
     deletedIds: s.deletedIds ?? {},
     inventory: s.inventory,
     complaints: s.complaints,
+    reminders: s.reminders,
     savedAt: s.savedAt,
   };
 }

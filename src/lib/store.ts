@@ -40,6 +40,11 @@ import {
   type InventoryItem,
 } from "./inventory";
 import { demoComplaints, normalizeComplaints, type RoomComplaint } from "./complaints";
+import {
+  normalizeReminders,
+  remindersFromHotel,
+  type HotelReminder,
+} from "./reminders";
 
 function afterSave() {
   void import("./supabase-sync").then((m) => m.requestCloudSave());
@@ -82,6 +87,7 @@ export interface LedgerState {
   creditGuests: CreditGuest[];
   inventory: InventoryItem[];
   complaints: RoomComplaint[];
+  reminders: HotelReminder[];
   selectedDate: string;
   dirty: Record<string, true>;
   openingDate: string;
@@ -117,6 +123,7 @@ export interface LedgerState {
   setAdvances: (advances: AdvanceRow[]) => void;
   setInventory: (inventory: InventoryItem[]) => void;
   setComplaints: (complaints: RoomComplaint[]) => void;
+  setReminders: (reminders: HotelReminder[]) => void;
   applySnapshot: (p: Partial<LedgerState>) => void;
   replaceSnapshot: (p: Partial<LedgerState>) => void;
   adoptLiveSnapshot: (p: Partial<LedgerState>) => void;
@@ -150,6 +157,7 @@ function seedState(): Omit<
   | "setAdvances"
   | "setInventory"
   | "setComplaints"
+  | "setReminders"
   | "applySnapshot"
   | "replaceSnapshot"
   | "adoptLiveSnapshot"
@@ -173,6 +181,7 @@ function seedState(): Omit<
     creditGuests: seed.creditGuests,
     inventory: seedInventory(),
     complaints: demoComplaints(),
+    reminders: [],
     selectedDate: DEFAULT_DATE,
     dirty: {},
     openingDate: BASE_OPENING_DATE,
@@ -236,6 +245,14 @@ function mergeSnapshot(
   const rooms = (persisted.rooms?.length ? persisted.rooms : current.rooms) as RoomDef[];
   const inventory = normalizeInventory(persisted.inventory ?? current.inventory);
   const complaints = normalizeComplaints(persisted.complaints ?? current.complaints);
+  const reminders = Array.isArray(persisted.reminders)
+    ? normalizeReminders(persisted.reminders)
+    : (() => {
+        const fromHotel = remindersFromHotel(persisted.hotel);
+        return fromHotel.length
+          ? fromHotel
+          : normalizeReminders(current.reminders);
+      })();
   const appRole = parseAppRole(persisted.appRole ?? current.appRole);
   const fromHotel = hotelFromCloud(persisted.hotel, current.hotel);
   const lockedDates = pickLockedDates(
@@ -302,6 +319,7 @@ function mergeSnapshot(
     rooms,
     inventory,
     complaints,
+    reminders,
     guests,
     food,
     wholesale,
@@ -581,6 +599,8 @@ export const useLedger = create<LedgerState>()(
             ),
           ),
         }),
+      setReminders: (reminders) =>
+        save({ reminders: normalizeReminders(reminders) }),
       applySnapshot: (p) => {
         const merged = mergeSnapshot(p, get(), { skipSeedFill: true });
         set({
@@ -614,6 +634,9 @@ export const useLedger = create<LedgerState>()(
           sealedIds: mergeSealed(cur.sealedIds, p.sealedIds),
           deletedIds: mergeSealed(cur.deletedIds, p.deletedIds),
           staff: normalizeStaff(p.staff ?? cur.staff),
+          reminders: Array.isArray(p.reminders)
+            ? normalizeReminders(p.reminders)
+            : cur.reminders,
         };
         set({
           ...next,
@@ -663,6 +686,7 @@ export const useLedger = create<LedgerState>()(
         securityCode: s.securityCode,
         inventory: s.inventory,
         complaints: s.complaints,
+        reminders: s.reminders,
         appRole: s.appRole,
         savedAt: s.savedAt,
       }),

@@ -18,6 +18,7 @@ import { Route as InventoryRouteImport } from './routes/inventory'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as RegisterRouteImport } from './routes/register'
+import { Route as RemindersRouteImport } from './routes/reminders'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as RoomsRouteImport } from './routes/rooms'
 import { Route as StaffRouteImport } from './routes/staff'
@@ -67,6 +68,11 @@ const RegisterRoute = RegisterRouteImport.update({
   path: '/register',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RemindersRoute = RemindersRouteImport.update({
+  id: '/reminders',
+  path: '/reminders',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReportsRoute = ReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
@@ -93,6 +99,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
+  '/reminders': typeof RemindersRoute
   '/reports': typeof ReportsRoute
   '/rooms': typeof RoomsRoute
   '/staff': typeof StaffRoute
@@ -107,6 +114,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
+  '/reminders': typeof RemindersRoute
   '/reports': typeof ReportsRoute
   '/rooms': typeof RoomsRoute
   '/staff': typeof StaffRoute
@@ -122,6 +130,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
+  '/reminders': typeof RemindersRoute
   '/reports': typeof ReportsRoute
   '/rooms': typeof RoomsRoute
   '/staff': typeof StaffRoute
@@ -138,6 +147,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/profile'
     | '/register'
+    | '/reminders'
     | '/reports'
     | '/rooms'
     | '/staff'
@@ -152,6 +162,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/profile'
     | '/register'
+    | '/reminders'
     | '/reports'
     | '/rooms'
     | '/staff'
@@ -166,6 +177,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/profile'
     | '/register'
+    | '/reminders'
     | '/reports'
     | '/rooms'
     | '/staff'
@@ -181,6 +193,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   ProfileRoute: typeof ProfileRoute
   RegisterRoute: typeof RegisterRoute
+  RemindersRoute: typeof RemindersRoute
   ReportsRoute: typeof ReportsRoute
   RoomsRoute: typeof RoomsRoute
   StaffRoute: typeof StaffRoute
@@ -251,6 +264,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RegisterRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reminders': {
+      id: '/reminders'
+      path: '/reminders'
+      fullPath: '/reminders'
+      preLoaderRoute: typeof RemindersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reports': {
       id: '/reports'
       path: '/reports'
@@ -285,6 +305,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   ProfileRoute: ProfileRoute,
   RegisterRoute: RegisterRoute,
+  RemindersRoute: RemindersRoute,
   ReportsRoute: ReportsRoute,
   RoomsRoute: RoomsRoute,
   StaffRoute: StaffRoute,
