@@ -55,7 +55,32 @@ describe("bank recon", () => {
     ];
     const lines = reconcileBank(bank, guests);
     assert.equal(lines[0]?.office?.name, "SITA");
+    assert.equal(lines[0]?.office?.date, "2026-09-18");
+    assert.equal(lines[0]?.office?.reason, "102");
     assert.equal(lines[0]?.bank.ref, "IMPS998877");
+  });
+
+  it("does not fill office from GST invoice number, only payment reference", () => {
+    const bank = parseStatementText(
+      "Date,Particulars,Credit,Ref\n17-09-2026,IMPS Flysky,2200,IMPS998877",
+      "2026-09",
+    );
+    const guests: GuestEntry[] = [
+      {
+        id: "g3",
+        date: "2026-09-18",
+        slNo: 3,
+        name: "RAM",
+        roomNo: "101",
+        mode: "QRS",
+        amount: 2200,
+        gstInvoiceNo: "IMPS998877",
+        source: "Walk-in",
+        gst: true,
+      },
+    ];
+    const lines = reconcileBank(bank, guests);
+    assert.equal(lines[0]?.office, null);
   });
 
   it("reads Withdrawal Amount and Deposit Amount headers", () => {

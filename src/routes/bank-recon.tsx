@@ -11,12 +11,13 @@ import {
   STATEMENT_HEADERS,
   mergeBankRows,
   parseStatementText,
+  reconcileBank,
   statementChartHtml,
   statementChartRows,
   statementTextFromPdf,
   type BankRow,
 } from "@/lib/bank-recon";
-import { money } from "@/lib/format";
+import { formatDayShort, money } from "@/lib/format";
 import { useLedger } from "@/lib/store";
 
 export const Route = createFileRoute("/bank-recon")({
@@ -25,6 +26,7 @@ export const Route = createFileRoute("/bank-recon")({
 
 function BankReconPage() {
   const date = useLedger((s) => s.selectedDate);
+  const guests = useLedger((s) => s.guests);
   const bankRows = useLedger((s) => s.bankRows);
   const setBankRows = useLedger((s) => s.setBankRows);
   const { busy: saving, saveToServer } = useAccountSave();
@@ -36,6 +38,10 @@ function BankReconPage() {
   const monthRows = useMemo(
     () => bankRows.filter((r) => r.month === month),
     [bankRows, month],
+  );
+  const lines = useMemo(
+    () => reconcileBank(monthRows, guests),
+    [monthRows, guests],
   );
 
   function applyParsed(parsed: BankRow[]) {
@@ -80,13 +86,18 @@ function BankReconPage() {
   }
 
   function downloadStatement() {
-    if (!monthRows.length) {
+    if (!lines.length) {
       toast.error("Upload a statement first");
       return;
     }
     const html = statementChartHtml(
-      [...STATEMENT_HEADERS],
-      statementChartRows(monthRows),
+      [...STATEMENT_HEADERS, "Office date", "Name", "Reason"],
+      lines.map((line, i) => [
+        ...(statementChartRows(monthRows)[i] ?? ["", "", "", "", ""]),
+        line.office ? line.office.date : "",
+        line.office?.name ?? "",
+        line.office?.reason ?? "",
+      ]),
     );
     const blob = new Blob([html], { type: "application/vnd.ms-excel" });
     const url = URL.createObjectURL(blob);
@@ -108,8 +119,9 @@ function BankReconPage() {
             Bank recon
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Journal list from the uploaded statement: Date, Narration,
-            Ch./Ref. no., Withdrawal, Deposit.
+            Journal from the bank statement. If Invoice payment reference
+            matches Ch./Ref. no., office date, name and reason fill
+            automatically.
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
@@ -168,30 +180,60 @@ function BankReconPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="overflow-x-auto p-0">
-          <table className="w-full min-w-[52rem] text-left text-sm">
+          <table className="w-full min-w-[72rem] text-left text-sm">
             <thead className="text-xs uppercase tracking-wide text-muted">
               <tr className="border-y border-border bg-bg-warm/50">
+                <th className="px-5 py-2 font-medium" colSpan={5}>
+                  Bank statement
+                </th>
+                <th className="px-3 py-2 font-medium" colSpan={3}>
+                  Office
+                </th>
+              </tr>
+              <tr className="border-b border-border bg-bg-warm/50">
                 <th className="px-5 py-2 font-medium">Date</th>
                 <th className="px-3 py-2 font-medium">Narration</th>
                 <th className="px-3 py-2 font-medium">Ch./Ref. no.</th>
                 <th className="px-3 py-2 text-right font-medium">Withdrawal</th>
                 <th className="px-3 py-2 text-right font-medium">Deposit</th>
+                <th className="px-3 py-2 font-medium">Office date</th>
+                <th className="px-3 py-2 font-medium">Name</th>
+                <th className="px-3 py-2 font-medium">Reason</th>
               </tr>
             </thead>
             <tbody>
-              {monthRows.map((row) => (
-                <tr key={row.id} className="border-b border-border/70">
-                  <td className="px-5 py-2.5 tabular">{row.dateRaw || "—"}</td>
-                  <td className="px-3 py-2.5">{row.particular || "—"}</td>
+              {lines.map((line) => (
+                <tr key={line.bank.id} className="border-b border-border/70">
+                  <td className="px-5 py-2.5 tabular">
+                    {line.bank.dateRaw || "—"}
+                  </td>
+                  <td className="px-3 py-2.5">{line.bank.particular || "—"}</td>
                   <td className="px-3 py-2.5 font-mono text-xs">
-                    {row.ref || "—"}
+                    {line.bank.ref || "—"}
                   </td>
                   <td className="px-3 py-2.5 text-right tabular">
-                    {row.debit ? money(row.debit) : "—"}
+                    {line.bank.debit ? money(line.bank.debit) : "—"}
                   </td>
                   <td className="px-3 py-2.5 text-right tabular">
-                    {row.credit ? money(row.credit) : "—"}
+                    {line.bank.credit ? money(line.bank.credit) : "—"}
                   </td>
+                  {line.office ? (
+                    <>
+                      <td className="px-3 py-2.5 tabular">
+                        {formatDayShort(line.office.date)}
+                      </td>
+                      <td className="px-3 py-2.5 font-medium">
+                        {line.office.name}
+                      </td>
+                      <td className="px-3 py-2.5 text-muted">
+                        {line.office.reason || "—"}
+                      </td>
+                    </>
+                  ) : (
+                    <td className="px-3 py-2.5 text-muted" colSpan={3}>
+                      —
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

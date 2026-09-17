@@ -21,6 +21,7 @@ export interface OfficeHit {
   date: string;
   name: string;
   source: string | null;
+  reason: string;
   amount: number;
   ref: string;
 }
@@ -143,20 +144,18 @@ export function mergeBankRows(current: BankRow[], incoming: BankRow[], month?: s
 export function officeHitsFromGuests(guests: GuestEntry[]): OfficeHit[] {
   const out: OfficeHit[] = [];
   for (const g of guests) {
-    const refs = [g.payRefNo, g.gstInvoiceNo].filter(
-      (v): v is string => Boolean(v && asText(v)),
-    );
-    const unique = [...new Set(refs.map((v) => asText(v)))].filter(Boolean);
-    for (const ref of unique) {
-      out.push({
-        id: g.id,
-        date: g.date,
-        name: g.name,
-        source: g.source ?? null,
-        amount: g.amount,
-        ref,
-      });
-    }
+    const ref = asText(g.payRefNo);
+    if (!ref) continue;
+    const reason = asText(g.source) || asText(g.gstInvoiceNo) || asText(g.roomNo);
+    out.push({
+      id: g.id,
+      date: g.date,
+      name: g.name,
+      source: g.source ?? null,
+      reason,
+      amount: g.amount,
+      ref,
+    });
   }
   return out;
 }
@@ -178,7 +177,10 @@ function pickOffice(
   offices: OfficeHit[],
   used: Set<string>,
 ): OfficeHit | null {
-  const ref = asText(bank.ref) || cellByHeader(bank, REF_HEAD);
+  const ref =
+    asText(bank.ref) ||
+    cellByHeader(bank, REF_HEAD) ||
+    extractRef(bank.particular);
   if (!ref) return null;
   const hits = offices.filter(
     (o) => !used.has(o.id + o.ref) && refsMatch(ref, o.ref),
