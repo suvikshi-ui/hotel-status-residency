@@ -10,6 +10,14 @@ create table if not exists public.users (
   created_at timestamptz not null default now()
 );
 
+alter table public.users add column if not exists owner_id uuid references auth.users (id) on delete cascade;
+alter table public.users add column if not exists name text not null default '';
+alter table public.users add column if not exists username text;
+alter table public.users add column if not exists role text not null default 'admin';
+alter table public.users add column if not exists created_at timestamptz not null default now();
+
+update public.users set owner_id = id where owner_id is null;
+
 create unique index if not exists users_username_idx
   on public.users (lower(username))
   where username is not null and username <> '';
