@@ -19,7 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { buildDayTake } from "@/lib/day-report";
 import { sumByBucket, expenseBucket } from "@/lib/expense-tally";
-import { formatDay, formatDayShort, money, moneyCompact, salaryDaysInMonth, salaryPayMonth, salaryPayMonthName } from "@/lib/format";
+import { formatDay, formatDayShort, money, moneyCompact, salaryPayMonth, salaryPayMonthName } from "@/lib/format";
 import {
   inventoryDifference,
   signedCount,
@@ -520,7 +520,7 @@ function SalaryReportPanel() {
   const hotel = useLedger((s) => s.hotel);
   const date = useLedger((s) => s.selectedDate);
   const staff = useLedger((s) => s.staff);
-  const monthDays = salaryDaysInMonth(date);
+  const monthDays = 30;
   const payMonth = salaryPayMonth(date);
   const payName = salaryPayMonthName(date);
   const rows = staff.map((r) => {

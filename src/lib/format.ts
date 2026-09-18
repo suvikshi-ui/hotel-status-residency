@@ -1,4 +1,4 @@
-import { format, parseISO, isValid, subMonths, getDaysInMonth } from "date-fns";
+import { format, parseISO, isValid, subMonths } from "date-fns";
 import type { PayMode } from "./types";
 
 export const inr = new Intl.NumberFormat("en-IN", {
@@ -63,10 +63,8 @@ export function salaryPayMonthKey(iso: string) {
   return format(d, "yyyy-MM");
 }
 
-export function salaryDaysInMonth(iso: string) {
-  const d = salaryPayDate(iso);
-  if (!isValid(d)) return 30;
-  return getDaysInMonth(d);
+export function salaryDaysInMonth(_iso?: string) {
+  return 30;
 }
 
 export function formatDayShort(iso: string) {

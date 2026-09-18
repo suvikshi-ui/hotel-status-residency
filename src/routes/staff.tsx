@@ -6,9 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatDay, money, salaryDaysInMonth, salaryPayMonth, salaryPayMonthKey, salaryPayMonthName, uid } from "@/lib/format";
+import { formatDay, money, salaryPayMonth, salaryPayMonthKey, salaryPayMonthName, uid } from "@/lib/format";
 import { ReportsLink } from "@/components/reports-link";
 import { escapeHtml, printDocument } from "@/lib/print-sheet";
 import { staffPay } from "@/lib/staff-pay";
@@ -32,7 +31,6 @@ function StaffPage() {
   const sealedIds = useLedger((s) => s.sealedIds);
   const { busy: saving, saveToServer } = useAccountSave();
   const [sheet, setSheet] = useState<Sheet>("salary");
-  const [monthDays, setMonthDays] = useState(() => salaryDaysInMonth(date));
   const [draft, setDraft] = useState<StaffRow[]>(staff);
   const [advDraft, setAdvDraft] = useState<AdvanceRow[]>(advances);
 
@@ -42,9 +40,6 @@ function StaffPage() {
   useEffect(() => {
     setAdvDraft(advances);
   }, [advances]);
-  useEffect(() => {
-    setMonthDays(salaryDaysInMonth(date));
-  }, [date]);
 
   const rows = useMemo(
     () =>
@@ -54,11 +49,11 @@ function StaffPage() {
           r.working,
           r.extra ?? 0,
           r.advance,
-          monthDays,
+          30,
         );
         return { ...r, extra: r.extra ?? 0, earned, payable };
       }),
-    [draft, monthDays],
+    [draft],
   );
 
   const payroll = rows.reduce((s, r) => s + r.payable, 0);
@@ -261,24 +256,7 @@ function StaffPage() {
             disabled={salaryFrozen}
             className="flex min-w-0 flex-col gap-5 border-0 p-0"
           >
-          <div className="flex flex-wrap items-end justify-between gap-3 print:hidden">
-            <div className="grid gap-1.5">
-              <Label htmlFor="month-days">Days in month</Label>
-              <Input
-                id="month-days"
-                type="text"
-                inputMode="numeric"
-                autoComplete="off"
-                className="w-24"
-                value={monthDays || ""}
-                onChange={(e) =>
-                  setMonthDays(Number(e.target.value.replace(/[^\d]/g, "")) || 0)
-                }
-                onBlur={() => {
-                  if (monthDays < 1) setMonthDays(30);
-                }}
-              />
-            </div>
+          <div className="flex flex-wrap items-end justify-end gap-3 print:hidden">
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" onClick={printSalary}>
                 <Printer className="size-4" />
@@ -312,7 +290,7 @@ function StaffPage() {
             <CardHeader>
               <CardTitle>Salary of {payName}</CardTitle>
               <p className="text-sm text-muted">
-                Payment of {payMonth}. Basic ÷ {monthDays} × (working + extra) −
+                Payment of {payMonth}. Basic ÷ 30 × (working + extra) −
                 advance = to pay
               </p>
             </CardHeader>
