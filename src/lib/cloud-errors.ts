@@ -4,10 +4,11 @@ export function isMissingSchema(error: {
 } | null): boolean {
   if (!error) return false;
   const m = (error.message ?? "").toLowerCase();
+  if (m.includes("function")) return false;
   return (
     error.code === "PGRST205" ||
     error.code === "42P01" ||
-    m.includes("schema cache") ||
+    (m.includes("schema cache") && m.includes("table")) ||
     (m.includes("could not find the table") && m.includes("public."))
   );
 }
@@ -44,7 +45,7 @@ export function isSkippableSealError(error: {
   if (!error) return false;
   const m = (error.message ?? "").toLowerCase();
   if (
-    /\b(guests|food|wholesale|expenses|balance_received|ledger_meta|rooms|staff|advances|complaints|inventory)\b/.test(
+    /\b(guests|food|wholesale|expenses|balance_received|ledger_meta|rooms|staff|advances)\b/.test(
       m,
     )
   ) {

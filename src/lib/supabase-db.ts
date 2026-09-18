@@ -637,6 +637,14 @@ export async function pullLedger(userId: string): Promise<CloudPull> {
   return { ok: true, kind: "data", snapshot };
 }
 
+function skipRowWrite(table: string, error: PostgrestError | null) {
+  if (!error) return true;
+  if (table === "complaints" || table === "inventory") {
+    return isMissingSchema(error);
+  }
+  return isSkippableSealError(error);
+}
+
 async function replaceRows(
   table: string,
   userId: string,
@@ -650,7 +658,11 @@ async function replaceRows(
     .select(idField)
     .eq("user_id", userId);
   if (selErr) {
-    if (!isSkippableSealError(selErr)) return selErr;
+    if (table === "complaints" || table === "inventory") {
+      if (!isMissingSchema(selErr)) return selErr;
+    } else if (!isSkippableSealError(selErr)) {
+      return selErr;
+    }
   }
 
   const keep = new Set(rows.map((r) => str(r[idField])));
@@ -669,14 +681,14 @@ async function replaceRows(
         .delete()
         .eq("user_id", userId)
         .in(idField, extra.slice(i, i + chunk));
-      if (error && !isSkippableSealError(error)) return error;
+      if (error && !skipRowWrite(table, error)) return error;
     }
   }
 
   if (!rows.length) {
     if (prune === undefined && (existing ?? []).length) {
       const { error } = await sb.from(table).delete().eq("user_id", userId);
-      if (error && !isSkippableSealError(error)) return error;
+      if (error && !skipRowWrite(table, error)) return error;
     }
     return null;
   }
@@ -687,7 +699,7 @@ async function replaceRows(
     const { error } = await sb
       .from(table)
       .upsert(payload.slice(i, i + chunk), { onConflict: `user_id,${idField}` });
-    if (error && !isSkippableSealError(error)) return error;
+    if (error && !skipRowWrite(table, error)) return error;
   }
   return null;
 }
