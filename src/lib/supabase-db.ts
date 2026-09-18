@@ -328,6 +328,7 @@ function namedFromDb(row: Record<string, unknown>): NamedAmount {
     amount: num(row.amount),
     particular: str(row.particular),
     kind: row.kind == null || row.kind === "" ? undefined : (str(row.kind) as NamedAmount["kind"]),
+    payRef: str(row.pay_ref) || str(row.payRef) || undefined,
   };
 }
 
@@ -391,6 +392,13 @@ function overlayBooks(snapshot: LedgerSnapshot, hotelRaw: unknown): LedgerSnapsh
   }
   if ((books.balReceived?.length ?? 0) > snapshot.balReceived.length) {
     next.balReceived = books.balReceived ?? snapshot.balReceived;
+  } else if (books.balReceived?.length) {
+    const extra = new Map(books.balReceived.map((r) => [r.id, r]));
+    next.balReceived = snapshot.balReceived.map((r) => {
+      const b = extra.get(r.id);
+      if (!b?.payRef) return r;
+      return { ...r, payRef: r.payRef || b.payRef };
+    });
   }
   if ((books.staff?.length ?? 0) > snapshot.staff.length) next.staff = books.staff ?? snapshot.staff;
   if ((books.advances?.length ?? 0) > snapshot.advances.length) {

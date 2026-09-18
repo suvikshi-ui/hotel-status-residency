@@ -110,7 +110,12 @@ function BalancePage() {
     .reduce((s, r) => s + r.amount, 0);
   const otherTotal = otherRows.reduce((s, r) => s + r.amount, 0);
 
-  function collectFrom(account: DueAccount, mode: PayMode, amount: number) {
+  function collectFrom(
+    account: DueAccount,
+    mode: PayMode,
+    amount: number,
+    payRef?: string,
+  ) {
     gate(
       () => {
         addBalReceived({
@@ -118,6 +123,7 @@ function BalancePage() {
           mode,
           amount,
           kind: "due",
+          payRef: payRef?.trim() || null,
         });
         toast.success(`Collected ${money(amount)} from ${account.key}`);
       },
@@ -274,7 +280,9 @@ function BalancePage() {
               pinned
               month={date.slice(0, 7)}
               onToggle={() => setQ("")}
-              onCollect={(mode, amount) => collectFrom(searchHit, mode, amount)}
+              onCollect={(mode, amount, payRef) =>
+                collectFrom(searchHit, mode, amount, payRef)
+              }
               onRemoveReceipt={removeReceipt}
               onPrintGuests={() => {
                 toast.message("Opening guest print…");
@@ -293,7 +301,9 @@ function BalancePage() {
                 onToggle={() =>
                   setOpenKey((k) => (k === account.key ? null : account.key))
                 }
-                onCollect={(mode, amount) => collectFrom(account, mode, amount)}
+                onCollect={(mode, amount, payRef) =>
+                  collectFrom(account, mode, amount, payRef)
+                }
                 onRemoveReceipt={removeReceipt}
                 onPrintGuests={() => {
                   toast.message("Opening guest print…");
@@ -335,7 +345,7 @@ function BalancePage() {
                 },
               );
             }}
-            onReceive={(source, mode, amount) => {
+            onReceive={(source, mode, amount, payRef) => {
               const account = lookupDueAccount(accounts, source);
               gate(
                 () => {
@@ -344,6 +354,7 @@ function BalancePage() {
                     mode,
                     amount,
                     kind: "due",
+                    payRef: payRef?.trim() || null,
                   });
                   toast.success(
                     `Received ${money(amount)} from ${account?.key ?? source}`,
@@ -414,7 +425,7 @@ function OtherTab({
   listRows: { id: string; date: string; particular: string; mode: PayMode; amount: number }[];
   rows: { id: string; date: string; particular: string; mode: PayMode; amount: number }[];
   onAddList: (source: string, amount: number) => void;
-  onReceive: (source: string, mode: PayMode, amount: number) => void;
+  onReceive: (source: string, mode: PayMode, amount: number, payRef?: string) => void;
   onAdd: (mode: PayMode, amount: number, note: string) => void;
   onRemove: (id: string) => void;
 }) {
@@ -423,6 +434,7 @@ function OtherTab({
   const [recvSource, setRecvSource] = useState("");
   const [recvMode, setRecvMode] = useState<PayMode>("CASH");
   const [recvAmount, setRecvAmount] = useState("");
+  const [recvRef, setRecvRef] = useState("");
   const [mode, setMode] = useState<PayMode>("CASH");
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
@@ -569,7 +581,7 @@ function OtherTab({
             </p>
           </div>
           <form
-            className="grid gap-3 sm:grid-cols-[1fr_9rem_8rem_auto]"
+            className="grid gap-3 sm:grid-cols-[1fr_9rem_8rem_1fr_auto]"
             onSubmit={(e) => {
               e.preventDefault();
               const src = recvSource.trim();
@@ -582,9 +594,10 @@ function OtherTab({
                 toast.error("Enter an amount");
                 return;
               }
-              onReceive(src, recvMode, amt);
+              onReceive(src, recvMode, amt, recvRef);
               setRecvSource("");
               setRecvAmount("");
+              setRecvRef("");
             }}
           >
             <div className="grid gap-1.5">
@@ -627,6 +640,16 @@ function OtherTab({
                 value={recvAmount}
                 onChange={(e) => setRecvAmount(e.target.value)}
                 placeholder="0"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="recv-ref">Payment reference number</Label>
+              <Input
+                id="recv-ref"
+                value={recvRef}
+                onChange={(e) => setRecvRef(e.target.value)}
+                placeholder="UPI / cheque / ref"
+                autoComplete="off"
               />
             </div>
             <div className="flex items-end">
@@ -773,12 +796,13 @@ function SourceCard({
   pinned?: boolean;
   month: string;
   onToggle: () => void;
-  onCollect: (mode: PayMode, amount: number) => void;
+  onCollect: (mode: PayMode, amount: number, payRef?: string) => void;
   onRemoveReceipt: (id: string) => void;
   onPrintGuests: () => void;
 }) {
   const [mode, setMode] = useState<PayMode>("CASH");
   const [amount, setAmount] = useState("");
+  const [payRef, setPayRef] = useState("");
   const shown = open || pinned;
   const carried =
     !account.settled && Boolean(account.lastDate) && account.lastDate.slice(0, 7) < month;
@@ -920,7 +944,12 @@ function SourceCard({
                     <div className="truncate text-sm">
                       {formatDayShort(r.date)} · {r.particular}
                     </div>
-                    <ModeBadge mode={r.mode} />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <ModeBadge mode={r.mode} />
+                      {r.payRef ? (
+                        <span className="text-xs text-muted">Ref {r.payRef}</span>
+                      ) : null}
+                    </div>
                   </div>
                   <div className="flex items-center gap-1">
                     <span className="tabular text-sm font-medium text-ok">
@@ -943,7 +972,7 @@ function SourceCard({
 
           {!account.settled ? (
             <form
-              className="mt-4 grid gap-3 sm:grid-cols-[9rem_1fr_auto]"
+              className="mt-4 grid gap-3 sm:grid-cols-[9rem_1fr_1fr_auto]"
               onSubmit={(e) => {
                 e.preventDefault();
                 const amt = Number(amount || Math.max(0, account.remaining));
@@ -951,8 +980,9 @@ function SourceCard({
                   toast.error("Enter an amount to collect");
                   return;
                 }
-                onCollect(mode, amt);
+                onCollect(mode, amt, payRef);
                 setAmount("");
+                setPayRef("");
               }}
             >
               <div className="grid gap-1.5">
@@ -981,6 +1011,16 @@ function SourceCard({
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder={String(Math.max(0, account.remaining))}
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor={`pay-ref-${account.key}`}>Payment reference number</Label>
+                <Input
+                  id={`pay-ref-${account.key}`}
+                  value={payRef}
+                  onChange={(e) => setPayRef(e.target.value)}
+                  placeholder="UPI / cheque / ref"
+                  autoComplete="off"
                 />
               </div>
               <div className="flex items-end">

@@ -25,6 +25,7 @@ export interface DueReceipt {
   particular: string;
   mode: PayMode;
   amount: number;
+  payRef?: string | null;
 }
 
 export type DueStatus = "paid" | "partial" | "open";
@@ -261,6 +262,7 @@ export function buildDueAccounts(
       particular: r.particular,
       mode: r.mode,
       amount: r.amount,
+      payRef: r.payRef ?? null,
     });
   }
 
