@@ -2,21 +2,25 @@
 -- Housekeeping (Kali, House, Housekeeping) opens Complaints + Inventory.
 
 create table if not exists public.users (
-  id uuid primary key references auth.users (id) on delete cascade,
-  owner_id uuid references auth.users (id) on delete cascade,
+  id uuid primary key,
+  owner_id uuid,
   name text not null default '',
   username text,
   role text not null default 'admin',
   created_at timestamptz not null default now()
 );
 
-alter table public.users add column if not exists owner_id uuid references auth.users (id) on delete cascade;
+alter table public.users drop constraint if exists users_owner_id_fkey;
+alter table public.users add column if not exists owner_id uuid;
 alter table public.users add column if not exists name text not null default '';
 alter table public.users add column if not exists username text;
 alter table public.users add column if not exists role text not null default 'admin';
 alter table public.users add column if not exists created_at timestamptz not null default now();
 
-update public.users set owner_id = id where owner_id is null;
+update public.users u
+set owner_id = u.id
+where u.owner_id is null
+  and exists (select 1 from auth.users a where a.id = u.id);
 
 create unique index if not exists users_username_idx
   on public.users (lower(username))

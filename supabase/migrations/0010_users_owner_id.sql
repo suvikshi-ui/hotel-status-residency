@@ -1,10 +1,14 @@
 -- public.users already existed without owner_id.
--- Add the column first, then the policy.
+-- Some rows are not in auth.users, so do not keep a foreign key.
 
-alter table public.users
-  add column if not exists owner_id uuid references auth.users (id) on delete cascade;
+alter table public.users drop constraint if exists users_owner_id_fkey;
 
-update public.users set owner_id = id where owner_id is null;
+alter table public.users add column if not exists owner_id uuid;
+
+update public.users u
+set owner_id = u.id
+where u.owner_id is null
+  and exists (select 1 from auth.users a where a.id = u.id);
 
 alter table public.users enable row level security;
 
