@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { ModeBadge } from "@/components/mode-badge";
 import { useGate } from "@/components/security-gate";
 import { formatDayShort, money } from "@/lib/format";
+import { buildGstStayBills } from "@/lib/invoice";
 import { useLedger } from "@/lib/store";
 
 export const Route = createFileRoute("/invoice")({ component: InvoicePage });
@@ -22,45 +23,40 @@ function InvoicePage() {
   const month = date.slice(0, 7);
   const gstRows = useMemo(
     () =>
-      guests
-        .filter((g) => g.gst && g.date.startsWith(month))
-        .slice()
-        .sort(
-          (a, b) =>
-            a.date.localeCompare(b.date) ||
-            a.slNo - b.slNo ||
-            a.name.localeCompare(b.name),
-        ),
+      buildGstStayBills(guests).filter(
+        (b) => b.checkIn <= `${month}-31` && b.checkOut >= `${month}-01`,
+      ),
     [guests, month],
   );
   const filtered = useMemo(() => {
     const name = nameQ.trim().toLowerCase();
     const source = sourceQ.trim().toLowerCase();
-    return gstRows.filter((g) => {
-      if (name && !g.name.toLowerCase().includes(name)) return false;
-      if (source && !(g.source ?? "").toLowerCase().includes(source)) return false;
+    return gstRows.filter((b) => {
+      if (name && !b.name.toLowerCase().includes(name)) return false;
+      if (source && !b.source.toLowerCase().includes(source)) return false;
       return true;
     });
   }, [gstRows, nameQ, sourceQ]);
-  const gstTotal = filtered.reduce((s, g) => s + g.amount, 0);
+  const gstTotal = filtered.reduce((s, b) => s + b.amount, 0);
 
   function saveField(
     id: string,
     field: "gstInvoiceNo" | "payRefNo",
     value: string,
   ) {
-    const row = gstRows.find((g) => g.id === id);
+    const row = gstRows.find((b) => b.id === id);
     const next = value.trim() || null;
-    const prev = (row?.[field] ?? null) || null;
+    const prev = (row?.[field] ?? "") || null;
     if (next === prev) return;
     gate(
       () => {
         updateGuest(id, { [field]: next }, { bypass: true });
-        toast.success("Invoice updated");
+        toast.success("Invoice updated for this stay");
       },
       {
         title: "Save this invoice?",
-        message: "Enter the security code to save GST invoice or payment reference.",
+        message:
+          "GST invoice number is one for check-in to check-out. Enter the security code to save.",
         confirmLabel: "Save",
       },
     );
@@ -76,13 +72,13 @@ function InvoicePage() {
           Invoice
         </h1>
         <p className="mt-1 text-sm text-muted">
-          Only GST bills. Filter by name or source.
+          One GST invoice number from check-in to check-out.
         </p>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <Card className="p-4">
-          <div className="text-xs font-medium text-muted">GST bills</div>
+          <div className="text-xs font-medium text-muted">GST stays</div>
           <div className="mt-1 font-display text-2xl font-semibold tabular">
             {filtered.length}
           </div>
@@ -125,48 +121,54 @@ function InvoicePage() {
           </div>
         </CardHeader>
         <CardContent className="overflow-x-auto p-0">
-          <table className="w-full min-w-[58rem] text-left text-sm">
+          <table className="w-full min-w-[64rem] text-left text-sm">
             <thead className="text-xs uppercase tracking-wide text-muted">
               <tr className="border-y border-border">
-                <th className="px-5 py-2 font-medium">Date</th>
+                <th className="px-5 py-2 font-medium">Check-in</th>
+                <th className="px-3 py-2 font-medium">Check-out</th>
                 <th className="px-3 py-2 font-medium">Name</th>
                 <th className="px-3 py-2 font-medium">Source</th>
                 <th className="px-3 py-2 font-medium">Room</th>
                 <th className="px-3 py-2 font-medium">Mode</th>
+                <th className="px-3 py-2 text-right font-medium">Nights</th>
                 <th className="px-3 py-2 text-right font-medium">Amount</th>
                 <th className="px-3 py-2 font-medium">GST invoice number</th>
                 <th className="px-3 py-2 font-medium">Payment reference number</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((g) => (
-                <tr key={g.id} className="border-b border-border/70">
+              {filtered.map((b) => (
+                <tr key={b.id} className="border-b border-border/70">
                   <td className="px-5 py-2.5 tabular text-muted">
-                    {formatDayShort(g.date)}
+                    {formatDayShort(b.checkIn)}
                   </td>
-                  <td className="px-3 py-2.5 font-medium">{g.name}</td>
-                  <td className="px-3 py-2.5 text-muted">{g.source || "—"}</td>
-                  <td className="px-3 py-2.5 tabular">{g.roomNo}</td>
+                  <td className="px-3 py-2.5 tabular text-muted">
+                    {formatDayShort(b.checkOut)}
+                  </td>
+                  <td className="px-3 py-2.5 font-medium">{b.name}</td>
+                  <td className="px-3 py-2.5 text-muted">{b.source || "—"}</td>
+                  <td className="px-3 py-2.5 tabular">{b.roomNo}</td>
                   <td className="px-3 py-2.5">
-                    <ModeBadge mode={g.mode} />
+                    <ModeBadge mode={b.mode} />
                   </td>
+                  <td className="px-3 py-2.5 text-right tabular">{b.nights}</td>
                   <td className="px-3 py-2.5 text-right tabular">
-                    {money(g.amount)}
+                    {money(b.amount)}
                   </td>
                   <td className="px-3 py-2">
                     <InvoiceCell
-                      value={g.gstInvoiceNo ?? ""}
+                      value={b.gstInvoiceNo}
                       placeholder="Invoice no."
-                      ariaLabel={`GST invoice number for ${g.name}`}
-                      onCommit={(v) => saveField(g.id, "gstInvoiceNo", v)}
+                      ariaLabel={`GST invoice number for ${b.name}`}
+                      onCommit={(v) => saveField(b.id, "gstInvoiceNo", v)}
                     />
                   </td>
                   <td className="px-3 py-2">
                     <InvoiceCell
-                      value={g.payRefNo ?? ""}
+                      value={b.payRefNo}
                       placeholder="Payment ref."
-                      ariaLabel={`Payment reference for ${g.name}`}
-                      onCommit={(v) => saveField(g.id, "payRefNo", v)}
+                      ariaLabel={`Payment reference for ${b.name}`}
+                      onCommit={(v) => saveField(b.id, "payRefNo", v)}
                     />
                   </td>
                 </tr>
@@ -176,7 +178,7 @@ function InvoicePage() {
           {filtered.length === 0 ? (
             <p className="py-10 text-center text-sm text-muted">
               {gstRows.length === 0
-                ? "No GST bills this month."
+                ? "No GST stays this month."
                 : "No bill matches this name or source."}
             </p>
           ) : null}

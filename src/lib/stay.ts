@@ -79,6 +79,50 @@ export function stayDates(guests: GuestEntry[], g: GuestEntry) {
   };
 }
 
+export function consecutiveStayNights(guests: GuestEntry[]): GuestEntry[][] {
+  const groups = new Map<string, GuestEntry[]>();
+  for (const g of guests) {
+    const k = stayKey(g);
+    const list = groups.get(k) ?? [];
+    list.push(g);
+    groups.set(k, list);
+  }
+  const chunks: GuestEntry[][] = [];
+  for (const list of groups.values()) {
+    const sorted = [...list].sort(
+      (a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id),
+    );
+    let cur: GuestEntry[] = [];
+    for (const n of sorted) {
+      const prev = cur[cur.length - 1];
+      if (prev) {
+        let gap = true;
+        try {
+          gap = differenceInCalendarDays(parseISO(n.date), parseISO(prev.date)) > 1;
+        } catch {
+          gap = n.date !== prev.date;
+        }
+        if (gap || prev.stay === "out") {
+          chunks.push(cur);
+          cur = [];
+        }
+      }
+      cur.push(n);
+    }
+    if (cur.length) chunks.push(cur);
+  }
+  return chunks;
+}
+
+export function stayChunkIds(guests: GuestEntry[], id: string): Set<string> {
+  const row = guests.find((g) => g.id === id);
+  if (!row) return new Set([id]);
+  const chunk = consecutiveStayNights(
+    guests.filter((g) => stayKey(g) === stayKey(row)),
+  ).find((nights) => nights.some((g) => g.id === id));
+  return new Set((chunk ?? [row]).map((g) => g.id));
+}
+
 /** Source/name edits follow the whole stay so Balance does not split one company. */
 export function applyGuestPatch(
   guests: GuestEntry[],
@@ -93,17 +137,18 @@ export function applyGuestPatch(
   const shareGst = Object.prototype.hasOwnProperty.call(patch, "gst");
   const shareInv = Object.prototype.hasOwnProperty.call(patch, "gstInvoiceNo");
   const shareRef = Object.prototype.hasOwnProperty.call(patch, "payRefNo");
+  const chunkIds = stayChunkIds(guests, id);
   return guests.map((g) => {
     if (g.id === id) return { ...g, ...patch };
-    if (!shareSource && !shareName && !shareGst && !shareInv && !shareRef) return g;
     if (stayKey(g) !== oldKey) return g;
+    const sameChunk = chunkIds.has(g.id);
     return {
       ...g,
       ...(shareSource ? { source: patch.source ?? null } : {}),
       ...(shareName && patch.name ? { name: patch.name } : {}),
-      ...(shareGst ? { gst: Boolean(patch.gst) } : {}),
-      ...(shareInv ? { gstInvoiceNo: patch.gstInvoiceNo ?? null } : {}),
-      ...(shareRef ? { payRefNo: patch.payRefNo ?? null } : {}),
+      ...(sameChunk && shareGst ? { gst: Boolean(patch.gst) } : {}),
+      ...(sameChunk && shareInv ? { gstInvoiceNo: patch.gstInvoiceNo ?? null } : {}),
+      ...(sameChunk && shareRef ? { payRefNo: patch.payRefNo ?? null } : {}),
     };
   });
 }

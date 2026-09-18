@@ -1,4 +1,5 @@
-import type { GuestEntry } from "./types";
+import { checkoutFromLastNight, consecutiveStayNights, nightsFromDates } from "./stay";
+import type { GuestEntry, PayMode } from "./types";
 
 export type GstBillMeta = {
   id: string;
@@ -92,4 +93,54 @@ export function mergeGuestGst(
     const bits = localMap.get(g.id) ?? cloudMap.get(g.id) ?? bitsOf(g);
     return { ...g, ...bits };
   });
+}
+
+export type GstStayBill = {
+  id: string;
+  ids: string[];
+  name: string;
+  roomNo: string;
+  source: string;
+  mode: PayMode;
+  checkIn: string;
+  checkOut: string;
+  nights: number;
+  amount: number;
+  gstInvoiceNo: string;
+  payRefNo: string;
+};
+
+export function buildGstStayBills(guests: GuestEntry[]): GstStayBill[] {
+  return consecutiveStayNights(guests)
+    .filter((chunk) => chunk.some((g) => g.gst))
+    .map((chunk) => {
+      const first = chunk[0]!;
+      const last = chunk[chunk.length - 1]!;
+      const checkIn = first.checkIn || first.date;
+      const checkOut =
+        last.checkOut ||
+        checkoutFromLastNight(last.date);
+      const billed = chunk.filter((g) => g.gst);
+      return {
+        id: first.id,
+        ids: chunk.map((g) => g.id),
+        name: first.name,
+        roomNo: first.roomNo,
+        source: (first.source ?? "").trim(),
+        mode: first.mode,
+        checkIn,
+        checkOut,
+        nights: nightsFromDates(checkIn, checkOut) || billed.length,
+        amount: billed.reduce((s, g) => s + g.amount, 0),
+        gstInvoiceNo:
+          billed.map((g) => g.gstInvoiceNo?.trim() || "").find(Boolean) || "",
+        payRefNo: billed.map((g) => g.payRefNo?.trim() || "").find(Boolean) || "",
+      };
+    })
+    .sort(
+      (a, b) =>
+        a.checkIn.localeCompare(b.checkIn) ||
+        a.name.localeCompare(b.name) ||
+        a.roomNo.localeCompare(b.roomNo),
+    );
 }
