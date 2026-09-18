@@ -140,6 +140,12 @@ function rememberPulled(snap: LedgerSnapshot, stamp?: string) {
   else if (snap.cloudUpdatedAt) lastCloudStamp = snap.cloudUpdatedAt;
 }
 
+function openOnToday() {
+  const today = todayIso();
+  if (useLedger.getState().selectedDate === today) return;
+  useLedger.getState().setDate(today);
+}
+
 function noteRemoteLockChange(wasLocked: boolean, nowLocked: boolean) {
   const selected = useLedger.getState().selectedDate;
   if (wasLocked && !nowLocked) {
@@ -367,24 +373,14 @@ async function pollCloud(userId: string) {
     if (locksDirty || hydrating || lastUserId !== userId) return;
     const local = snapshotFromStore();
     const cloud = pulled.snapshot;
-    if (
-      preferLocalOverCloud({
-        localSavedAt: local.savedAt ?? 0,
-        cloudUpdatedAt: cloud.savedAt ?? 0,
-        localScore: ledgerActivityScore(local),
-        cloudScore: ledgerActivityScore(cloud),
-      })
-    ) {
-      if (stamp) lastCloudStamp = stamp;
-      if (hashOf(local) !== lastHash) void flush(userId);
-      return;
-    }
     const localChanged = hashOf(local) !== lastHash;
-    const merged = mergeLiveSnapshot(lastPulled, local, pulled.snapshot);
-    if (hashOf(merged) !== hashOf(local)) applyMerged(merged, local);
-    rememberPulled(merged, pulled.snapshot.cloudUpdatedAt);
+    const merged = mergeLiveSnapshot(lastPulled, local, cloud);
+    const mergedHash = hashOf(merged);
+    const localHash = hashOf(local);
+    if (mergedHash !== localHash) applyMerged(merged, local);
+    rememberPulled(merged, cloud.cloudUpdatedAt);
     lastHash = hashOf(snapshotFromStore());
-    if (localChanged || locksDirty) void flush(userId);
+    if (localChanged || locksDirty || mergedHash !== localHash) void flush(userId);
     else if (phase === "loading" || phase === "error") setPhase("synced");
   } catch {
     /* keep local books if the pull fails */
@@ -539,23 +535,26 @@ export async function hydrateFromCloud(userId: string): Promise<CloudPhase> {
           cloudScore,
         });
       if (keepLocal) {
-        rememberPulled(local, cloud.cloudUpdatedAt);
-        lastHash = hashOf(local);
+        const base = lastPulled;
+        const merged = mergeLiveSnapshot(base, local, cloud);
+        if (hashOf(merged) !== hashOf(local)) applyMerged(merged, local);
+        openOnToday();
+        const toPush = snapshotFromStore();
+        rememberPulled(toPush, cloud.cloudUpdatedAt);
+        lastHash = hashOf(toPush);
         setPhase("synced");
-        if (localScore > cloudScore) {
-          hydrating = false;
-          await pushLedger(
-            userId,
-            { ...local, savedAt: Date.now() + 2_000 },
-            undefined,
-            useLedger.getState().appRole,
-            undefined,
-          );
-          useLedger.setState({ savedAt: Date.now() + 2_000 });
-          lastHash = hashOf(snapshotFromStore());
-          const stamp = (await pullLedgerStamp(userId)) || cloud.cloudUpdatedAt;
-          rememberPulled(snapshotFromStore(), stamp);
-        }
+        hydrating = false;
+        await pushLedger(
+          userId,
+          { ...toPush, savedAt: Date.now() + 2_000 },
+          undefined,
+          useLedger.getState().appRole,
+          pruneFromBase(base, toPush),
+        );
+        useLedger.setState({ savedAt: Date.now() + 2_000 });
+        lastHash = hashOf(snapshotFromStore());
+        const stamp = (await pullLedgerStamp(userId)) || cloud.cloudUpdatedAt;
+        rememberPulled(snapshotFromStore(), stamp);
         return "synced";
       }
       clearLocalLedgerCache();
@@ -567,6 +566,7 @@ export async function hydrateFromCloud(userId: string): Promise<CloudPhase> {
       });
       writeStoredLocks(ledgerOwnerKey(), parseLockedDates(cloud.lockedDates));
       claimAnonymousLedger(userId);
+      openOnToday();
       rememberPulled(snapshotFromStore(), cloud.cloudUpdatedAt);
       lastHash = hashOf(snapshotFromStore());
       setPhase("synced");
@@ -574,6 +574,7 @@ export async function hydrateFromCloud(userId: string): Promise<CloudPhase> {
     }
 
     if (localScore > 0) {
+      openOnToday();
       rememberPulled(local, "");
       lastHash = hashOf(local);
       setPhase("synced");

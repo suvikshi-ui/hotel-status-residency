@@ -96,6 +96,27 @@ function emptyRows(s: LedgerSnapshot): LedgerSnapshot {
   };
 }
 
+export function overlayLockedDayRows<T extends { date: string }>(
+  merged: T[],
+  cloud: T[] | undefined,
+  locked: Record<string, true> | undefined,
+  localRev: Record<string, number> | undefined,
+  cloudRev: Record<string, number> | undefined,
+): T[] {
+  const dates = Object.keys(locked ?? {});
+  if (!dates.length) return merged;
+  const takeCloud = new Set<string>();
+  for (const d of dates) {
+    if (!locked?.[d]) continue;
+    if ((localRev?.[d] ?? 0) > (cloudRev?.[d] ?? 0)) continue;
+    takeCloud.add(d);
+  }
+  if (!takeCloud.size) return merged;
+  const rest = merged.filter((r) => !takeCloud.has(r.date));
+  const fromCloud = (cloud ?? []).filter((r) => takeCloud.has(r.date));
+  return [...rest, ...fromCloud];
+}
+
 export function mergeLiveSnapshot(
   base: LedgerSnapshot | null,
   local: LedgerSnapshot,
@@ -116,43 +137,76 @@ export function mergeLiveSnapshot(
     parseSealedIds(local.deletedIds),
     parseSealedIds(cloud.deletedIds),
   );
+  const localRev = parseLockRev(local.lockRev);
+  const cloudRev = parseLockRev(cloud.lockRev);
+  const locked = locks.locked;
   return {
     hotel: pick3(b.hotel, local.hotel, cloud.hotel),
     opening: pick3(b.opening, local.opening, cloud.opening),
     rooms: mergeByKey((r) => r.no, b.rooms, local.rooms, cloud.rooms),
     guests: mergeGuestGst(
-      dropDeletedRows(
-        mergeByKey((r) => r.id, b.guests, local.guests, cloud.guests),
-        deletedIds,
-        sealKey.guest,
+      overlayLockedDayRows(
+        dropDeletedRows(
+          mergeByKey((r) => r.id, b.guests, local.guests, cloud.guests),
+          deletedIds,
+          sealKey.guest,
+        ),
+        cloud.guests,
+        locked,
+        localRev,
+        cloudRev,
       ),
       local.guests,
       cloud.guests,
     ),
-    food: dropDeletedRows(
-      mergeByKey((r) => r.id, b.food, local.food, cloud.food),
-      deletedIds,
-      sealKey.food,
-    ),
-    wholesale: dropDeletedRows(
-      mergeByKey((r) => r.id, b.wholesale, local.wholesale, cloud.wholesale),
-      deletedIds,
-      sealKey.wholesale,
-    ),
-    expenses: dropDeletedRows(
-      mergeByKey((r) => r.id, b.expenses, local.expenses, cloud.expenses),
-      deletedIds,
-      sealKey.expense,
-    ),
-    balReceived: dropDeletedRows(
-      mergeByKey(
-        (r) => r.id,
-        b.balReceived,
-        local.balReceived,
-        cloud.balReceived,
+    food: overlayLockedDayRows(
+      dropDeletedRows(
+        mergeByKey((r) => r.id, b.food, local.food, cloud.food),
+        deletedIds,
+        sealKey.food,
       ),
-      deletedIds,
-      sealKey.balance,
+      cloud.food,
+      locked,
+      localRev,
+      cloudRev,
+    ),
+    wholesale: overlayLockedDayRows(
+      dropDeletedRows(
+        mergeByKey((r) => r.id, b.wholesale, local.wholesale, cloud.wholesale),
+        deletedIds,
+        sealKey.wholesale,
+      ),
+      cloud.wholesale,
+      locked,
+      localRev,
+      cloudRev,
+    ),
+    expenses: overlayLockedDayRows(
+      dropDeletedRows(
+        mergeByKey((r) => r.id, b.expenses, local.expenses, cloud.expenses),
+        deletedIds,
+        sealKey.expense,
+      ),
+      cloud.expenses,
+      locked,
+      localRev,
+      cloudRev,
+    ),
+    balReceived: overlayLockedDayRows(
+      dropDeletedRows(
+        mergeByKey(
+          (r) => r.id,
+          b.balReceived,
+          local.balReceived,
+          cloud.balReceived,
+        ),
+        deletedIds,
+        sealKey.balance,
+      ),
+      cloud.balReceived,
+      locked,
+      localRev,
+      cloudRev,
     ),
     staff: mergeByKey((r) => r.id, b.staff, local.staff, cloud.staff).filter(
       (r) => !/^st-(0|1|2|3|4|5|6|7|8|9|10|11|12|13|14)$/.test(r.id),

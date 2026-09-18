@@ -43,6 +43,7 @@ import { demoComplaints, normalizeComplaints, type RoomComplaint } from "./compl
 import {
   normalizeReminders,
   remindersFromHotel,
+  todayIso,
   type HotelReminder,
 } from "./reminders";
 import {
@@ -70,7 +71,7 @@ const seed = seedJson as SeedData;
 const BASE_OPENING_DATE = seed.days[0]?.date ?? "2026-09-01";
 
 export const LAST_SEEDED = "2026-09-09";
-export const DEFAULT_DATE = "2026-09-09";
+export const DEFAULT_DATE = todayIso();
 export const LEDGER_STORAGE_KEY = "status-ledger-v6";
 const LEGACY_STORAGE_KEYS = ["status-ledger-v5", "status-ledger-v4"];
 
@@ -323,7 +324,7 @@ function mergeSnapshot(
   const balReceived = opts?.replace
     ? (persisted.balReceived ?? [])
     : mergeRowsByDate(persisted.balReceived, current.balReceived);
-  let selectedDate = persisted.selectedDate ?? current.selectedDate ?? DEFAULT_DATE;
+  let selectedDate = todayIso();
   const openingDate = opts?.replace
     ? persisted.openingDate || current.openingDate
     : earlierDate(persisted.openingDate, current.openingDate) ||

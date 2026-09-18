@@ -128,6 +128,29 @@ describe("live merge across desks", () => {
     assert.equal(merged.selectedDate, "2026-09-11");
   });
 
+  it("takes the other desk's full locked day instead of this desk's thinner copy", () => {
+    const local = snap({
+      guests: [
+        { id: "g1", date: "2026-09-09", slNo: 1, name: "Thin", roomNo: "1", mode: "CASH", amount: 1 },
+      ],
+      selectedDate: "2026-09-09",
+    });
+    const cloud = snap({
+      guests: [
+        { id: "g1", date: "2026-09-09", slNo: 1, name: "RAM", roomNo: "101", mode: "CASH", amount: 2000 },
+        { id: "g2", date: "2026-09-09", slNo: 2, name: "SHYAM", roomNo: "102", mode: "BALANCE", amount: 2500 },
+      ],
+      lockedDates: { "2026-09-09": true },
+      lockRev: { "2026-09-09": 4 },
+      savedAt: 50,
+    });
+    const merged = mergeLiveSnapshot(local, local, cloud);
+    assert.equal(merged.guests.length, 2);
+    assert.equal(merged.guests.find((g) => g.id === "g1")?.name, "RAM");
+    assert.ok(merged.guests.some((g) => g.id === "g2"));
+    assert.equal(merged.lockedDates?.["2026-09-09"], true);
+  });
+
   it("picks cloud scalar when local did not change", () => {
     assert.equal(pick3("a", "a", "b"), "b");
     assert.equal(pick3("a", "c", "a"), "c");
