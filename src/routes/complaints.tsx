@@ -50,6 +50,7 @@ function ComplaintsPage() {
   const rooms = useLedger((s) => s.rooms);
   const complaints = useLedger((s) => s.complaints);
   const setComplaints = useLedger((s) => s.setComplaints);
+  const removeComplaint = useLedger((s) => s.removeComplaint);
   const sealedIds = useLedger((s) => s.sealedIds);
   const { busy: saving, saveToServer } = useAccountSave();
   const role = useLedger((s) => s.appRole);
@@ -127,6 +128,30 @@ function ComplaintsPage() {
         : `Register ${level} complaint for room ${roomNo}?`,
       confirmLabel: existing ? "Save" : "Register",
     });
+  }
+
+  function remove() {
+    const existing = open?.existing;
+    const roomNo = open?.roomNo;
+    if (!existing || !roomNo) return;
+    if (isSealed(sealedIds, sealKey.complaint(existing.id))) {
+      toast.message("Saved cube — this complaint will not change");
+      return;
+    }
+    gate(
+      () => {
+        removeComplaint(existing.id);
+        toast.success(`Room ${roomNo} complaint deleted`);
+        setOpen(null);
+      },
+      {
+        title: `Delete room ${roomNo} complaint?`,
+        message: existing.note || "This cube will be removed.",
+        confirmLabel: "Delete",
+        danger: true,
+        requireCode: true,
+      },
+    );
   }
 
   return (
@@ -288,6 +313,11 @@ function ComplaintsPage() {
               </div>
             </div>
             <div className="flex justify-end gap-2">
+              {open?.existing ? (
+                <Button type="button" variant="danger" onClick={remove}>
+                  Delete
+                </Button>
+              ) : null}
               <Button type="button" variant="outline" onClick={() => setOpen(null)}>
                 Cancel
               </Button>

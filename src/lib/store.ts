@@ -130,6 +130,7 @@ export interface LedgerState {
   setAdvances: (advances: AdvanceRow[]) => void;
   setInventory: (inventory: InventoryItem[]) => void;
   setComplaints: (complaints: RoomComplaint[]) => void;
+  removeComplaint: (id: string, opts?: BypassGuard) => void;
   setReminders: (reminders: HotelReminder[]) => void;
   setBankRows: (bankRows: BankRow[]) => void;
   applySnapshot: (p: Partial<LedgerState>) => void;
@@ -165,6 +166,7 @@ function seedState(): Omit<
   | "setAdvances"
   | "setInventory"
   | "setComplaints"
+  | "removeComplaint"
   | "setReminders"
   | "setBankRows"
   | "applySnapshot"
@@ -617,6 +619,15 @@ export const useLedger = create<LedgerState>()(
             ),
           ),
         }),
+      removeComplaint: (id, opts) => {
+        const key = sealKey.complaint(id);
+        if (isSealed(get().sealedIds, key) && !opts?.bypass) return;
+        save({
+          complaints: get().complaints.filter((c) => c.id !== id),
+          sealedIds: omitSealed(get().sealedIds, [key]),
+          deletedIds: withSealed(get().deletedIds, [key]),
+        });
+      },
       setReminders: (reminders) =>
         save({ reminders: normalizeReminders(reminders) }),
       setBankRows: (bankRows) =>
