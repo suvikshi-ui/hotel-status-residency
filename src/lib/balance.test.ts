@@ -281,4 +281,32 @@ describe("buildDueAccounts stays", () => {
     assert.equal(fly!.collected, 0);
     assert.equal(fly!.remaining, 2000);
   });
+
+  it("cuts remaining after a receive even when the source name is typed loosely", () => {
+    const accounts = buildDueAccounts(
+      [
+        guest({
+          id: "a1",
+          date: "2026-09-01",
+          name: "RAMESH",
+          source: "Fly Sky",
+          stay: "out",
+        }),
+      ],
+      [
+        receipt({
+          id: "r1",
+          amount: 2000,
+          particular: "Fly-Sky",
+          kind: "due",
+          mode: "CASH",
+        }),
+      ],
+    );
+    const fly = accounts.find((a) => a.key === "FLY SKY");
+    assert.ok(fly);
+    assert.equal(fly!.collected, 2000);
+    assert.equal(fly!.remaining, 0);
+    assert.equal(fly!.settled, true);
+  });
 });

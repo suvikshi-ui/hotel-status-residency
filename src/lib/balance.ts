@@ -67,11 +67,18 @@ export function sourceKey(g: GuestEntry): string {
   return (g.name ?? "").trim().toUpperCase() || "UNKNOWN";
 }
 
+function canonName(s: string) {
+  return s.trim().toUpperCase().replace(/[^A-Z0-9]+/g, "");
+}
+
 function receiptMatches(particular: string, key: string): boolean {
   const p = particular.trim().toUpperCase();
   const k = key.trim().toUpperCase();
   if (!p || !k) return false;
   if (p === k) return true;
+  const pc = canonName(p);
+  const kc = canonName(k);
+  if (pc && kc && (pc === kc || pc.includes(kc) || kc.includes(pc))) return true;
   const escaped = k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`(^|[^A-Z0-9])${escaped}([^A-Z0-9]|$)`).test(p);
 }

@@ -566,7 +566,6 @@ export const useLedger = create<LedgerState>()(
       },
       addBalReceived: (row) => {
         const date = row.date ?? get().selectedDate;
-        if (dayIsLocked(get(), date)) return;
         const balReceived = [
           ...get().balReceived,
           { ...row, id: uid("b"), date },

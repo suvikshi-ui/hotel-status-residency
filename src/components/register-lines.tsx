@@ -423,12 +423,12 @@ export function RegisterLines() {
               gate(
                 () => {
                   addBal({
-                    particular: t,
+                    particular: dueAccount?.key ?? t,
                     mode: dueMode,
                     amount: n,
                     kind: "due",
                   });
-                  toast.success(`Collected ${money(n)} from ${t}`);
+                  toast.success(`Collected ${money(n)} from ${dueAccount?.key ?? t}`);
                   setDueAmt("");
                 },
                 {
