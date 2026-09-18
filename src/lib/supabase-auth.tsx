@@ -42,6 +42,12 @@ type AuthCtx = {
 
 const Ctx = createContext<AuthCtx | null>(null);
 
+function metaOwnerId(user: User) {
+  const meta = user.user_metadata ?? {};
+  const raw = meta.owner_id;
+  return typeof raw === "string" && raw.length > 8 ? raw : null;
+}
+
 function toStaff(user: User | null): StaffUser | null {
   if (!user) return null;
   const meta = user.user_metadata ?? {};
@@ -51,13 +57,14 @@ function toStaff(user: User | null): StaffUser | null {
     null;
   const username =
     (typeof meta.username === "string" && meta.username) || null;
+  const ownerId = metaOwnerId(user) || user.id;
   return {
     id: user.id,
     email: user.email ?? null,
     name,
     username,
     role: "admin",
-    ownerId: user.id,
+    ownerId,
   };
 }
 
@@ -67,17 +74,21 @@ async function staffFromDb(user: User | null): Promise<StaffUser | null> {
   try {
     const row = await fetchPublicUser(base.id);
     if (row) {
+      const role = roleFromUsersTable(row.role);
+      const linked =
+        row.ownerId && row.ownerId !== row.id ? row.ownerId : null;
       return {
         ...base,
         name: row.name || base.name,
         username: row.username || base.username,
-        role: roleFromUsersTable(row.role),
-        ownerId: row.ownerId || base.id,
+        role,
+        ownerId: role === "admin" ? row.ownerId || base.id : linked || base.ownerId || base.id,
       };
     }
   } catch {
-    /* no public.users row → admin panel, never JWT metadata */
+    /* keep JWT owner link */
   }
+  if (base.ownerId !== base.id) return base;
   try {
     await ensurePublicUser({
       id: base.id,

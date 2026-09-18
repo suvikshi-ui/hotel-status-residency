@@ -227,19 +227,9 @@ export function mergeLiveSnapshot(
       parseSealedIds(cloud.sealedIds),
     ),
     deletedIds,
-    inventory: mergeByKey(
-      (r) => r.id,
-      b.inventory ?? [],
-      local.inventory ?? [],
-      cloud.inventory ?? [],
-    ),
+    inventory: mergeRowsById(local.inventory ?? [], cloud.inventory ?? []),
     complaints: dropDeletedRows(
-      mergeByKey(
-        (r) => r.id,
-        b.complaints ?? [],
-        local.complaints ?? [],
-        cloud.complaints ?? [],
-      ),
+      mergeRowsById(local.complaints ?? [], cloud.complaints ?? []),
       deletedIds,
       sealKey.complaint,
     ),

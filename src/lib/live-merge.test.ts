@@ -155,4 +155,21 @@ describe("live merge across desks", () => {
     assert.equal(pick3("a", "a", "b"), "b");
     assert.equal(pick3("a", "c", "a"), "c");
   });
+
+  it("keeps a complaint this desk logged if the account pull is still empty", () => {
+    const row = {
+      id: "c1",
+      roomNo: "101",
+      note: "AC",
+      level: "red" as const,
+      createdAt: "2026-09-18",
+    };
+    const next = mergeLiveSnapshot(
+      snap({ complaints: [row] }),
+      snap({ complaints: [row] }),
+      snap({ complaints: [] }),
+    );
+    assert.equal(next.complaints?.length, 1);
+    assert.equal(next.complaints?.[0].id, "c1");
+  });
 });

@@ -44,7 +44,7 @@ export function isSkippableSealError(error: {
   if (!error) return false;
   const m = (error.message ?? "").toLowerCase();
   if (
-    /\b(guests|food|wholesale|expenses|balance_received|ledger_meta|rooms|staff|advances)\b/.test(
+    /\b(guests|food|wholesale|expenses|balance_received|ledger_meta|rooms|staff|advances|complaints|inventory)\b/.test(
       m,
     )
   ) {
