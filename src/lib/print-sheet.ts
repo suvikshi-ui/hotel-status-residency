@@ -97,7 +97,7 @@ export function printDocument({
 export const A4_PX = { width: 794, height: 1123, marginMm: 8 };
 
 export const REPORT_FONT_HREF =
-  "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap";
+  "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,800&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap";
 
 export const A4_PRINT_CSS = `@page { size: A4 portrait; margin: 8mm; background: #fff; }
 html, body {

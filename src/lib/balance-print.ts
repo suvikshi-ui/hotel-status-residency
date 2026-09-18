@@ -34,7 +34,7 @@ function printFrame(title: string, inner: string) {
 <head>
   <meta charset="utf-8" />
   <title>${escapeHtml(title)}</title>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,800&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap" />
   <style>
     @page { size: A4 portrait; margin: 10mm; }
     html, body { margin: 0; background: #fff; color: #111; }
@@ -48,7 +48,7 @@ function printFrame(title: string, inner: string) {
     .head img { height: 52px; width: auto; }
     .head h1 {
       margin: 0; font-family: Fraunces, "Times New Roman", serif;
-      font-size: 26px; letter-spacing: -.03em; color: #f4c430; font-weight: 600;
+      font-size: 32px; letter-spacing: -.04em; color: #f4c430; font-weight: 800;
     }
     .head p { margin: 4px 0 0; font-family: Fraunces, "Times New Roman", serif; font-size: 13px; letter-spacing: -.02em; }
     .body { padding: 12px 14px 16px; }

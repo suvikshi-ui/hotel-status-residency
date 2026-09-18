@@ -288,9 +288,10 @@ export function DayChart({
           <div
             style={{
               fontFamily: '"Fraunces", "Times New Roman", serif',
-              fontSize: 28,
-              fontWeight: 600,
-              letterSpacing: "-0.03em",
+              fontSize: 34,
+              fontWeight: 800,
+              letterSpacing: "-0.04em",
+              lineHeight: 1.05,
             }}
           >
             {hotel}

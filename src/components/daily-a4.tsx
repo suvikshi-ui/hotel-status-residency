@@ -48,7 +48,7 @@ function roomsFor(
   return out.length ? ` (${out.join(",")})` : "";
 }
 
-const SIZE = { fs: 12.5, pad: "5px 8px", head: 13, title: 28, date: 16 };
+const SIZE = { fs: 12.5, pad: "5px 8px", head: 13, title: 34, date: 16 };
 
 const B = "1px solid #1a1a1a";
 const FRAME = "2px solid #1a1a1a";
@@ -245,7 +245,7 @@ export function DailyA4({
       <div
         className="daily-a4-head"
         style={{
-          padding: "10px 14px",
+          padding: "8px 10px",
           borderBottom: B,
           background: "#14352c",
           color: "#f4efe4",
@@ -256,40 +256,42 @@ export function DailyA4({
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 14,
+            justifyContent: "space-between",
+            gap: 10,
           }}
         >
           <img
             src={publicUrl("logo.png?v=2")}
             alt=""
             style={{
-              height: 58,
+              height: 52,
               width: "auto",
               flexShrink: 0,
               objectFit: "contain",
             }}
           />
-          <div style={{ flex: 1, minWidth: 0, textAlign: "center" }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div
               style={{
                 fontFamily: DISPLAY,
-                fontWeight: 600,
+                fontWeight: 800,
                 fontSize: SIZE.title,
-                letterSpacing: "-0.03em",
-                lineHeight: 1.15,
+                letterSpacing: "-0.04em",
+                lineHeight: 1.05,
                 color: "#f4c430",
+                fontOpticalSizing: "auto",
               }}
             >
               {hotel}
             </div>
             <div
               style={{
-                marginTop: 4,
+                marginTop: 2,
                 fontFamily: DISPLAY,
-                fontWeight: 500,
+                fontWeight: 600,
                 fontSize: 13,
                 letterSpacing: "-0.02em",
-                lineHeight: 1.25,
+                lineHeight: 1.2,
               }}
             >
               {blessing}
@@ -298,10 +300,11 @@ export function DailyA4({
           <div
             style={{
               fontFamily: DISPLAY,
-              fontWeight: 600,
+              fontWeight: 700,
               fontSize: SIZE.date,
               whiteSpace: "nowrap",
               letterSpacing: "-0.02em",
+              flexShrink: 0,
             }}
           >
             DATE : {sheetDate(date)}
