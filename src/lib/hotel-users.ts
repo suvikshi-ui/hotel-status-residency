@@ -2,7 +2,6 @@ import { type AppRole } from "./roles";
 import {
   hashPassword,
   normalizeUsername,
-  usernameToEmail,
 } from "./hotel-login";
 import {
   hotelUserFromRow,
@@ -133,89 +132,31 @@ export async function createHotelUser(input: {
   const ownerId = adminSession?.user.id;
   if (!ownerId || !adminSession) throw new Error("Sign in as Admin first");
 
-  let hotelRow: HotelUser | null = null;
-  const inserted = await sb
-    .from("hotel_users")
-    .insert({
-      owner_id: ownerId,
-      name,
-      username,
-      password_hash: hashPassword(input.password),
-      role: input.role,
-    })
-    .select("id, owner_id, name, username, role, created_at")
-    .single();
-
-  if (inserted.error) {
-    if (!isMissingSchema(inserted.error) && !isDuplicateName(inserted.error.message)) {
-      throw new Error(inserted.error.message);
-    }
-  } else if (inserted.data) {
-    hotelRow = rowOf(inserted.data as Record<string, unknown>);
-  }
-
-  const { data: signed, error: signErr } = await sb.auth.signUp({
-    email: usernameToEmail(username),
-    password: input.password,
-    options: {
-      data: {
-        full_name: name,
-        username,
-        role: input.role,
-        owner_id: ownerId,
-      },
-    },
+  const viaRpc = await sb.rpc("create_staff_login", {
+    p_name: name,
+    p_username: username,
+    p_password: input.password,
+    p_hash: hashPassword(input.password),
+    p_role: input.role,
   });
-
-  let authId = signed?.user?.id ?? null;
-  if (signErr) {
-    const msg = signErr.message.toLowerCase();
-    if (!msg.includes("already")) {
-      await sb.auth.setSession(adminSession);
-      throw new Error(signErr.message);
-    }
-    const { data: existing } = await sb.auth.signInWithPassword({
-      email: usernameToEmail(username),
-      password: input.password,
-    });
-    authId = existing.user?.id ?? authId;
-  }
-  await sb.auth.setSession(adminSession);
-
-  if (authId) {
-    const { error: usersErr } = await sb.from("users").upsert(
-      {
-        id: authId,
-        owner_id: ownerId,
-        name,
-        username,
-        role: input.role,
-      },
-      { onConflict: "id" },
+  if (!viaRpc.error && viaRpc.data) {
+    const row = rowOf(
+      (typeof viaRpc.data === "object" && viaRpc.data
+        ? viaRpc.data
+        : {}) as Record<string, unknown>,
     );
-    if (usersErr) {
-      if (isMissingSchema(usersErr)) {
-        throw new Error(
-          "Users table is off. Copy the SQL, run it in Supabase, then add the user again.",
-        );
-      }
-      if (isDuplicateName(usersErr.message)) {
-        throw new Error("That username is already taken");
-      }
-      throw new Error(usersErr.message);
+    if (row.id && row.username) return row;
+  }
+  if (viaRpc.error && !isMissingSchema(viaRpc.error)) {
+    const msg = viaRpc.error.message.toLowerCase();
+    if (!msg.includes("could not find the function") && !msg.includes("schema cache")) {
+      throw new Error(viaRpc.error.message);
     }
-    return {
-      id: authId,
-      ownerId,
-      name,
-      username,
-      role: input.role,
-      createdAt: new Date().toISOString().slice(0, 10),
-    };
   }
 
-  if (hotelRow) return hotelRow;
-  throw new Error("Could not create the login. Try a different username.");
+  throw new Error(
+    "Staff login SQL is not in the account yet. Copy Users SQL, Run it in Supabase, then Save this user again. No email is sent.",
+  );
 }
 
 export async function loginHotelUser(

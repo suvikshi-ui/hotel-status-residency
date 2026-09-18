@@ -32,8 +32,9 @@ import {
 } from "@/lib/supabase-config";
 import hotelUsersSql from "../../supabase/migrations/0002_hotel_users.sql?raw";
 import appUsersSql from "../../supabase/migrations/0003_public_users.sql?raw";
+import staffLoginSql from "../../supabase/migrations/0012_create_staff_login.sql?raw";
 
-const USERS_SQL = `${hotelUsersSql}\n\n${appUsersSql}`;
+const USERS_SQL = `${hotelUsersSql}\n\n${appUsersSql}\n\n${staffLoginSql}`;
 
 export function AddUserCard() {
   const [open, setOpen] = useState(false);
