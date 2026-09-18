@@ -48,8 +48,8 @@ function printFrame(title: string, inner: string) {
     .head img { height: 52px; width: auto; }
     .head h1 {
       margin: 0; font-family: Fraunces, "Times New Roman", serif;
-      font-size: 32px; letter-spacing: .16em; color: #f4c430; font-weight: 800;
-      transform: scaleX(1.12); transform-origin: center; white-space: nowrap;
+      font-size: 32px; letter-spacing: .05em; color: #f4c430; font-weight: 700;
+      transform: scaleX(0.94); transform-origin: center; white-space: nowrap;
     }
     .head p { margin: 4px 0 0; font-family: Fraunces, "Times New Roman", serif; font-size: 13px; letter-spacing: -.02em; }
     .body { padding: 12px 14px 16px; }

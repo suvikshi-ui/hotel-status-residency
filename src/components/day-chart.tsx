@@ -289,10 +289,10 @@ export function DayChart({
             style={{
               fontFamily: '"Fraunces", "Times New Roman", serif',
               fontSize: 34,
-              fontWeight: 800,
-              letterSpacing: "0.16em",
+              fontWeight: 700,
+              letterSpacing: "0.05em",
               lineHeight: 1.05,
-              transform: "scaleX(1.12)",
+              transform: "scaleX(0.94)",
               transformOrigin: "center",
               whiteSpace: "nowrap",
             }}

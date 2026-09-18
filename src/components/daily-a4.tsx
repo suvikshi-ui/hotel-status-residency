@@ -274,13 +274,13 @@ export function DailyA4({
             <div
               style={{
                 fontFamily: DISPLAY,
-                fontWeight: 800,
+                fontWeight: 700,
                 fontSize: SIZE.title,
-                letterSpacing: "0.16em",
+                letterSpacing: "0.05em",
                 lineHeight: 1.05,
                 color: "#f4c430",
                 fontOpticalSizing: "auto",
-                transform: "scaleX(1.12)",
+                transform: "scaleX(0.94)",
                 transformOrigin: "center",
                 whiteSpace: "nowrap",
               }}
