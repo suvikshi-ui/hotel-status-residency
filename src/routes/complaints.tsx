@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { FileDown, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useGate } from "@/components/security-gate";
 import {
   COMPLAINT_LEVELS,
@@ -21,12 +23,22 @@ import {
   type ComplaintLevel,
   type RoomComplaint,
 } from "@/lib/complaints";
+import {
+  COMPLAINT_LIST_KIND,
+  complaintStatus,
+  downloadComplaintPdf,
+  filterComplaints,
+  printComplaintList,
+  sortComplaints,
+  type ComplaintListKind,
+  complaintListPdf,
+} from "@/lib/complaint-report";
 import { formatDayShort } from "@/lib/format";
 import { useLedger } from "@/lib/store";
 import type { RoomDef } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { SaveCube, useAccountSave } from "@/components/save-cube";
-import { isSealed, sealKey } from "@/lib/sheet-seal";
+import { isSealed, sealKey, type SealedIds } from "@/lib/sheet-seal";
 
 export const Route = createFileRoute("/complaints")({
   component: ComplaintsPage,
@@ -64,6 +76,8 @@ function ComplaintsPage() {
 
   const openCount = complaints.filter((c) => c.level !== "green").length;
   const redCount = complaints.filter((c) => c.level === "red").length;
+  const solvedCount = complaints.filter((c) => c.level === "green").length;
+  const isAdmin = role === "admin";
 
   const byFloor = useMemo(
     () =>
@@ -165,99 +179,53 @@ function ComplaintsPage() {
           Complaints
         </h1>
         <p className="mt-1 text-sm text-muted">
-          Log a cube, then press Save to send the books to the server.
+          {isAdmin
+            ? "Cubes for the floor. List tab for the full report, print and PDF."
+            : "Log a cube, then press Save to send the books to the server."}
         </p>
       </div>
       <SaveCube busy={saving} onSave={() => void saveToServer()} />
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Open" value={openCount} />
         <Stat label="Emergency" value={redCount} tone="danger" />
+        <Stat label="Solved" value={solvedCount} />
         <Stat label="Logged" value={complaints.length} />
       </div>
 
-      <div className="flex flex-wrap gap-3 text-xs">
-        <Legend className="bg-danger" label="Emergency" />
-        <Legend className="bg-due" label="Moderate" />
-        <Legend className="bg-ok" label="Solved" />
-        <Legend className="border border-dashed border-border bg-card" label="Empty cube" />
-      </div>
-
-      {byFloor.map(({ floor, rooms: floorRooms }) => (
-        <Card key={floor}>
-          <CardHeader>
-            <CardTitle className="text-base">{floor} floor</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-1.5">
-            {floorRooms.map((r) => {
-              const items = complaintsForRoom(complaints, r.no);
-              const { trail, slots } = roomCubeLayout(items);
-              const hottest = items.find((c) => c.level === "red")
-                ? "red"
-                : items.find((c) => c.level === "yellow")
-                  ? "yellow"
-                  : items.find((c) => c.level === "green")
-                    ? "green"
-                    : null;
-              return (
-                <div
-                  key={r.no}
-                  className="flex flex-wrap items-center gap-2 rounded-lg bg-bg-warm/50 px-2 py-1.5 sm:px-3"
-                >
-                  <span className="w-10 shrink-0 font-display text-lg font-semibold tabular">
-                    {r.no}
-                  </span>
-                  {hottest ? (
-                    <span
-                      className={cn(
-                        "size-2 shrink-0 rounded-full",
-                        hottest === "red" && "bg-danger",
-                        hottest === "yellow" && "bg-due",
-                        hottest === "green" && "bg-ok",
-                      )}
-                    />
-                  ) : (
-                    <span className="size-2 shrink-0 rounded-full bg-border" />
-                  )}
-                  <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-                    {trail.map((c) => (
-                      <Cube
-                        key={c.id}
-                        item={c}
-                        size="sm"
-                        frozen={isSealed(sealedIds, sealKey.complaint(c.id))}
-                        onClick={() => startEdit(r.no, c)}
-                      />
-                    ))}
-                    {slots.map((item, i) =>
-                      item ? (
-                        <Cube
-                          key={item.id}
-                          item={item}
-                          size="md"
-                          frozen={isSealed(sealedIds, sealKey.complaint(item.id))}
-                          onClick={() => startEdit(r.no, item)}
-                        />
-                      ) : (
-                        <button
-                          key={`${r.no}-empty-${i}`}
-                          type="button"
-                          onClick={() => startNew(r.no)}
-                          aria-label={`Add complaint for room ${r.no}`}
-                          className="grid size-11 place-items-center rounded-md border border-dashed border-border bg-card text-lg leading-none text-muted hover:border-primary hover:text-primary"
-                        >
-                          +
-                        </button>
-                      ),
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-      ))}
+      {isAdmin ? (
+        <Tabs defaultValue="cubes">
+          <TabsList className="grid w-full grid-cols-2 print:hidden" aria-label="Complaint views">
+            <TabsTrigger value="cubes" className="w-full">
+              Cubes
+            </TabsTrigger>
+            <TabsTrigger value="list" className="w-full">
+              List
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="cubes" className="flex flex-col gap-5">
+            <ComplaintCubes
+              byFloor={byFloor}
+              complaints={complaints}
+              sealedIds={sealedIds}
+              onNew={startNew}
+              onEdit={startEdit}
+            />
+          </TabsContent>
+          <TabsContent value="list">
+            <ComplaintList rooms={rooms} complaints={complaints} />
+          </TabsContent>
+        </Tabs>
+      ) : (
+        <ComplaintCubes
+          byFloor={byFloor}
+          complaints={complaints}
+          sealedIds={sealedIds}
+          onNew={startNew}
+          onEdit={startEdit}
+        />
+      )}
 
       <Dialog
         open={Boolean(open)}
@@ -328,6 +296,233 @@ function ComplaintsPage() {
           </div>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function ComplaintCubes({
+  byFloor,
+  complaints,
+  sealedIds,
+  onNew,
+  onEdit,
+}: {
+  byFloor: { floor: RoomDef["floor"]; rooms: RoomDef[] }[];
+  complaints: RoomComplaint[];
+  sealedIds: SealedIds;
+  onNew: (roomNo: string) => void;
+  onEdit: (roomNo: string, existing: RoomComplaint) => void;
+}) {
+  return (
+    <>
+      <div className="flex flex-wrap gap-3 text-xs">
+        <Legend className="bg-danger" label="Emergency" />
+        <Legend className="bg-due" label="Moderate" />
+        <Legend className="bg-ok" label="Solved" />
+        <Legend className="border border-dashed border-border bg-card" label="Empty cube" />
+      </div>
+      {byFloor.map(({ floor, rooms: floorRooms }) => (
+        <Card key={floor}>
+          <CardHeader>
+            <CardTitle className="text-base">{floor} floor</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-1.5">
+            {floorRooms.map((r) => {
+              const items = complaintsForRoom(complaints, r.no);
+              const { trail, slots } = roomCubeLayout(items);
+              const hottest = items.find((c) => c.level === "red")
+                ? "red"
+                : items.find((c) => c.level === "yellow")
+                  ? "yellow"
+                  : items.find((c) => c.level === "green")
+                    ? "green"
+                    : null;
+              return (
+                <div
+                  key={r.no}
+                  className="flex flex-wrap items-center gap-2 rounded-lg bg-bg-warm/50 px-2 py-1.5 sm:px-3"
+                >
+                  <span className="w-10 shrink-0 font-display text-lg font-semibold tabular">
+                    {r.no}
+                  </span>
+                  {hottest ? (
+                    <span
+                      className={cn(
+                        "size-2 shrink-0 rounded-full",
+                        hottest === "red" && "bg-danger",
+                        hottest === "yellow" && "bg-due",
+                        hottest === "green" && "bg-ok",
+                      )}
+                    />
+                  ) : (
+                    <span className="size-2 shrink-0 rounded-full bg-border" />
+                  )}
+                  <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+                    {trail.map((c) => (
+                      <Cube
+                        key={c.id}
+                        item={c}
+                        size="sm"
+                        frozen={isSealed(sealedIds, sealKey.complaint(c.id))}
+                        onClick={() => onEdit(r.no, c)}
+                      />
+                    ))}
+                    {slots.map((item, i) =>
+                      item ? (
+                        <Cube
+                          key={item.id}
+                          item={item}
+                          size="md"
+                          frozen={isSealed(sealedIds, sealKey.complaint(item.id))}
+                          onClick={() => onEdit(r.no, item)}
+                        />
+                      ) : (
+                        <button
+                          key={`${r.no}-empty-${i}`}
+                          type="button"
+                          onClick={() => onNew(r.no)}
+                          aria-label={`Add complaint for room ${r.no}`}
+                          className="grid size-11 place-items-center rounded-md border border-dashed border-border bg-card text-lg leading-none text-muted hover:border-primary hover:text-primary"
+                        >
+                          +
+                        </button>
+                      ),
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      ))}
+    </>
+  );
+}
+
+function ComplaintList({
+  rooms,
+  complaints,
+}: {
+  rooms: RoomDef[];
+  complaints: RoomComplaint[];
+}) {
+  const hotel = useLedger((s) => s.hotel);
+  const [kind, setKind] = useState<ComplaintListKind>("all");
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const rows = useMemo(
+    () => sortComplaints(filterComplaints(complaints, kind), rooms),
+    [complaints, kind, rooms],
+  );
+  const floorOf = useMemo(
+    () => new Map(rooms.map((r) => [r.no, r.floor])),
+    [rooms],
+  );
+
+  function printList() {
+    toast.message("Opening print…");
+    printComplaintList({
+      hotel: hotel.name,
+      place: hotel.place,
+      kind,
+      rows,
+      rooms,
+    });
+  }
+
+  async function savePdf() {
+    setPdfBusy(true);
+    try {
+      const blob = await complaintListPdf({
+        hotel: hotel.name,
+        place: hotel.place,
+        kind,
+        rows,
+        rooms,
+      });
+      downloadComplaintPdf(blob, kind);
+      toast.success("PDF saved");
+    } catch {
+      toast.error("PDF failed");
+    } finally {
+      setPdfBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
+        <div className="flex flex-wrap gap-1.5">
+          {COMPLAINT_LIST_KIND.map((opt) => (
+            <Button
+              key={opt.id}
+              type="button"
+              size="sm"
+              variant={kind === opt.id ? "default" : "outline"}
+              onClick={() => setKind(opt.id)}
+            >
+              {opt.label}
+            </Button>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" onClick={printList}>
+            <Printer className="size-4" />
+            Print
+          </Button>
+          <Button type="button" onClick={() => void savePdf()} disabled={pdfBusy}>
+            <FileDown className="size-4" />
+            {pdfBusy ? "PDF…" : "PDF"}
+          </Button>
+        </div>
+      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">
+            {kind === "open"
+              ? "Open complaints"
+              : kind === "solved"
+                ? "Solved complaints"
+                : "All complaints"}
+          </CardTitle>
+          <p className="text-sm text-muted">
+            {rows.length} {rows.length === 1 ? "entry" : "entries"} · room, problem, status
+          </p>
+        </CardHeader>
+        <CardContent className="overflow-x-auto p-0">
+          <table className="w-full min-w-[36rem] text-left text-sm">
+            <thead className="text-xs uppercase tracking-wide text-muted">
+              <tr className="border-y border-border">
+                <th className="px-5 py-2 font-medium">Room</th>
+                <th className="px-3 py-2 font-medium">Floor</th>
+                <th className="px-3 py-2 font-medium">Problem</th>
+                <th className="px-3 py-2 font-medium">Status</th>
+                <th className="px-5 py-2 font-medium">Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length ? (
+                rows.map((c) => (
+                  <tr key={c.id} className="border-b border-border/70">
+                    <td className="px-5 py-2 font-medium tabular">{c.roomNo}</td>
+                    <td className="px-3 py-2 text-muted">{floorOf.get(c.roomNo) ?? ""}</td>
+                    <td className="px-3 py-2">{c.note || "—"}</td>
+                    <td className="px-3 py-2">{complaintStatus(c.level)}</td>
+                    <td className="px-5 py-2 tabular text-muted">
+                      {c.createdAt ? formatDayShort(c.createdAt) : ""}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td className="px-5 py-6 text-muted" colSpan={5}>
+                    No complaints in this list
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
     </div>
   );
 }
