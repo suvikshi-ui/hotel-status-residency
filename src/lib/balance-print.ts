@@ -34,12 +34,12 @@ function printFrame(title: string, inner: string) {
 <head>
   <meta charset="utf-8" />
   <title>${escapeHtml(title)}</title>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Cinzel:wght@600;700&display=swap" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap" />
   <style>
     @page { size: A4 portrait; margin: 10mm; }
     html, body { margin: 0; background: #fff; color: #111; }
     * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-    body { font: 12.5px/1.4 Georgia, "Times New Roman", Times, serif; }
+    body { font: 12.5px/1.45 "Source Serif 4", Georgia, "Times New Roman", serif; }
     .sheet { border: 2.5px solid #1a1a1a; min-height: 277mm; overflow: hidden; }
     .head {
       display: flex; align-items: center; gap: 14px;
@@ -47,19 +47,19 @@ function printFrame(title: string, inner: string) {
     }
     .head img { height: 52px; width: auto; }
     .head h1 {
-      margin: 0; font-family: "Cinzel Decorative", Algerian, serif;
-      font-size: 22px; letter-spacing: .12em; color: #f4c430; font-weight: 900;
+      margin: 0; font-family: "Playfair Display", Georgia, serif;
+      font-size: 22px; letter-spacing: .02em; color: #f4c430; font-weight: 700;
     }
-    .head p { margin: 4px 0 0; font-family: Cinzel, Georgia, serif; font-size: 11px; letter-spacing: .08em; }
+    .head p { margin: 4px 0 0; font-family: "Source Serif 4", Georgia, serif; font-size: 11px; letter-spacing: .04em; }
     .body { padding: 12px 14px 16px; }
     h2 {
-      margin: 0 0 10px; text-align: center; font-family: Cinzel, Georgia, serif;
-      font-size: 14px; letter-spacing: .16em; text-transform: uppercase;
+      margin: 0 0 10px; text-align: center; font-family: "Playfair Display", Georgia, serif;
+      font-size: 15px; letter-spacing: .04em; text-transform: uppercase;
       text-decoration: underline;
     }
     .src {
-      margin: 16px 0 6px; font-family: Cinzel, Georgia, serif;
-      font-size: 13px; letter-spacing: .1em; text-transform: uppercase;
+      margin: 16px 0 6px; font-family: "Playfair Display", Georgia, serif;
+      font-size: 13px; letter-spacing: .04em; text-transform: uppercase;
       border-bottom: 1px solid #1a1a1a; padding-bottom: 3px;
     }
     table { width: 100%; border-collapse: collapse; }

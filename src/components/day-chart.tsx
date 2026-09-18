@@ -287,7 +287,7 @@ export function DayChart({
           <img src={publicUrl("logo.png?v=2")} alt="" style={{ height: 48, width: "auto" }} />
           <div
             style={{
-              fontFamily: '"Cinzel Decorative", Algerian, Georgia, serif',
+              fontFamily: '"Playfair Display", Georgia, serif',
               fontSize: 26,
               fontWeight: 700,
               letterSpacing: "0.02em",

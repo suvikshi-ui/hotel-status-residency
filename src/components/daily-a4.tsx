@@ -53,8 +53,8 @@ const SIZE = { fs: 12.5, pad: "5px 8px", head: 13, title: 24 };
 const B = "1px solid #1a1a1a";
 const FRAME = "2px solid #1a1a1a";
 const SPLIT = "1px solid #d8d0c0";
-const BODY = '"Cinzel", "Times New Roman", Times, Georgia, serif';
-const DISPLAY = '"Cinzel Decorative", Algerian, "Times New Roman", serif';
+const BODY = '"Source Serif 4", Georgia, "Times New Roman", serif';
+const DISPLAY = '"Playfair Display", Georgia, "Times New Roman", serif';
 
 const fill = {
   ob: "#f4c430",
@@ -137,8 +137,8 @@ function BlockTitle({ children }: { children: string }) {
           border: B,
           padding: "8px 8px",
           textAlign: "center",
-          fontWeight: 900,
-          letterSpacing: "0.16em",
+          fontWeight: 700,
+          letterSpacing: "0.04em",
           fontSize: 14,
           fontFamily: DISPLAY,
           background: "#f3ead4",
@@ -273,9 +273,9 @@ export function DailyA4({
             <div
               style={{
                 fontFamily: DISPLAY,
-                fontWeight: 900,
+                fontWeight: 700,
                 fontSize: SIZE.title,
-                letterSpacing: "0.14em",
+                letterSpacing: "0.02em",
                 lineHeight: 1.15,
                 color: "#f4c430",
               }}
@@ -285,10 +285,10 @@ export function DailyA4({
             <div
               style={{
                 marginTop: 4,
-                fontFamily: DISPLAY,
-                fontWeight: 700,
+                fontFamily: BODY,
+                fontWeight: 600,
                 fontSize: SIZE.fs,
-                letterSpacing: "0.1em",
+                letterSpacing: "0.02em",
                 textDecoration: "underline",
               }}
             >

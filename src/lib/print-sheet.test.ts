@@ -10,7 +10,7 @@ describe("A4 print page", () => {
     assert.match(A4_PRINT_CSS, /size: A4 portrait/);
     assert.match(A4_PRINT_CSS, /daily-a4-head/);
     const html = a4PrintDocument("Daily report", '<div class="daily-a4"></div>');
-    assert.match(html, /Cinzel/);
+    assert.match(html, /Playfair\+Display/);
     assert.match(html, /class="daily-a4"/);
   });
 });

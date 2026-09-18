@@ -96,8 +96,8 @@ export function printDocument({
 
 export const A4_PX = { width: 794, height: 1123, marginMm: 8 };
 
-export const CINZEL_FONT_HREF =
-  "https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Cinzel:wght@600;700&display=swap";
+export const REPORT_FONT_HREF =
+  "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap";
 
 export const A4_PRINT_CSS = `@page { size: A4 portrait; margin: 8mm; background: #fff; }
 html, body {
@@ -130,7 +130,7 @@ export function a4PrintDocument(title: string, inner: string) {
 <head>
   <meta charset="utf-8" />
   <title>${escapeHtml(title)}</title>
-  <link rel="stylesheet" href="${CINZEL_FONT_HREF}" />
+  <link rel="stylesheet" href="${REPORT_FONT_HREF}" />
   <style>${A4_PRINT_CSS}</style>
 </head>
 <body><div class="a4-page">${inner}</div></body>
