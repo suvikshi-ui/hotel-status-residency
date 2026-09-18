@@ -290,8 +290,11 @@ export function DayChart({
               fontFamily: '"Fraunces", "Times New Roman", serif',
               fontSize: 34,
               fontWeight: 800,
-              letterSpacing: "-0.04em",
+              letterSpacing: "0.16em",
               lineHeight: 1.05,
+              transform: "scaleX(1.12)",
+              transformOrigin: "center",
+              whiteSpace: "nowrap",
             }}
           >
             {hotel}

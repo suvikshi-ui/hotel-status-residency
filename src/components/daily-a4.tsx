@@ -270,16 +270,19 @@ export function DailyA4({
               objectFit: "contain",
             }}
           />
-          <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ flex: 1, minWidth: 0, textAlign: "center", overflow: "hidden" }}>
             <div
               style={{
                 fontFamily: DISPLAY,
                 fontWeight: 800,
                 fontSize: SIZE.title,
-                letterSpacing: "-0.04em",
+                letterSpacing: "0.16em",
                 lineHeight: 1.05,
                 color: "#f4c430",
                 fontOpticalSizing: "auto",
+                transform: "scaleX(1.12)",
+                transformOrigin: "center",
+                whiteSpace: "nowrap",
               }}
             >
               {hotel}
