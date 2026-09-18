@@ -18,7 +18,7 @@ import {
   fetchPublicUser,
   loginHotelUser,
 } from "./hotel-users";
-import { loginIsEmail, usernameToEmail } from "./hotel-login";
+import { loginIsEmail, normalizeUsername, usernameToEmail } from "./hotel-login";
 import {
   authEventReloadsBooks,
   sameStaffUser,
@@ -94,12 +94,14 @@ async function staffFromDb(user: User | null): Promise<StaffUser | null> {
 
 function friendlyAuthError(message: string) {
   const m = message.toLowerCase();
-  if (m.includes("invalid login")) return "Wrong email or password.";
+  if (m.includes("invalid login")) return "Wrong username or password.";
+  if (m.includes("not confirmed") || m.includes("email not confirmed")) {
+    return "This login is not confirmed yet. Ask Admin to run the confirm SQL, then try username and password again.";
+  }
   if (m.includes("already registered") || m.includes("already been registered")) {
-    return "That email already has an account. Sign in instead.";
+    return "That username already has an account. Sign in instead.";
   }
   if (m.includes("password")) return message;
-  if (m.includes("email")) return message;
   if (m.includes("not connected") || m.includes("not configured")) {
     return "Supabase is not connected. Add the project ID and publishable key.";
   }
@@ -168,15 +170,18 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signUp = useCallback(
-    async (email: string, password: string, name: string) => {
+    async (login: string, password: string, name: string) => {
       if (!isSupabaseConfigured()) {
         throw new Error(friendlyAuthError("not connected"));
       }
+      const raw = login.trim();
+      const email = loginIsEmail(raw) ? raw.toLowerCase() : usernameToEmail(raw);
+      const username = loginIsEmail(raw) ? normalizeUsername(raw.split("@")[0] ?? raw) : normalizeUsername(raw);
       const { data, error } = await getSupabase().auth.signUp({
-        email: email.trim().toLowerCase(),
+        email,
         password,
         options: {
-          data: { full_name: name.trim() },
+          data: { full_name: name.trim(), username },
         },
       });
       if (error) throw new Error(friendlyAuthError(error.message));

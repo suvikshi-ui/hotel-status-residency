@@ -22,7 +22,7 @@ function LoginPage() {
   const navigate = useNavigate();
   const [tab, setTab] = useState("signin");
   const [busy, setBusy] = useState(false);
-  const [email, setEmail] = useState("");
+  const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -46,13 +46,13 @@ function LoginPage() {
 
   async function onSignIn(e: FormEvent) {
     e.preventDefault();
-    if (!email.trim() || !password) {
-      toast.error("Enter email and password");
+    if (!login.trim() || !password) {
+      toast.error("Enter username and password");
       return;
     }
     setBusy(true);
     try {
-      await signIn(email, password);
+      await signIn(login, password);
       toast.success("Signed in");
       void navigate({ to: "/" });
     } catch (err) {
@@ -68,8 +68,8 @@ function LoginPage() {
       toast.error("Enter your name");
       return;
     }
-    if (!email.trim() || !password) {
-      toast.error("Enter email and password");
+    if (!login.trim() || !password) {
+      toast.error("Enter username and password");
       return;
     }
     if (password.length < 6) {
@@ -82,9 +82,9 @@ function LoginPage() {
     }
     setBusy(true);
     try {
-      const result = await signUp(email, password, name);
+      const result = await signUp(login, password, name);
       if (result === "confirm") {
-        toast.success("Check your email to confirm, then sign in.");
+        toast.success("Username saved. Sign in with username and password.");
         setTab("signin");
         setPassword("");
         setConfirm("");
@@ -111,8 +111,8 @@ function LoginPage() {
             Hotel Status Residency
           </h1>
           <p className="mt-3 text-sm leading-relaxed text-sidebar-muted">
-            Night audit, register and cash book — sign in with the hotel email
-            to open your books.
+            Night audit, register and cash book — sign in with the username
+            Admin saved. No email.
           </p>
         </div>
         <p className="text-[11px] uppercase tracking-[0.14em] text-sidebar-muted">
@@ -137,7 +137,7 @@ function LoginPage() {
             {tab === "signup" ? "Create account" : "Sign in"}
           </h2>
           <p className="mt-1 text-sm text-muted">
-            Username or email, and password.
+            Username and password. No email.
           </p>
 
           {!configured ? (
@@ -170,13 +170,14 @@ function LoginPage() {
             <TabsContent value="signin" className="mt-5">
               <form className="grid gap-3" onSubmit={onSignIn}>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="email">Username or email</Label>
+                  <Label htmlFor="login">Username</Label>
                   <Input
-                    id="email"
+                    id="login"
                     type="text"
                     autoComplete="username"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    value={login}
+                    onChange={(e) => setLogin(e.target.value)}
+                    placeholder="username"
                     required
                   />
                 </div>
@@ -209,13 +210,14 @@ function LoginPage() {
                   />
                 </div>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="email-up">Email</Label>
+                  <Label htmlFor="login-up">Username</Label>
                   <Input
-                    id="email-up"
-                    type="email"
-                    autoComplete="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    id="login-up"
+                    type="text"
+                    autoComplete="username"
+                    value={login}
+                    onChange={(e) => setLogin(e.target.value)}
+                    placeholder="username"
                     required
                   />
                 </div>

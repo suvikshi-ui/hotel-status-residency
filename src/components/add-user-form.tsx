@@ -88,7 +88,7 @@ export function AddUserCard() {
     try {
       const row = await createHotelUser({ name, username, password, role });
       toast.success(
-        `${row.name} saved · ${ROLE_LABEL[row.role]} · ${roleAccess(row.role)}`,
+        `${row.name} saved. They sign in with username ${row.username} — no email.`,
       );
       reset();
       setOpen(false);
@@ -263,8 +263,8 @@ export function AddUserCard() {
           <DialogHeader>
             <DialogTitle>Add user</DialogTitle>
             <DialogDescription>
-              Saved to the Supabase users table. Housekeeping (Kali) can open
-              Complaints and Inventory.
+              Name, username and password only. They sign in with that
+              username — no email.
             </DialogDescription>
           </DialogHeader>
           <form className="flex flex-col gap-3" onSubmit={(e) => void onSave(e)}>
