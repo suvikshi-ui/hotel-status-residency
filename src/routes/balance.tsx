@@ -80,7 +80,7 @@ function BalancePage() {
   }, [accounts, onlyOpen, q]);
 
   const openDue = accounts.reduce(
-    (s, a) => s + Math.max(0, a.billed - a.listBilled - a.collected),
+    (s, a) => s + Math.max(0, a.billed - a.collected),
     0,
   );
   const collected = accounts.reduce((s, a) => s + a.collected, 0);
@@ -99,6 +99,10 @@ function BalancePage() {
   );
   const otherRows = receipts
     .filter((r) => r.kind === "other")
+    .slice()
+    .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+  const listRows = receipts
+    .filter((r) => r.kind === "list")
     .slice()
     .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
   const otherToday = otherRows
@@ -310,7 +314,48 @@ function BalancePage() {
             booksCb={books?.outstanding.cb ?? 0}
             today={otherToday}
             total={otherTotal}
+            sources={sourceHints}
+            listRows={listRows}
             rows={otherRows}
+            onAddList={(source, amount) => {
+              gate(
+                () => {
+                  addBalReceived({
+                    particular: source.trim(),
+                    mode: "BALANCE",
+                    amount,
+                    kind: "list",
+                  });
+                  toast.success(`${source.trim()} added to the Balance list`);
+                },
+                {
+                  title: "Add this source to the Balance list?",
+                  message: `${source.trim()} · ${money(amount)}. Books outstanding will not change.`,
+                  confirmLabel: "Add to list",
+                },
+              );
+            }}
+            onReceive={(source, mode, amount) => {
+              const account = lookupDueAccount(accounts, source);
+              gate(
+                () => {
+                  addBalReceived({
+                    particular: (account?.key ?? source).trim(),
+                    mode,
+                    amount,
+                    kind: "due",
+                  });
+                  toast.success(
+                    `Received ${money(amount)} from ${account?.key ?? source}`,
+                  );
+                },
+                {
+                  title: "Receive this amount?",
+                  message: `Cut ${money(amount)} from ${account?.key ?? source} as a normal collection.`,
+                  confirmLabel: "Receive",
+                },
+              );
+            }}
             onAdd={(mode, amount, note) => {
               gate(
                 () => {
@@ -333,11 +378,11 @@ function BalancePage() {
               gate(
                 () => {
                   removeBalReceived(id);
-                  toast.success("Other entry removed");
+                  toast.success("Entry removed");
                 },
                 {
-                  title: "Delete this Other entry?",
-                  message: "Remove this Other amount?",
+                  title: "Delete this entry?",
+                  message: "Remove this amount?",
                   confirmLabel: "Delete",
                   danger: true,
                 },
@@ -354,17 +399,30 @@ function OtherTab({
   booksCb,
   today,
   total,
+  sources,
+  listRows,
   rows,
+  onAddList,
+  onReceive,
   onAdd,
   onRemove,
 }: {
   booksCb: number;
   today: number;
   total: number;
+  sources: string[];
+  listRows: { id: string; date: string; particular: string; mode: PayMode; amount: number }[];
   rows: { id: string; date: string; particular: string; mode: PayMode; amount: number }[];
+  onAddList: (source: string, amount: number) => void;
+  onReceive: (source: string, mode: PayMode, amount: number) => void;
   onAdd: (mode: PayMode, amount: number, note: string) => void;
   onRemove: (id: string) => void;
 }) {
+  const [listSource, setListSource] = useState("");
+  const [listAmount, setListAmount] = useState("");
+  const [recvSource, setRecvSource] = useState("");
+  const [recvMode, setRecvMode] = useState<PayMode>("CASH");
+  const [recvAmount, setRecvAmount] = useState("");
   const [mode, setMode] = useState<PayMode>("CASH");
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
@@ -391,6 +449,194 @@ function OtherTab({
           </div>
         </Card>
       </div>
+
+      <Card>
+        <CardContent className="flex flex-col gap-4 p-5">
+          <div>
+            <p className="font-display text-lg font-semibold tracking-tight">
+              Add to list
+            </p>
+            <p className="mt-1 text-sm text-muted">
+              Source name + balance amount. Name shows on the main Balance list.
+              Books outstanding stays the same.
+            </p>
+          </div>
+          <form
+            className="grid gap-3 sm:grid-cols-[1fr_8rem_auto]"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const src = listSource.trim();
+              const amt = Number(listAmount);
+              if (!src) {
+                toast.error("Enter a source name");
+                return;
+              }
+              if (!Number.isFinite(amt) || amt <= 0) {
+                toast.error("Enter an amount");
+                return;
+              }
+              onAddList(src, amt);
+              setListSource("");
+              setListAmount("");
+            }}
+          >
+            <div className="grid gap-1.5">
+              <Label htmlFor="list-source">Source</Label>
+              <Input
+                id="list-source"
+                value={listSource}
+                onChange={(e) => setListSource(e.target.value)}
+                placeholder="Company / source name"
+                list="balance-list-sources"
+                autoComplete="off"
+              />
+              <datalist id="balance-list-sources">
+                {sources.map((s) => (
+                  <option key={s} value={s} />
+                ))}
+              </datalist>
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Balance amount</Label>
+              <Input
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                value={listAmount}
+                onChange={(e) => setListAmount(e.target.value)}
+                placeholder="0"
+              />
+            </div>
+            <div className="flex items-end">
+              <Button type="submit" className="w-full">
+                Add to list
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      {listRows.length > 0 ? (
+        <Card>
+          <CardContent className="overflow-x-auto p-0">
+            <table className="w-full min-w-[32rem] text-left text-sm">
+              <thead className="text-xs uppercase tracking-wide text-muted">
+                <tr className="border-y border-border">
+                  <th className="px-5 py-2 font-medium">Date</th>
+                  <th className="px-3 py-2 font-medium">Source</th>
+                  <th className="px-3 py-2 text-right font-medium">List amount</th>
+                  <th className="px-3 py-2" />
+                </tr>
+              </thead>
+              <tbody>
+                {listRows.map((r) => (
+                  <tr key={r.id} className="border-b border-border/70">
+                    <td className="px-5 py-2.5 tabular text-muted">
+                      {formatDayShort(r.date)}
+                    </td>
+                    <td className="px-3 py-2.5">{r.particular}</td>
+                    <td className="px-3 py-2.5 text-right tabular">
+                      {money(r.amount)}
+                    </td>
+                    <td className="px-3 py-2.5 text-right">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-9 min-h-9 text-muted hover:text-danger"
+                        aria-label="Remove list entry"
+                        onClick={() => onRemove(r.id)}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      <Card>
+        <CardContent className="flex flex-col gap-4 p-5">
+          <div>
+            <p className="font-display text-lg font-semibold tracking-tight">
+              Receive
+            </p>
+            <p className="mt-1 text-sm text-muted">
+              Source + paid by + amount. Normal cut from that source. Then press
+              Save.
+            </p>
+          </div>
+          <form
+            className="grid gap-3 sm:grid-cols-[1fr_9rem_8rem_auto]"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const src = recvSource.trim();
+              const amt = Number(recvAmount);
+              if (!src) {
+                toast.error("Enter a source name");
+                return;
+              }
+              if (!Number.isFinite(amt) || amt <= 0) {
+                toast.error("Enter an amount");
+                return;
+              }
+              onReceive(src, recvMode, amt);
+              setRecvSource("");
+              setRecvAmount("");
+            }}
+          >
+            <div className="grid gap-1.5">
+              <Label htmlFor="recv-source">Source</Label>
+              <Input
+                id="recv-source"
+                value={recvSource}
+                onChange={(e) => setRecvSource(e.target.value)}
+                placeholder="Company / source name"
+                list="balance-recv-sources"
+                autoComplete="off"
+              />
+              <datalist id="balance-recv-sources">
+                {sources.map((s) => (
+                  <option key={s} value={s} />
+                ))}
+              </datalist>
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Paid by</Label>
+              <Select value={recvMode} onValueChange={(v) => setRecvMode(v as PayMode)}>
+                <SelectTrigger aria-label="Receive payment mode">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {DUE_PAY_MODES.map((m) => (
+                    <SelectItem key={m} value={m}>
+                      {MODE_LABEL[m]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Received</Label>
+              <Input
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                value={recvAmount}
+                onChange={(e) => setRecvAmount(e.target.value)}
+                placeholder="0"
+              />
+            </div>
+            <div className="flex items-end">
+              <Button type="submit" className="w-full">
+                Receive
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardContent className="flex flex-col gap-4 p-5">
@@ -560,6 +806,7 @@ function SourceCard({
               {account.guestCount} guest{account.guestCount === 1 ? "" : "s"} ·{" "}
               {account.stays.length} stay{account.stays.length === 1 ? "" : "s"} ·{" "}
               {account.nights} night{account.nights === 1 ? "" : "s"}
+              {account.listBilled > 0 ? ` · list ${money(account.listBilled)}` : ""}
               {account.firstDate
                 ? ` · ${formatDayShort(account.firstDate)}–${formatDayShort(account.lastDate)}`
                 : ""}
@@ -645,7 +892,9 @@ function SourceCard({
             </table>
             {account.stays.length === 0 ? (
               <p className="px-5 py-4 text-sm text-muted">
-                No guest stays on this source.
+                {account.listBilled > 0
+                  ? `List opening ${money(account.listBilled)}. Receive cuts this source.`
+                  : "No guest stays on this source."}
               </p>
             ) : null}
           </div>

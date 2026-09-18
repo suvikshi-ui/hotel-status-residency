@@ -238,6 +238,16 @@ export function buildDueAccounts(
     if (!row.lastDate || g.date > row.lastDate) row.lastDate = g.date;
   }
 
+  for (const r of receipts) {
+    if (r.kind !== "list") continue;
+    const key = (r.particular ?? "").trim().toUpperCase() || "UNKNOWN";
+    const row = ensure(key);
+    row.billed += r.amount;
+    row.listBilled += r.amount;
+    if (!row.firstDate || r.date < row.firstDate) row.firstDate = r.date;
+    if (!row.lastDate || r.date > row.lastDate) row.lastDate = r.date;
+  }
+
   const keys = [...map.keys()].sort((a, b) => b.length - a.length);
   for (const r of receipts) {
     if (r.kind === "ota" || r.kind === "other" || r.kind === "list") continue;
@@ -323,7 +333,7 @@ export function uniqueSources(
     }
   }
   for (const r of receipts ?? []) {
-    if (r.kind === "ota" || r.kind === "other" || r.kind === "list") continue;
+    if (r.kind === "ota" || r.kind === "other") continue;
     const s = (r.particular ?? "").trim();
     if (s) set.add(s);
   }

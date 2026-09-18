@@ -242,7 +242,7 @@ describe("buildDueAccounts stays", () => {
     assert.equal(motor!.collected, 0);
   });
 
-  it("keeps Other and list entries off the Balance source list", () => {
+  it("puts list openings on the Balance source list without treating them as collections", () => {
     const accounts = buildDueAccounts(
       [
         guest({ id: "a1", date: "2026-09-01", name: "RAMESH", stay: "out" }),
@@ -261,10 +261,21 @@ describe("buildDueAccounts stays", () => {
           kind: "list",
           mode: "BALANCE",
         }),
+        receipt({
+          id: "r2",
+          amount: 1000,
+          particular: "New Co",
+          kind: "due",
+          mode: "CASH",
+        }),
       ],
     );
     assert.equal(accounts.some((a) => a.key === "OTHER · TEA"), false);
-    assert.equal(accounts.some((a) => a.key === "NEW CO"), false);
+    const listed = accounts.find((a) => a.key === "NEW CO");
+    assert.ok(listed);
+    assert.equal(listed!.listBilled, 3500);
+    assert.equal(listed!.collected, 1000);
+    assert.equal(listed!.remaining, 2500);
     const fly = accounts.find((a) => a.key === "FLYSKY");
     assert.ok(fly);
     assert.equal(fly!.collected, 0);
