@@ -71,7 +71,7 @@ function canonName(s: string) {
   return s.trim().toUpperCase().replace(/[^A-Z0-9]+/g, "");
 }
 
-function receiptMatches(particular: string, key: string): boolean {
+export function receiptMatches(particular: string, key: string): boolean {
   const p = particular.trim().toUpperCase();
   const k = key.trim().toUpperCase();
   if (!p || !k) return false;

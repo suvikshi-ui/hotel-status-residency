@@ -16,6 +16,7 @@ export const Route = createFileRoute("/invoice")({ component: InvoicePage });
 function InvoicePage() {
   const date = useLedger((s) => s.selectedDate);
   const guests = useLedger((s) => s.guests);
+  const receipts = useLedger((s) => s.balReceived);
   const updateGuest = useLedger((s) => s.updateGuest);
   const { gate } = useGate();
   const [nameQ, setNameQ] = useState("");
@@ -23,10 +24,10 @@ function InvoicePage() {
   const month = date.slice(0, 7);
   const gstRows = useMemo(
     () =>
-      buildGstStayBills(guests).filter(
+      buildGstStayBills(guests, receipts).filter(
         (b) => b.checkIn <= `${month}-31` && b.checkOut >= `${month}-01`,
       ),
-    [guests, month],
+    [guests, receipts, month],
   );
   const filtered = useMemo(() => {
     const name = nameQ.trim().toLowerCase();

@@ -1,5 +1,6 @@
+import { receiptMatches, sourceKey } from "./balance";
 import { checkoutFromLastNight, consecutiveStayNights, nightsFromDates } from "./stay";
-import type { GuestEntry, PayMode } from "./types";
+import type { GuestEntry, NamedAmount, PayMode } from "./types";
 
 export type GstBillMeta = {
   id: string;
@@ -110,7 +111,36 @@ export type GstStayBill = {
   payRefNo: string;
 };
 
-export function buildGstStayBills(guests: GuestEntry[]): GstStayBill[] {
+export function payRefsForSource(
+  receipts: NamedAmount[] | undefined,
+  key: string,
+): string[] {
+  if (!receipts?.length || !key.trim()) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const rows = receipts
+    .filter(
+      (r) => r.kind !== "ota" && r.kind !== "other" && r.kind !== "list",
+    )
+    .filter((r) => receiptMatches(r.particular, key))
+    .sort(
+      (a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id),
+    );
+  for (const r of rows) {
+    const ref = (r.payRef ?? "").trim();
+    if (!ref) continue;
+    const k = ref.toUpperCase();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(ref);
+  }
+  return out;
+}
+
+export function buildGstStayBills(
+  guests: GuestEntry[],
+  receipts: NamedAmount[] = [],
+): GstStayBill[] {
   return consecutiveStayNights(guests)
     .filter((chunk) => chunk.some((g) => g.gst))
     .map((chunk) => {
@@ -121,6 +151,12 @@ export function buildGstStayBills(guests: GuestEntry[]): GstStayBill[] {
         last.checkOut ||
         checkoutFromLastNight(last.date);
       const billed = chunk.filter((g) => g.gst);
+      const fromGuest =
+        billed.map((g) => g.payRefNo?.trim() || "").find(Boolean) || "";
+      const fromRecv = payRefsForSource(receipts, sourceKey(first));
+      const payRefNo =
+        fromGuest ||
+        fromRecv.join(" · ");
       return {
         id: first.id,
         ids: chunk.map((g) => g.id),
@@ -134,7 +170,7 @@ export function buildGstStayBills(guests: GuestEntry[]): GstStayBill[] {
         amount: billed.reduce((s, g) => s + g.amount, 0),
         gstInvoiceNo:
           billed.map((g) => g.gstInvoiceNo?.trim() || "").find(Boolean) || "",
-        payRefNo: billed.map((g) => g.payRefNo?.trim() || "").find(Boolean) || "",
+        payRefNo,
       };
     })
     .sort(

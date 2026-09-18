@@ -56,6 +56,33 @@ describe("invoice gst flag", () => {
     assert.equal(bills[0]?.gstInvoiceNo, "GST-88");
   });
 
+  it("shows the Balance receive payment reference on the GST stay", () => {
+    const bills = buildGstStayBills(
+      [
+        g("n1", {
+          date: "2026-09-01",
+          gst: true,
+          source: "Flysky",
+          mode: "BALANCE",
+          stay: "out",
+          checkOut: "2026-09-02",
+        }),
+      ],
+      [
+        {
+          id: "r1",
+          date: "2026-09-05",
+          particular: "Flysky",
+          mode: "CASH",
+          amount: 1500,
+          kind: "due",
+          payRef: "UPI-4411",
+        },
+      ],
+    );
+    assert.equal(bills[0]?.payRefNo, "UPI-4411");
+  });
+
   it("copies one GST invoice number across the stay nights", () => {
     const nights = [
       g("n1", { date: "2026-09-01", gst: true, stay: "continue" }),
