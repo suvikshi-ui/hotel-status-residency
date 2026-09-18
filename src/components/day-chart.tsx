@@ -287,21 +287,37 @@ export function DayChart({
           <img src={publicUrl("logo.png?v=2")} alt="" style={{ height: 48, width: "auto" }} />
           <div
             style={{
-              fontFamily: '"Playfair Display", Georgia, serif',
-              fontSize: 26,
-              fontWeight: 700,
-              letterSpacing: "0.02em",
+              fontFamily: '"Fraunces", "Times New Roman", serif',
+              fontSize: 28,
+              fontWeight: 600,
+              letterSpacing: "-0.03em",
             }}
           >
             {hotel}
           </div>
           <img src={publicUrl("logo.png?v=2")} alt="" style={{ height: 48, width: "auto" }} />
         </div>
-        <div style={{ marginTop: 4, fontSize: 12, color: "#6f675c" }}>{blessing}</div>
-        <div style={{ marginTop: 10, fontSize: 18, fontWeight: 700 }}>
+        <div
+          style={{
+            marginTop: 4,
+            fontSize: 13,
+            color: "#6f675c",
+            fontFamily: '"Fraunces", "Times New Roman", serif',
+          }}
+        >
+          {blessing}
+        </div>
+        <div
+          style={{
+            marginTop: 10,
+            fontSize: 18,
+            fontWeight: 600,
+            fontFamily: '"Fraunces", "Times New Roman", serif',
+          }}
+        >
           Detailed daily · {longDay(date)}
         </div>
-        <div style={{ marginTop: 4, fontSize: 12 }}>
+        <div style={{ marginTop: 4, fontSize: 16, fontWeight: 600 }}>
           {sept(date)} 11:00 AM — {sept(next)} 11:00 AM
         </div>
         <div style={{ marginTop: 3, fontSize: 11, color: "#6f675c" }}>

@@ -48,13 +48,13 @@ function roomsFor(
   return out.length ? ` (${out.join(",")})` : "";
 }
 
-const SIZE = { fs: 12.5, pad: "5px 8px", head: 13, title: 24 };
+const SIZE = { fs: 12.5, pad: "5px 8px", head: 13, title: 28, date: 16 };
 
 const B = "1px solid #1a1a1a";
 const FRAME = "2px solid #1a1a1a";
 const SPLIT = "1px solid #d8d0c0";
 const BODY = '"Source Serif 4", Georgia, "Times New Roman", serif';
-const DISPLAY = '"Playfair Display", Georgia, "Times New Roman", serif';
+const DISPLAY = '"Fraunces", "Times New Roman", serif';
 
 const fill = {
   ob: "#f4c430",
@@ -273,34 +273,35 @@ export function DailyA4({
             <div
               style={{
                 fontFamily: DISPLAY,
-                fontWeight: 700,
+                fontWeight: 600,
                 fontSize: SIZE.title,
-                letterSpacing: "0.02em",
+                letterSpacing: "-0.03em",
                 lineHeight: 1.15,
                 color: "#f4c430",
               }}
             >
-              {hotel.toUpperCase()}
+              {hotel}
             </div>
             <div
               style={{
                 marginTop: 4,
-                fontFamily: BODY,
-                fontWeight: 600,
-                fontSize: SIZE.fs,
-                letterSpacing: "0.02em",
-                textDecoration: "underline",
+                fontFamily: DISPLAY,
+                fontWeight: 500,
+                fontSize: 13,
+                letterSpacing: "-0.02em",
+                lineHeight: 1.25,
               }}
             >
-              {blessing.toUpperCase()}
+              {blessing}
             </div>
           </div>
           <div
             style={{
-              fontFamily: BODY,
-              fontWeight: 700,
-              fontSize: SIZE.fs,
+              fontFamily: DISPLAY,
+              fontWeight: 600,
+              fontSize: SIZE.date,
               whiteSpace: "nowrap",
+              letterSpacing: "-0.02em",
             }}
           >
             DATE : {sheetDate(date)}
