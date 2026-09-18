@@ -16,6 +16,7 @@ import { ledgerOwnerKey, useLedger } from "./store";
 import { isSupabaseConfigured } from "./supabase-config";
 import { isPermissionMessage } from "./cloud-errors";
 import { preferLocalOverCloud } from "./cloud-save";
+import { todayIso } from "./reminders";
 import {
   isDayLocked,
   locksEqual,
@@ -51,6 +52,8 @@ let hideVis: (() => void) | null = null;
 let inFlight: Promise<void> | null = null;
 let queued = false;
 let locksDirty = false;
+const toldRemoteLock = new Set<string>();
+const toldRemoteUnlock = new Set<string>();
 let lockTimer: ReturnType<typeof setInterval> | null = null;
 let lastPulled: LedgerSnapshot | null = null;
 let lastCloudStamp = "";
@@ -137,6 +140,31 @@ function rememberPulled(snap: LedgerSnapshot, stamp?: string) {
   else if (snap.cloudUpdatedAt) lastCloudStamp = snap.cloudUpdatedAt;
 }
 
+function noteRemoteLockChange(wasLocked: boolean, nowLocked: boolean) {
+  const selected = useLedger.getState().selectedDate;
+  if (wasLocked && !nowLocked) {
+    if (toldRemoteUnlock.has(selected)) return;
+    toldRemoteUnlock.add(selected);
+    toldRemoteLock.delete(selected);
+    toast.message(`Register unlocked for ${selected} on the other desk.`);
+    return;
+  }
+  if (wasLocked || !nowLocked) return;
+  if (toldRemoteLock.has(selected)) return;
+  toldRemoteLock.add(selected);
+  const today = todayIso();
+  if (selected < today && !hydrating) {
+    toast.message(
+      `${selected} is locked on the other desk. Continue on ${today} — the account still auto-saves.`,
+    );
+    useLedger.getState().setDate(today);
+    return;
+  }
+  toast.message(
+    `Register locked for ${selected} on the other desk. The account still auto-saves.`,
+  );
+}
+
 function applyMerged(merged: LedgerSnapshot, previous: LedgerSnapshot) {
   const selected = useLedger.getState().selectedDate;
   const wasLocked = isDayLocked(previous.lockedDates, selected);
@@ -169,11 +197,7 @@ function applyMerged(merged: LedgerSnapshot, previous: LedgerSnapshot) {
     savedAt: merged.savedAt,
   });
   writeStoredLocks(ledgerOwnerKey(), merged.lockedDates ?? {});
-  if (!wasLocked && nowLocked) {
-    toast.message(`Register locked for ${selected} on the other desk.`);
-  } else if (wasLocked && !nowLocked) {
-    toast.message(`Register unlocked for ${selected} on the other desk.`);
-  }
+  noteRemoteLockChange(wasLocked, nowLocked);
 }
 
 function applyRemoteLocks(next: {
@@ -189,11 +213,7 @@ function applyRemoteLocks(next: {
   if (lastPulled) {
     lastPulled = { ...lastPulled, lockedDates: next.locked, lockRev: next.rev };
   }
-  if (!wasLocked && nowLocked) {
-    toast.message(`Register locked for ${selected} on the other desk.`);
-  } else if (wasLocked && !nowLocked) {
-    toast.message(`Register unlocked for ${selected} on the other desk.`);
-  }
+  noteRemoteLockChange(wasLocked, nowLocked);
 }
 
 async function syncLocksFromHotel(userId: string) {
