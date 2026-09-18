@@ -17,6 +17,7 @@ import confirmSql from "../../supabase/migrations/0011_confirm_staff_logins.sql?
 import staffLoginSql from "../../supabase/migrations/0012_create_staff_login.sql?raw";
 import deleteLoginSql from "../../supabase/migrations/0013_delete_staff_login.sql?raw";
 import linkStaffSql from "../../supabase/migrations/0014_link_staff_books.sql?raw";
+import shareHotelSql from "../../supabase/migrations/0015_share_one_hotel.sql?raw";
 
 export function CloudSchemaSetup({ userId }: { userId?: string | null }) {
   const [retrying, setRetrying] = useState(false);
@@ -26,7 +27,7 @@ export function CloudSchemaSetup({ userId }: { userId?: string | null }) {
       <Button
         type="button"
         onClick={() => {
-          const sql = `${ledgerSql}\n\n${usersSql}\n\n${appUsersSql}\n\n${rlsSql}\n\n${locksSql}\n\n${sealsSql}\n\n${staffSaveSql}\n\n${deskSaveSql}\n\n${ownerIdSql}\n\n${confirmSql}\n\n${staffLoginSql}\n\n${deleteLoginSql}\n\n${linkStaffSql}`;
+          const sql = `${ledgerSql}\n\n${usersSql}\n\n${appUsersSql}\n\n${rlsSql}\n\n${locksSql}\n\n${sealsSql}\n\n${staffSaveSql}\n\n${deskSaveSql}\n\n${ownerIdSql}\n\n${confirmSql}\n\n${staffLoginSql}\n\n${deleteLoginSql}\n\n${linkStaffSql}\n\n${shareHotelSql}`;
           if (copyText(sql)) {
             toast.success("SQL copied. Paste it in the SQL editor, run it, then retry.");
           } else {

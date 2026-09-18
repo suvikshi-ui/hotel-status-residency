@@ -15,6 +15,7 @@ import { setLedgerOwner } from "./store";
 import { stopCloudSync } from "./supabase-sync";
 import {
   ensurePublicUser,
+  fetchHotelOwnerId,
   fetchPublicUser,
   loginHotelUser,
 } from "./hotel-users";
@@ -71,6 +72,7 @@ function toStaff(user: User | null): StaffUser | null {
 async function staffFromDb(user: User | null): Promise<StaffUser | null> {
   const base = toStaff(user);
   if (!base) return null;
+  const hotelOwner = await fetchHotelOwnerId().catch(() => null);
   try {
     const row = await fetchPublicUser(base.id);
     if (row) {
@@ -82,13 +84,15 @@ async function staffFromDb(user: User | null): Promise<StaffUser | null> {
         name: row.name || base.name,
         username: row.username || base.username,
         role,
-        ownerId: role === "admin" ? row.ownerId || base.id : linked || base.ownerId || base.id,
+        ownerId: hotelOwner || linked || base.ownerId || base.id,
       };
     }
   } catch {
-    /* keep JWT owner link */
+    /* keep JWT / hotel owner link */
   }
-  if (base.ownerId !== base.id) return base;
+  if (hotelOwner || base.ownerId !== base.id) {
+    return { ...base, ownerId: hotelOwner || base.ownerId };
+  }
   try {
     await ensurePublicUser({
       id: base.id,
@@ -100,7 +104,7 @@ async function staffFromDb(user: User | null): Promise<StaffUser | null> {
   } catch {
     /* ignore */
   }
-  return { ...base, role: "admin" };
+  return { ...base, role: "admin", ownerId: hotelOwner || base.id };
 }
 
 function friendlyAuthError(message: string) {

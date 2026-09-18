@@ -24,6 +24,16 @@ function rowOf(r: Record<string, unknown>): HotelUser {
   return hotelUserFromRow(r);
 }
 
+export async function fetchHotelOwnerId() {
+  if (!isSupabaseConfigured()) return null;
+  const sb = getSupabase();
+  const viaFn = await sb.rpc("hotel_owner_id");
+  if (!viaFn.error && viaFn.data) return String(viaFn.data);
+  const viaPrimary = await sb.rpc("hotel_primary_owner");
+  if (!viaPrimary.error && viaPrimary.data) return String(viaPrimary.data);
+  return null;
+}
+
 export async function fetchPublicUser(userId: string) {
   if (!isSupabaseConfigured()) return null;
   const sb = getSupabase();
