@@ -159,6 +159,63 @@ export async function createHotelUser(input: {
   );
 }
 
+export async function deleteHotelUser(input: {
+  id: string;
+  username: string;
+  selfId?: string | null;
+}): Promise<void> {
+  const username = normalizeUsername(input.username);
+  if (!username && !input.id) throw new Error("Pick a user to delete");
+  if (input.selfId && input.id && input.id === input.selfId) {
+    throw new Error("Cannot delete your own login");
+  }
+  if (!isSupabaseConfigured()) {
+    throw new Error("Cloud is not connected, so the account cannot be saved yet.");
+  }
+  const sb = getSupabase();
+  const { data: sessionData, error: sessionErr } = await sb.auth.getSession();
+  if (sessionErr) throw new Error(sessionErr.message);
+  if (!sessionData.session) throw new Error("Sign in as Admin first");
+
+  const viaRpc = await sb.rpc("delete_staff_login", {
+    p_id: input.id || null,
+    p_username: username,
+  });
+  if (!viaRpc.error) return;
+  if (!isMissingSchema(viaRpc.error)) {
+    const msg = viaRpc.error.message.toLowerCase();
+    if (!msg.includes("could not find the function") && !msg.includes("schema cache")) {
+      throw new Error(viaRpc.error.message);
+    }
+  }
+
+  const ownerId = sessionData.session.user.id;
+  if (input.id) {
+    const fromUsers = await sb.from("users").delete().eq("id", input.id).neq("id", ownerId);
+    if (fromUsers.error && !isMissingSchema(fromUsers.error)) {
+      throw new Error(fromUsers.error.message);
+    }
+  }
+  if (username) {
+    const fromHotel = await sb
+      .from("hotel_users")
+      .delete()
+      .eq("owner_id", ownerId)
+      .eq("username", username);
+    if (fromHotel.error && !isMissingSchema(fromHotel.error)) {
+      throw new Error(fromHotel.error.message);
+    }
+    const fromName = await sb
+      .from("users")
+      .delete()
+      .eq("username", username)
+      .neq("id", ownerId);
+    if (fromName.error && !isMissingSchema(fromName.error)) {
+      throw new Error(fromName.error.message);
+    }
+  }
+}
+
 export async function loginHotelUser(
   username: string,
   password: string,

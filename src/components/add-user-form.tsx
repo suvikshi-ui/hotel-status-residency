@@ -18,9 +18,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useGate } from "@/components/security-gate";
+import { useStaffSession } from "@/lib/supabase-auth";
 import {
   HOUSE_STAFF_PRESETS,
   createHotelUser,
+  deleteHotelUser,
   loadHotelUsers,
   missingHouseStaff,
   type HotelUser,
@@ -33,10 +36,13 @@ import {
 import hotelUsersSql from "../../supabase/migrations/0002_hotel_users.sql?raw";
 import appUsersSql from "../../supabase/migrations/0003_public_users.sql?raw";
 import staffLoginSql from "../../supabase/migrations/0012_create_staff_login.sql?raw";
+import deleteLoginSql from "../../supabase/migrations/0013_delete_staff_login.sql?raw";
 
-const USERS_SQL = `${hotelUsersSql}\n\n${appUsersSql}\n\n${staffLoginSql}`;
+const USERS_SQL = `${hotelUsersSql}\n\n${appUsersSql}\n\n${staffLoginSql}\n\n${deleteLoginSql}`;
 
 export function AddUserCard() {
+  const { user } = useStaffSession();
+  const { gate } = useGate();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -99,6 +105,34 @@ export function AddUserCard() {
     } finally {
       setBusy(false);
     }
+  }
+
+  function onDelete(row: HotelUser) {
+    if (user?.id && row.id === user.id) {
+      toast.error("Cannot delete your own login");
+      return;
+    }
+    gate(
+      () => {
+        setBusy(true);
+        void deleteHotelUser({ id: row.id, username: row.username, selfId: user?.id })
+          .then(() => {
+            toast.success(`${row.name || row.username} deleted`);
+            return refresh();
+          })
+          .catch((err) => {
+            toast.error(err instanceof Error ? err.message : "Could not delete user");
+          })
+          .finally(() => setBusy(false));
+      },
+      {
+        title: `Delete ${row.name || row.username}?`,
+        message: "Enter the security code. This login will be removed.",
+        confirmLabel: "Delete",
+        danger: true,
+        requireCode: true,
+      },
+    );
   }
 
   function copyUsersSql() {
@@ -224,8 +258,19 @@ export function AddUserCard() {
                     <td className="px-3 py-2.5 tabular text-muted">{u.username || "—"}</td>
                     <td className="px-3 py-2.5">{ROLE_LABEL[u.role]}</td>
                     <td className="px-3 py-2.5">{roleAccess(u.role)}</td>
-                    <td className="px-3 py-2.5 text-right text-xs text-muted">
-                      Saved
+                    <td className="px-3 py-2.5 text-right">
+                      {user?.id && u.id === user.id ? (
+                        <span className="text-xs text-muted">You</span>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={busy}
+                          onClick={() => onDelete(u)}
+                        >
+                          Delete
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 ))}
