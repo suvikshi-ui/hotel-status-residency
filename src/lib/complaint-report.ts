@@ -21,19 +21,8 @@ export function filterComplaints(rows: RoomComplaint[], kind: ComplaintListKind)
 }
 
 export function sortComplaints(rows: RoomComplaint[], rooms: RoomDef[]) {
-  const floorOf = new Map(rooms.map((r) => [r.no, r.floor]));
-  const floorRank: Record<string, number> = {
-    Ground: 0,
-    First: 1,
-    Second: 2,
-    Third: 3,
-  };
+  void rooms;
   return [...rows].sort((a, b) => {
-    const fa = floorOf.get(a.roomNo) ?? "";
-    const fb = floorOf.get(b.roomNo) ?? "";
-    const ra = floorRank[fa] ?? 9;
-    const rb = floorRank[fb] ?? 9;
-    if (ra !== rb) return ra - rb;
     const na = Number(a.roomNo);
     const nb = Number(b.roomNo);
     if (Number.isFinite(na) && Number.isFinite(nb) && na !== nb) return na - nb;
@@ -50,10 +39,9 @@ export function complaintListTitle(kind: ComplaintListKind) {
 
 export function complaintTableHtml(rows: RoomComplaint[], rooms: RoomDef[]) {
   const list = sortComplaints(rows, rooms);
-  const floorOf = new Map(rooms.map((r) => [r.no, r.floor]));
   return `<table>
     <thead><tr>
-      <th>Room</th><th>Floor</th><th>Problem</th><th>Status</th><th>Date</th>
+      <th>Room</th><th>Problem</th><th>Status</th><th>Date</th>
     </tr></thead>
     <tbody>
       ${
@@ -62,18 +50,17 @@ export function complaintTableHtml(rows: RoomComplaint[], rooms: RoomDef[]) {
               .map(
                 (c) => `<tr>
         <td>${escapeHtml(c.roomNo)}</td>
-        <td>${escapeHtml(floorOf.get(c.roomNo) ?? "")}</td>
         <td>${escapeHtml(c.note || "—")}</td>
         <td>${escapeHtml(complaintStatus(c.level))}</td>
         <td>${escapeHtml(c.createdAt || "")}</td>
       </tr>`,
               )
               .join("")
-          : `<tr><td colspan="5">No complaints</td></tr>`
+          : `<tr><td colspan="4">No complaints</td></tr>`
       }
     </tbody>
     <tfoot><tr>
-      <td colspan="4">Total</td>
+      <td colspan="3">Total</td>
       <td class="num">${list.length}</td>
     </tr></tfoot>
   </table>`;
@@ -105,15 +92,13 @@ export async function complaintListPdf(input: {
   const { jsPDF } = await import("jspdf");
   const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
   const list = sortComplaints(input.rows, input.rooms);
-  const floorOf = new Map(input.rooms.map((r) => [r.no, r.floor]));
   const title = complaintListTitle(input.kind);
   const pageW = 210;
   const margin = 14;
   const bottom = 287;
   const cols = [
-    { x: margin, w: 16, key: "room" as const },
-    { x: margin + 16, w: 22, key: "floor" as const },
-    { x: margin + 38, w: 86, key: "note" as const },
+    { x: margin, w: 28, key: "room" as const },
+    { x: margin + 28, w: 96, key: "note" as const },
     { x: margin + 124, w: 32, key: "status" as const },
     { x: margin + 156, w: 26, key: "date" as const },
   ];
@@ -139,10 +124,9 @@ export async function complaintListPdf(input: {
     pdf.line(margin, y, pageW - margin, y);
     y += 5;
     pdf.text("Room", cols[0].x, y);
-    pdf.text("Floor", cols[1].x, y);
-    pdf.text("Problem", cols[2].x, y);
-    pdf.text("Status", cols[3].x, y);
-    pdf.text("Date", cols[4].x, y);
+    pdf.text("Problem", cols[1].x, y);
+    pdf.text("Status", cols[2].x, y);
+    pdf.text("Date", cols[3].x, y);
     y += 2;
     pdf.line(margin, y, pageW - margin, y);
     y += 5;
@@ -157,7 +141,7 @@ export async function complaintListPdf(input: {
   }
 
   for (const c of list) {
-    const note = pdf.splitTextToSize(c.note || "—", cols[2].w - 2) as string[];
+    const note = pdf.splitTextToSize(c.note || "—", cols[1].w - 2) as string[];
     const h = Math.max(6, note.length * 5);
     if (y + h > bottom) {
       pdf.addPage();
@@ -165,10 +149,9 @@ export async function complaintListPdf(input: {
       header();
     }
     pdf.text(c.roomNo, cols[0].x, y);
-    pdf.text(String(floorOf.get(c.roomNo) ?? ""), cols[1].x, y);
-    pdf.text(note, cols[2].x, y);
-    pdf.text(complaintStatus(c.level), cols[3].x, y);
-    pdf.text(c.createdAt || "", cols[4].x, y);
+    pdf.text(note, cols[1].x, y);
+    pdf.text(complaintStatus(c.level), cols[2].x, y);
+    pdf.text(c.createdAt || "", cols[3].x, y);
     y += h;
   }
 

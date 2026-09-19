@@ -413,10 +413,6 @@ function ComplaintList({
     () => sortComplaints(filterComplaints(complaints, kind), rooms),
     [complaints, kind, rooms],
   );
-  const floorOf = useMemo(
-    () => new Map(rooms.map((r) => [r.no, r.floor])),
-    [rooms],
-  );
 
   function printList() {
     toast.message("Opening print…");
@@ -493,7 +489,6 @@ function ComplaintList({
             <thead className="text-xs uppercase tracking-wide text-muted">
               <tr className="border-y border-border">
                 <th className="px-5 py-2 font-medium">Room</th>
-                <th className="px-3 py-2 font-medium">Floor</th>
                 <th className="px-3 py-2 font-medium">Problem</th>
                 <th className="px-3 py-2 font-medium">Status</th>
                 <th className="px-5 py-2 font-medium">Date</th>
@@ -504,7 +499,6 @@ function ComplaintList({
                 rows.map((c) => (
                   <tr key={c.id} className="border-b border-border/70">
                     <td className="px-5 py-2 font-medium tabular">{c.roomNo}</td>
-                    <td className="px-3 py-2 text-muted">{floorOf.get(c.roomNo) ?? ""}</td>
                     <td className="px-3 py-2">{c.note || "—"}</td>
                     <td className="px-3 py-2">{complaintStatus(c.level)}</td>
                     <td className="px-5 py-2 tabular text-muted">
@@ -514,7 +508,7 @@ function ComplaintList({
                 ))
               ) : (
                 <tr>
-                  <td className="px-5 py-6 text-muted" colSpan={5}>
+                  <td className="px-5 py-6 text-muted" colSpan={4}>
                     No complaints in this list
                   </td>
                 </tr>
