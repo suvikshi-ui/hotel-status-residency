@@ -49,6 +49,16 @@ export function complaintsForRoom(rows: RoomComplaint[], roomNo: string) {
   return rows.filter((r) => r.roomNo === roomNo);
 }
 
+export const COMPLAINT_DESKS = ["Reception", "Other"] as const;
+
+export function isComplaintDesk(roomNo: string) {
+  return (COMPLAINT_DESKS as readonly string[]).includes(roomNo);
+}
+
+export function complaintPlaceLabel(roomNo: string) {
+  return isComplaintDesk(roomNo) ? roomNo : `Room ${roomNo}`;
+}
+
 /** Older cubes shrink; the last two stay full-size with one empty cube in front. */
 export function roomCubeLayout(items: RoomComplaint[]) {
   if (items.length <= LIVE) {

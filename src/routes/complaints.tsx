@@ -16,7 +16,9 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useGate } from "@/components/security-gate";
 import {
+  COMPLAINT_DESKS,
   COMPLAINT_LEVELS,
+  complaintPlaceLabel,
   complaintsForRoom,
   emptyComplaint,
   roomCubeLayout,
@@ -124,10 +126,10 @@ function ComplaintsPage() {
             c.id === existing.id ? { ...c, note: text, level } : c,
           ),
         );
-        toast.success(`Room ${roomNo} updated`);
+        toast.success(`${complaintPlaceLabel(roomNo)} updated`);
       } else {
         setComplaints([...complaints, emptyComplaint(roomNo, level, text)]);
-        toast.success(`Room ${roomNo} complaint logged`);
+        toast.success(`${complaintPlaceLabel(roomNo)} complaint logged`);
       }
       setOpen(null);
     };
@@ -155,7 +157,7 @@ function ComplaintsPage() {
     gate(
       () => {
         removeComplaint(existing.id);
-        toast.success(`Room ${roomNo} complaint deleted`);
+        toast.success(`${complaintPlaceLabel(roomNo)} complaint deleted`);
         setOpen(null);
       },
       {
@@ -236,8 +238,8 @@ function ComplaintsPage() {
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>
-              {open?.existing ? "Update complaint" : "Register complaint"} · Room{" "}
-              {open?.roomNo}
+              {open?.existing ? "Update complaint" : "Register complaint"} ·{" "}
+              {open ? complaintPlaceLabel(open.roomNo) : ""}
             </DialogTitle>
             <DialogDescription>
               Red for emergency, yellow if it can wait, green when it is fixed.
@@ -327,75 +329,120 @@ function ComplaintCubes({
             <CardTitle className="text-base">{floor} floor</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-1.5">
-            {floorRooms.map((r) => {
-              const items = complaintsForRoom(complaints, r.no);
-              const { trail, slots } = roomCubeLayout(items);
-              const hottest = items.find((c) => c.level === "red")
-                ? "red"
-                : items.find((c) => c.level === "yellow")
-                  ? "yellow"
-                  : items.find((c) => c.level === "green")
-                    ? "green"
-                    : null;
-              return (
-                <div
-                  key={r.no}
-                  className="flex flex-wrap items-center gap-2 rounded-lg bg-bg-warm/50 px-2 py-1.5 sm:px-3"
-                >
-                  <span className="w-10 shrink-0 font-display text-lg font-semibold tabular">
-                    {r.no}
-                  </span>
-                  {hottest ? (
-                    <span
-                      className={cn(
-                        "size-2 shrink-0 rounded-full",
-                        hottest === "red" && "bg-danger",
-                        hottest === "yellow" && "bg-due",
-                        hottest === "green" && "bg-ok",
-                      )}
-                    />
-                  ) : (
-                    <span className="size-2 shrink-0 rounded-full bg-border" />
-                  )}
-                  <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-                    {trail.map((c) => (
-                      <Cube
-                        key={c.id}
-                        item={c}
-                        size="sm"
-                        frozen={isSealed(sealedIds, sealKey.complaint(c.id))}
-                        onClick={() => onEdit(r.no, c)}
-                      />
-                    ))}
-                    {slots.map((item, i) =>
-                      item ? (
-                        <Cube
-                          key={item.id}
-                          item={item}
-                          size="md"
-                          frozen={isSealed(sealedIds, sealKey.complaint(item.id))}
-                          onClick={() => onEdit(r.no, item)}
-                        />
-                      ) : (
-                        <button
-                          key={`${r.no}-empty-${i}`}
-                          type="button"
-                          onClick={() => onNew(r.no)}
-                          aria-label={`Add complaint for room ${r.no}`}
-                          className="grid size-11 place-items-center rounded-md border border-dashed border-border bg-card text-lg leading-none text-muted hover:border-primary hover:text-primary"
-                        >
-                          +
-                        </button>
-                      ),
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+            {floorRooms.map((r) => (
+              <CubeLine
+                key={r.no}
+                place={r.no}
+                complaints={complaints}
+                sealedIds={sealedIds}
+                onNew={onNew}
+                onEdit={onEdit}
+              />
+            ))}
           </CardContent>
         </Card>
       ))}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Desk</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-1.5">
+          {COMPLAINT_DESKS.map((place) => (
+            <CubeLine
+              key={place}
+              place={place}
+              wide
+              complaints={complaints}
+              sealedIds={sealedIds}
+              onNew={onNew}
+              onEdit={onEdit}
+            />
+          ))}
+        </CardContent>
+      </Card>
     </>
+  );
+}
+
+function CubeLine({
+  place,
+  wide,
+  complaints,
+  sealedIds,
+  onNew,
+  onEdit,
+}: {
+  place: string;
+  wide?: boolean;
+  complaints: RoomComplaint[];
+  sealedIds: SealedIds;
+  onNew: (roomNo: string) => void;
+  onEdit: (roomNo: string, existing: RoomComplaint) => void;
+}) {
+  const items = complaintsForRoom(complaints, place);
+  const { trail, slots } = roomCubeLayout(items);
+  const hottest = items.find((c) => c.level === "red")
+    ? "red"
+    : items.find((c) => c.level === "yellow")
+      ? "yellow"
+      : items.find((c) => c.level === "green")
+        ? "green"
+        : null;
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-lg bg-bg-warm/50 px-2 py-1.5 sm:px-3">
+      <span
+        className={cn(
+          "shrink-0 font-display text-lg font-semibold",
+          wide ? "w-28" : "w-10 tabular",
+        )}
+      >
+        {place}
+      </span>
+      {hottest ? (
+        <span
+          className={cn(
+            "size-2 shrink-0 rounded-full",
+            hottest === "red" && "bg-danger",
+            hottest === "yellow" && "bg-due",
+            hottest === "green" && "bg-ok",
+          )}
+        />
+      ) : (
+        <span className="size-2 shrink-0 rounded-full bg-border" />
+      )}
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+        {trail.map((c) => (
+          <Cube
+            key={c.id}
+            item={c}
+            size="sm"
+            frozen={isSealed(sealedIds, sealKey.complaint(c.id))}
+            onClick={() => onEdit(place, c)}
+          />
+        ))}
+        {slots.map((item, i) =>
+          item ? (
+            <Cube
+              key={item.id}
+              item={item}
+              size="md"
+              frozen={isSealed(sealedIds, sealKey.complaint(item.id))}
+              onClick={() => onEdit(place, item)}
+            />
+          ) : (
+            <button
+              key={`${place}-empty-${i}`}
+              type="button"
+              onClick={() => onNew(place)}
+              aria-label={`Add complaint for ${complaintPlaceLabel(place)}`}
+              className="grid size-11 place-items-center rounded-md border border-dashed border-border bg-card text-lg leading-none text-muted hover:border-primary hover:text-primary"
+            >
+              +
+            </button>
+          ),
+        )}
+      </div>
+    </div>
   );
 }
 
