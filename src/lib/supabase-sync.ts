@@ -25,7 +25,7 @@ import {
   parseLockedDates,
   writeStoredLocks,
 } from "./register-lock";
-import { dropDeletedRows, mergeSealed } from "./sheet-seal";
+import { dropDeletedRows, mergeSealed, sealKey } from "./sheet-seal";
 import { mergeInventoryFiles } from "./inventory";
 import { readHouseFiles } from "./house-files";
 
@@ -292,6 +292,19 @@ async function doFlush(userId: string) {
   const base = lastPulled;
   if (pulled.kind === "data") {
     const cloud = pulled.snapshot;
+    const deleted = local.deletedIds ?? {};
+    const files = mergeInventoryFiles(local.inventoryFiles, cloud.inventoryFiles).filter(
+      (file) => !deleted[file.id],
+    );
+    const complaints = mergeRowsById(local.complaints ?? [], cloud.complaints ?? []).filter(
+      (row) => !deleted[row.id] && !deleted[sealKey.complaint(row.id)],
+    );
+    if (
+      JSON.stringify(files) !== JSON.stringify(local.inventoryFiles ?? []) ||
+      complaints.length !== (local.complaints ?? []).length
+    ) {
+      useLedger.setState({ inventoryFiles: files, complaints });
+    }
     const keepLocal = preferLocalOverCloud({
       localSavedAt: local.savedAt ?? 0,
       cloudUpdatedAt: cloud.savedAt ?? 0,
@@ -300,8 +313,10 @@ async function doFlush(userId: string) {
     });
     if (!keepLocal) {
       const merged = mergeLiveSnapshot(base, snapshotFromStore(), cloud);
-      if (hashOf(merged) !== hashOf(local)) applyMerged(merged, local);
+      if (hashOf(merged) !== hashOf(snapshotFromStore())) applyMerged(merged, local);
       toPush = merged;
+    } else {
+      toPush = snapshotFromStore();
     }
   }
 

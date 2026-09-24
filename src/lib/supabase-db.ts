@@ -1055,11 +1055,14 @@ export async function pushLedger(
     };
   }
   await pushSheetSeals(userId, snap.sealedIds);
+  await pushInventoryBooks(userId, snap.inventoryFiles ?? []);
   return { ok: true };
 }
 
 async function pushInventoryBooks(userId: string, files: InventoryFile[]) {
   const sb = getSupabase();
+  const shared = await sb.rpc("save_shared_inventory", { files });
+  if (!shared.error) return;
   const encoded = files.map((file) => {
     const row = encodeInventoryFile(file);
     return {
