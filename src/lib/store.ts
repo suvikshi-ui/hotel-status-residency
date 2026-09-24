@@ -17,6 +17,7 @@ import type {
   SeedData,
   StaffRow,
 } from "./types";
+import { normalizeStaffProfiles, type StaffProfile } from "./types";
 import { uid } from "./format";
 import { applyGuestPatch, applyStay, applyYesterdayRoll } from "./stay";
 import { rebuildDayBooks } from "./ledger";
@@ -88,6 +89,7 @@ export interface LedgerState {
   balReceived: NamedAmount[];
   days: DayBooks[];
   staff: StaffRow[];
+  staffRegister: StaffProfile[];
   advances: AdvanceRow[];
   ota: OtaRow[];
   janSales: JanSale[];
@@ -130,6 +132,7 @@ export interface LedgerState {
   removeBalReceived: (id: string, opts?: BypassGuard) => void;
   restoreSeed: () => void;
   setStaff: (staff: StaffRow[]) => void;
+  setStaffRegister: (rows: StaffProfile[]) => void;
   setAdvances: (advances: AdvanceRow[]) => void;
   setInventory: (inventory: InventoryItem[]) => void;
   saveInventoryFile: (file: InventoryFile) => void;
@@ -168,6 +171,7 @@ function seedState(): Omit<
   | "removeBalReceived"
   | "restoreSeed"
   | "setStaff"
+  | "setStaffRegister"
   | "setAdvances"
   | "setInventory"
   | "saveInventoryFile"
@@ -192,6 +196,7 @@ function seedState(): Omit<
     balReceived: seed.balReceived as NamedAmount[],
     days: seed.days as DayBooks[],
     staff: normalizeStaff(seed.staff as StaffRow[]),
+    staffRegister: [],
     advances: normalizeAdvances(seed.advances as AdvanceRow[]),
     ota: seed.ota,
     janSales: seed.janSales,
@@ -261,6 +266,9 @@ function mergeSnapshot(
   opts?: { skipSeedFill?: boolean; replace?: boolean },
 ): LedgerState {
   const staff = normalizeStaff(persisted.staff ?? current.staff);
+  const staffRegister = normalizeStaffProfiles(
+    persisted.staffRegister ?? current.staffRegister,
+  );
   const advances = normalizeAdvances(persisted.advances ?? current.advances);
   const rooms = (persisted.rooms?.length ? persisted.rooms : current.rooms) as RoomDef[];
   const inventory = normalizeInventory(persisted.inventory ?? current.inventory);
@@ -346,6 +354,7 @@ function mergeSnapshot(
     ...current,
     ...persisted,
     staff,
+    staffRegister,
     advances,
     rooms,
     inventory,
@@ -610,6 +619,9 @@ export const useLedger = create<LedgerState>()(
         if (isSealed(get().sealedIds, sealKey.staffMonth(month))) return;
         save({ staff: normalizeStaff(staff) });
       },
+      setStaffRegister: (rows) => {
+        save({ staffRegister: normalizeStaffProfiles(rows) });
+      },
       setAdvances: (advances) => {
         const month = get().selectedDate.slice(0, 7);
         if (isSealed(get().sealedIds, sealKey.advanceMonth(month))) return;
@@ -700,6 +712,9 @@ export const useLedger = create<LedgerState>()(
           sealedIds: mergeSealed(cur.sealedIds, p.sealedIds),
           deletedIds: mergeSealed(cur.deletedIds, p.deletedIds),
           staff: normalizeStaff(p.staff ?? cur.staff),
+          staffRegister: Array.isArray(p.staffRegister)
+            ? normalizeStaffProfiles(p.staffRegister)
+            : cur.staffRegister,
           reminders: Array.isArray(p.reminders)
             ? normalizeReminders(p.reminders)
             : cur.reminders,
@@ -751,6 +766,7 @@ export const useLedger = create<LedgerState>()(
         dirty: s.dirty,
         advances: s.advances,
         staff: s.staff,
+        staffRegister: s.staffRegister,
         rooms: s.rooms,
         securityCode: s.securityCode,
         inventory: s.inventory,

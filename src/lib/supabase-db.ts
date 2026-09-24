@@ -63,7 +63,9 @@ import type {
   PayMode,
   RoomDef,
   StaffRow,
+  StaffProfile,
 } from "./types";
+import { normalizeStaffProfiles } from "./types";
 
 export const LEDGER_TABLES = [
   "ledger_meta",
@@ -91,6 +93,7 @@ export type LedgerSnapshot = {
   expenses: NamedAmount[];
   balReceived: NamedAmount[];
   staff: StaffRow[];
+  staffRegister?: StaffProfile[];
   advances: AdvanceRow[];
   ota: OtaRow[];
   janSales: JanSale[];
@@ -233,6 +236,10 @@ export function snapshotFromUnknown(
     expenses: (p.expenses ?? fallback.expenses) as NamedAmount[],
     balReceived: (p.balReceived ?? fallback.balReceived) as NamedAmount[],
     staff: (p.staff ?? fallback.staff).map(staffOf),
+    staffRegister: normalizeStaffProfiles(
+      (p as { staffRegister?: StaffProfile[] }).staffRegister ??
+        fallback.staffRegister,
+    ),
     advances: (p.advances ?? fallback.advances).map(advanceOf),
     ota: (p.ota ?? fallback.ota) as OtaRow[],
     janSales: (p.janSales ?? fallback.janSales) as JanSale[],
@@ -371,6 +378,9 @@ export function booksFromHotel(hotel: unknown): Partial<LedgerSnapshot> | null {
     ? (b.balReceived as NamedAmount[])
     : [];
   const staff = Array.isArray(b.staff) ? (b.staff as StaffRow[]) : [];
+  const staffRegister = Array.isArray(b.staffRegister)
+    ? (b.staffRegister as StaffProfile[])
+    : [];
   const advances = Array.isArray(b.advances) ? (b.advances as AdvanceRow[]) : [];
   const rooms = Array.isArray(b.rooms) ? (b.rooms as RoomDef[]) : [];
   if (
@@ -378,7 +388,8 @@ export function booksFromHotel(hotel: unknown): Partial<LedgerSnapshot> | null {
     !food.length &&
     !wholesale.length &&
     !expenses.length &&
-    !balReceived.length
+    !balReceived.length &&
+    !staffRegister.length
   ) {
     return null;
   }
@@ -389,6 +400,7 @@ export function booksFromHotel(hotel: unknown): Partial<LedgerSnapshot> | null {
     expenses,
     balReceived,
     staff,
+    staffRegister,
     advances,
     rooms,
     savedAt: num(b.savedAt) || undefined,
@@ -418,6 +430,9 @@ function overlayBooks(snapshot: LedgerSnapshot, hotelRaw: unknown): LedgerSnapsh
     });
   }
   if ((books.staff?.length ?? 0) > snapshot.staff.length) next.staff = books.staff ?? snapshot.staff;
+  if ((books.staffRegister?.length ?? 0) > (snapshot.staffRegister?.length ?? 0)) {
+    next.staffRegister = books.staffRegister;
+  }
   if ((books.advances?.length ?? 0) > snapshot.advances.length) {
     next.advances = books.advances ?? snapshot.advances;
   }
@@ -434,6 +449,7 @@ function booksForHotel(snap: LedgerSnapshot) {
     expenses: snap.expenses,
     balReceived: snap.balReceived,
     staff: snap.staff,
+    staffRegister: snap.staffRegister ?? [],
     advances: snap.advances,
     rooms: snap.rooms,
     savedAt: snap.savedAt ?? Date.now(),

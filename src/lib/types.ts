@@ -96,6 +96,33 @@ export interface DayBooks {
   online: OnlineLedger;
 }
 
+export interface StaffProfile {
+  id: string;
+  name: string;
+  mobile: string;
+  mobile2: string;
+  address: string;
+  post: string;
+}
+
+export function normalizeStaffProfiles(
+  rows: StaffProfile[] | undefined | null,
+): StaffProfile[] {
+  return (rows ?? [])
+    .filter((row) => row && typeof row === "object")
+    .map((row, i) => ({
+      id: row.id || `sp-${i}`,
+      name: (row.name ?? "").trim(),
+      mobile: (row.mobile ?? "").trim(),
+      mobile2: (row.mobile2 ?? "").trim(),
+      address: (row.address ?? "").trim(),
+      post: (row.post ?? "").trim(),
+    }))
+    .filter(
+      (row) => row.name || row.mobile || row.mobile2 || row.address || row.post,
+    );
+}
+
 export interface StaffRow {
   id: string;
   name: string;

@@ -15,25 +15,31 @@ import { useLedger } from "@/lib/store";
 import { HotelLogo } from "@/components/hotel-logo";
 import { SaveCube, useAccountSave } from "@/components/save-cube";
 import { isSealed, sealKey } from "@/lib/sheet-seal";
-import type { AdvanceRow, StaffRow } from "@/lib/types";
+import type { AdvanceRow, StaffProfile, StaffRow } from "@/lib/types";
 
 export const Route = createFileRoute("/staff")({ component: StaffPage });
 
-type Sheet = "salary" | "advance";
+type Sheet = "register" | "salary" | "advance";
 
 function StaffPage() {
   const hotel = useLedger((s) => s.hotel);
   const date = useLedger((s) => s.selectedDate);
   const staff = useLedger((s) => s.staff);
+  const staffRegister = useLedger((s) => s.staffRegister);
   const advances = useLedger((s) => s.advances);
   const setStaff = useLedger((s) => s.setStaff);
+  const setStaffRegister = useLedger((s) => s.setStaffRegister);
   const setAdvances = useLedger((s) => s.setAdvances);
   const sealedIds = useLedger((s) => s.sealedIds);
   const { busy: saving, saveToServer } = useAccountSave();
-  const [sheet, setSheet] = useState<Sheet>("salary");
+  const [sheet, setSheet] = useState<Sheet>("register");
+  const [regDraft, setRegDraft] = useState<StaffProfile[]>(staffRegister);
   const [draft, setDraft] = useState<StaffRow[]>(staff);
   const [advDraft, setAdvDraft] = useState<AdvanceRow[]>(advances);
 
+  useEffect(() => {
+    setRegDraft(staffRegister);
+  }, [staffRegister]);
   useEffect(() => {
     setDraft(staff);
   }, [staff]);
@@ -69,7 +75,47 @@ function StaffPage() {
   const advFrozen = isSealed(sealedIds, sealKey.advanceMonth(monthKey));
   const payMonth = salaryPayMonth(date);
   const payName = salaryPayMonthName(date);
-  const frozen = sheet === "salary" ? salaryFrozen : advFrozen;
+
+  function addProfile() {
+    setRegDraft((prev) => [
+      ...prev,
+      { id: uid("sp"), name: "", mobile: "", mobile2: "", address: "", post: "" },
+    ]);
+  }
+
+  function patchProfile(id: string, field: keyof StaffProfile, value: string) {
+    setRegDraft((prev) =>
+      prev.map((row) => (row.id === id ? { ...row, [field]: value } : row)),
+    );
+  }
+
+  function printRegister() {
+    const body = `<table>
+      <thead><tr>
+        <th>Name</th><th>Mobile</th><th>Mobile 2</th><th>Address</th><th>Post</th>
+      </tr></thead>
+      <tbody>
+        ${regDraft
+          .map(
+            (r) => `<tr>
+          <td>${escapeHtml(r.name)}</td>
+          <td>${escapeHtml(r.mobile)}</td>
+          <td>${escapeHtml(r.mobile2)}</td>
+          <td>${escapeHtml(r.address)}</td>
+          <td>${escapeHtml(r.post)}</td>
+        </tr>`,
+          )
+          .join("")}
+      </tbody>
+    </table>`;
+    toast.message("Opening print…");
+    printDocument({
+      title: "Staff register",
+      heading: hotel.name,
+      sub: `${hotel.place} · Staff register`,
+      table: body,
+    });
+  }
 
   function addStaff() {
     if (salaryFrozen) return;
@@ -201,7 +247,7 @@ function StaffPage() {
               {hotel.name}
             </h2>
             <p className="mt-1 text-sm text-muted">
-              {hotel.place} · {sheet === "salary" ? `Salary of ${payName} · Payment of ${payMonth}` : "Advance sheet"} · {formatDay(date)}
+              {hotel.place} · {sheet === "salary" ? `Staff salary register · Salary of ${payName}` : sheet === "advance" ? "Staff advance register" : "Staff register"} · {formatDay(date)}
             </p>
           </div>
         </div>
@@ -213,12 +259,18 @@ function StaffPage() {
             Payroll
           </p>
           <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight">
-            {sheet === "salary" ? `Salary of ${payName}` : "Staff"}
+            {sheet === "register"
+              ? "Staff register"
+              : sheet === "salary"
+                ? "Staff salary register"
+                : "Staff advance register"}
           </h1>
           <p className="mt-1 text-sm text-muted">
-            {sheet === "salary"
-              ? `Payment of ${payMonth}`
-              : "Salary sheet and advance sheet are separate"}
+            {sheet === "register"
+              ? "Name, two mobiles, address, and the post you write."
+              : sheet === "salary"
+                ? `Salary of ${payName} · Payment of ${payMonth}`
+                : "Advance given in cash or QR."}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -231,25 +283,102 @@ function StaffPage() {
                   total: payable,
                 }));
                 setStaff(next);
-              } else {
+              } else if (sheet === "advance") {
                 setAdvances(advDraft);
+              } else {
+                setStaffRegister(regDraft);
               }
               void saveToServer();
             }}
           />
-          <ReportsLink view={sheet === "advance" ? "advance" : "salary"} />
+          {sheet === "register" ? null : (
+            <ReportsLink view={sheet === "advance" ? "advance" : "salary"} />
+          )}
         </div>
       </div>
 
       <Tabs value={sheet} onValueChange={(v) => setSheet(v as Sheet)}>
-        <TabsList className="grid w-full grid-cols-2 print:hidden" aria-label="Staff sheets">
+        <TabsList className="grid w-full grid-cols-3 print:hidden" aria-label="Staff registers">
+          <TabsTrigger value="register" className="w-full">
+            Staff register
+          </TabsTrigger>
           <TabsTrigger value="salary" className="w-full">
-            Salary of {payName}
+            Salary register
           </TabsTrigger>
           <TabsTrigger value="advance" className="w-full">
-            Advance sheet
+            Advance register
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="register" className="flex flex-col gap-5">
+          <div className="flex justify-end print:hidden">
+            <Button type="button" variant="outline" onClick={printRegister}>
+              <Printer className="size-4" />
+              Print
+            </Button>
+          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Staff register</CardTitle>
+              <p className="text-sm text-muted">
+                Name, two mobile numbers, address, and post. Write the post
+                yourself — housekeeping, manager, or whatever the job is.
+              </p>
+            </CardHeader>
+            <CardContent className="overflow-x-auto p-0">
+              <table className="w-full min-w-[52rem] text-left text-sm">
+                <thead className="text-xs uppercase tracking-wide text-muted">
+                  <tr className="border-y border-border">
+                    <th className="px-5 py-2 font-medium">Name</th>
+                    <th className="px-3 py-2 font-medium">Mobile</th>
+                    <th className="px-3 py-2 font-medium">Mobile 2</th>
+                    <th className="px-3 py-2 font-medium">Address</th>
+                    <th className="px-3 py-2 font-medium">Post</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {regDraft.length ? (
+                    regDraft.map((row) => (
+                      <tr key={row.id} className="border-b border-border/70">
+                        {(
+                          [
+                            ["name", "Name"],
+                            ["mobile", "Mobile"],
+                            ["mobile2", "Second mobile"],
+                            ["address", "Address"],
+                            ["post", "Post"],
+                          ] as const
+                        ).map(([field, label]) => (
+                          <td key={field} className="px-3 py-2">
+                            <Input
+                              aria-label={`${row.name || "staff"} ${label}`}
+                              value={row[field]}
+                              inputMode={field === "mobile" || field === "mobile2" ? "tel" : "text"}
+                              placeholder={field === "post" ? "Write the post" : ""}
+                              onChange={(e) => patchProfile(row.id, field, e.target.value)}
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td className="px-5 py-6 text-muted" colSpan={5}>
+                        No staff yet. Add a name.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+              <div className="border-t border-border p-3 print:hidden">
+                <Button type="button" variant="outline" onClick={addProfile}>
+                  <Plus className="size-4" />
+                  Add
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="salary" className="flex flex-col gap-5">
           <fieldset
@@ -288,7 +417,7 @@ function StaffPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Salary of {payName}</CardTitle>
+              <CardTitle>Staff salary register</CardTitle>
               <p className="text-sm text-muted">
                 Payment of {payMonth}. Basic ÷ 30 × (working + extra) −
                 advance = to pay
@@ -450,7 +579,7 @@ function StaffPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Advance sheet</CardTitle>
+              <CardTitle>Staff advance register</CardTitle>
               <p className="text-sm text-muted">
                 Edit name, cash and QR. Total adds itself.
               </p>

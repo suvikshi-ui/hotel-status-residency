@@ -79,6 +79,7 @@ function emptyRows(s: LedgerSnapshot): LedgerSnapshot {
     expenses: [],
     balReceived: [],
     staff: [],
+    staffRegister: [],
     advances: [],
     rooms: [],
     inventory: [],
@@ -211,6 +212,12 @@ export function mergeLiveSnapshot(
     ),
     staff: mergeByKey((r) => r.id, b.staff, local.staff, cloud.staff).filter(
       (r) => !/^st-(0|1|2|3|4|5|6|7|8|9|10|11|12|13|14)$/.test(r.id),
+    ),
+    staffRegister: mergeByKey(
+      (r) => r.id,
+      b.staffRegister ?? [],
+      local.staffRegister ?? [],
+      cloud.staffRegister ?? [],
     ),
     advances: mergeByKey((r) => r.id, b.advances, local.advances, cloud.advances),
     ota: pick3(b.ota, local.ota, cloud.ota),
