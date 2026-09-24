@@ -22,7 +22,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { DateNav } from "@/components/date-nav";
 import { HotelLogo } from "@/components/hotel-logo";
 import { useLedger } from "@/lib/store";
-import { bottomNavPaths, canOpenPath, ROLE_LABEL } from "@/lib/roles";
+import { bottomNavPaths, canOpenPath } from "@/lib/roles";
 import { useStaffSession } from "@/lib/supabase-auth";
 import { useCloudSync } from "@/lib/supabase-sync";
 import { ReminderPopup } from "@/components/reminder-popup";
@@ -47,7 +47,7 @@ function NavLinks({
   variant,
 }: {
   onNavigate?: () => void;
-  variant: "side" | "bottom";
+  variant: "side" | "bottom" | "top";
 }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { user } = useStaffSession();
@@ -80,7 +80,7 @@ function NavLinks({
     );
   }
   return (
-    <nav className="flex flex-col gap-1 px-3">
+    <nav className={cn("flex gap-1", variant === "top" ? "flex-wrap" : "flex-col px-3")}>
       {items.map((item) => {
         const active = pathname === item.to;
         const Icon = item.icon;
@@ -90,10 +90,15 @@ function NavLinks({
             to={item.to as "/"}
             onClick={onNavigate}
             className={cn(
-              "flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors",
-              active
-                ? "bg-sidebar-line text-sidebar-fg"
-                : "text-sidebar-muted hover:bg-sidebar-line/60 hover:text-sidebar-fg",
+              "flex min-h-10 items-center gap-2 rounded-lg text-sm font-medium transition-colors",
+              variant === "top" ? "px-3" : "gap-3 px-3",
+              variant === "top"
+                ? active
+                  ? "bg-primary text-primary-fg"
+                  : "text-fg hover:bg-bg-warm"
+                : active
+                  ? "bg-sidebar-line text-sidebar-fg"
+                  : "text-sidebar-muted hover:bg-sidebar-line/60 hover:text-sidebar-fg",
             )}
           >
             <Icon className="size-4 shrink-0" />
@@ -111,8 +116,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const role = user?.role ?? "admin";
   const cloud = useCloudSync();
   const [menu, setMenu] = useState(false);
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [leaving, setLeaving] = useState(false);
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   useEffect(() => {
     setMenu(false);
@@ -123,134 +128,86 @@ export function AppShell({ children }: { children: ReactNode }) {
     void signOut().catch(() => setLeaving(false));
   }
 
-  const accountLabel = user?.name || user?.email || "Staff";
-
   return (
-    <div className="min-h-dvh md:grid md:grid-cols-[16.5rem_1fr]">
-      <aside className="hidden bg-sidebar text-sidebar-fg print:hidden md:sticky md:top-0 md:flex md:h-dvh md:flex-col md:overflow-hidden">
-        <div className="flex items-center gap-3 px-5 py-5">
-          <HotelLogo mark className="h-11 w-auto shrink-0" />
-          <div className="min-w-0">
-            <div className="font-display text-lg font-semibold leading-tight tracking-tight">
-              {hotel.name}
-            </div>
-            <div className="text-[11px] uppercase tracking-[0.14em] text-sidebar-muted">
-              {hotel.place}
-            </div>
-          </div>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <NavLinks variant="side" />
-        </div>
-        <div className="border-t border-sidebar-line px-5 py-4">
-          {user ? (
-            <>
-              <div className="truncate text-xs font-medium text-sidebar-fg">
-                {accountLabel}
-              </div>
-              <div className="truncate text-[11px] text-sidebar-muted">
-                {ROLE_LABEL[role]}
-              </div>
-              {user.email && user.name ? (
-                <div className="truncate text-[11px] text-sidebar-muted">
-                  {user.email}
-                </div>
-              ) : null}
-              <div className="mt-1 text-[10px] uppercase tracking-[0.12em] text-sidebar-muted">
-                {cloud.phase === "saving"
-                  ? "Sending to other desks…"
-                  : cloud.phase === "missing-schema"
-                    ? "Not in account yet"
-                    : cloud.phase === "error"
-                      ? "Account save failed"
-                      : cloud.phase === "loading"
-                        ? "Loading books…"
-                        : "Account saved"}
-              </div>
-              {(cloud.phase === "error" || cloud.phase === "missing-schema") &&
-              cloud.message ? (
-                <p className="mt-1 text-[10px] leading-snug text-due">
-                  {cloud.message}
-                </p>
-              ) : null}
-              <button
-                type="button"
-                onClick={onSignOut}
-                disabled={leaving}
-                className="mt-3 flex min-h-10 w-full items-center gap-2 rounded-lg px-2 text-sm text-sidebar-muted hover:bg-sidebar-line/60 hover:text-sidebar-fg disabled:cursor-wait"
-              >
-                <LogOut className="size-4" />
-                {leaving ? "Signing out…" : "Sign out"}
-              </button>
-            </>
-          ) : (
-            <p className="text-[10px] leading-snug text-sidebar-muted">
-              {hotel.blessing}
-            </p>
-          )}
-        </div>
-      </aside>
-
+    <div className="min-h-dvh">
       <div className="flex min-w-0 flex-col pb-20 md:pb-0">
-        <header className="sticky top-0 z-30 flex items-center gap-2 border-b border-border bg-bg/90 px-3 py-2 backdrop-blur-md print:hidden md:px-6">
-          <Sheet open={menu} onOpenChange={setMenu}>
-            <SheetTrigger asChild>
+        <header className="sticky top-0 z-30 border-b border-border bg-bg/95 backdrop-blur-md print:hidden">
+          <div className="flex items-center gap-2 px-3 py-2 md:px-6">
+            <Sheet open={menu} onOpenChange={setMenu}>
+              <SheetTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="md:hidden"
+                  aria-label="Open menu"
+                >
+                  <Menu className="size-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="bg-sidebar pt-14 text-sidebar-fg">
+                <div className="mb-6 flex items-center gap-3 px-5">
+                  <HotelLogo mark className="h-10 w-auto shrink-0" />
+                  <div className="min-w-0">
+                    <div className="font-display text-lg font-semibold leading-tight">
+                      {hotel.name}
+                    </div>
+                    <div className="text-[11px] uppercase tracking-[0.14em] text-sidebar-muted">
+                      {hotel.place}
+                    </div>
+                  </div>
+                </div>
+                <NavLinks variant="side" onNavigate={() => setMenu(false)} />
+                {user ? (
+                  <button
+                    type="button"
+                    onClick={onSignOut}
+                    disabled={leaving}
+                    className="mt-6 flex min-h-11 w-full items-center gap-2 rounded-lg px-5 text-sm text-sidebar-muted hover:bg-sidebar-line/60"
+                  >
+                    <LogOut className="size-4" />
+                    {leaving ? "Signing out…" : "Sign out"}
+                  </button>
+                ) : null}
+              </SheetContent>
+            </Sheet>
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <HotelLogo mark className="h-9 w-auto shrink-0" />
+              <div className="min-w-0">
+                <div className="truncate font-display text-base font-semibold">
+                  {hotel.name}
+                </div>
+                <div className="hidden truncate text-[10px] uppercase tracking-[0.12em] text-muted md:block">
+                  {cloud.phase === "saving"
+                    ? "Sending to other desks…"
+                    : cloud.phase === "missing-schema"
+                      ? "Not in account yet"
+                      : cloud.phase === "error"
+                        ? "Account save failed"
+                        : cloud.phase === "loading"
+                          ? "Loading books…"
+                          : "Account saved"}
+                </div>
+              </div>
+            </div>
+            <DateNav />
+            {user ? (
               <Button
                 variant="ghost"
                 size="icon"
-                className="md:hidden"
-                aria-label="Open menu"
+                className="shrink-0"
+                aria-label={leaving ? "Signing out" : "Sign out"}
+                onClick={onSignOut}
+                disabled={leaving}
               >
-                <Menu className="size-5" />
+                <LogOut className="size-4" />
               </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="pt-14">
-              <div className="mb-6 flex items-center gap-3 px-5">
-                <HotelLogo mark className="h-10 w-auto shrink-0" />
-                <div className="min-w-0">
-                  <div className="font-display text-lg font-semibold leading-tight">
-                    {hotel.name}
-                  </div>
-                  <div className="text-[11px] uppercase tracking-[0.14em] text-muted">
-                    {hotel.place}
-                  </div>
-                </div>
-              </div>
-              <NavLinks variant="side" onNavigate={() => setMenu(false)} />
-              {user ? (
-                <button
-                  type="button"
-                  onClick={onSignOut}
-                  disabled={leaving}
-                  className="mt-6 flex min-h-11 w-full items-center gap-2 rounded-lg px-5 text-sm text-muted hover:bg-bg-warm"
-                >
-                  <LogOut className="size-4" />
-                  {leaving ? "Signing out…" : "Sign out"}
-                </button>
-              ) : null}
-            </SheetContent>
-          </Sheet>
-          <div className="flex min-w-0 flex-1 items-center gap-2">
-            <HotelLogo mark className="h-9 w-auto shrink-0" />
-            <div className="min-w-0 truncate font-display text-base font-semibold">
-              {hotel.name}
-            </div>
+            ) : null}
           </div>
-          <DateNav />
-          {user ? (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="shrink-0"
-              aria-label={leaving ? "Signing out" : "Sign out"}
-              onClick={onSignOut}
-              disabled={leaving}
-            >
-              <LogOut className="size-4" />
-            </Button>
-          ) : null}
+          <div className="hidden border-t border-border px-3 py-2 md:block md:px-6">
+            <NavLinks variant="top" />
+          </div>
         </header>
-        <main className="mx-auto w-full max-w-6xl flex-1 px-3 py-5 print:max-w-none print:px-0 print:py-0 md:px-8 md:py-8">
+        <main className="w-full flex-1 px-3 py-5 print:px-0 print:py-0 md:px-8 md:py-8">
           {children}
         </main>
       </div>
@@ -268,14 +225,14 @@ export function AppShell({ children }: { children: ReactNode }) {
               More
             </button>
           </SheetTrigger>
-          <SheetContent side="left" className="pt-14">
+          <SheetContent side="left" className="bg-sidebar pt-14 text-sidebar-fg">
             <div className="mb-6 flex items-center gap-3 px-5">
               <HotelLogo mark className="h-10 w-auto shrink-0" />
               <div className="min-w-0">
                 <div className="font-display text-lg font-semibold leading-tight">
                   {hotel.name}
                 </div>
-                <div className="text-[11px] uppercase tracking-[0.14em] text-muted">
+                <div className="text-[11px] uppercase tracking-[0.14em] text-sidebar-muted">
                   {hotel.place}
                 </div>
               </div>
