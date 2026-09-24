@@ -27,6 +27,7 @@ import {
 } from "./register-lock";
 import { dropDeletedRows, mergeSealed } from "./sheet-seal";
 import { mergeInventoryFiles } from "./inventory";
+import { readHouseFiles } from "./house-files";
 
 export type CloudPhase =
   | "off"
@@ -250,7 +251,20 @@ async function syncLocksFromHotel(userId: string) {
   }
 }
 
+function withHouseFiles(userId: string, snap: LedgerSnapshot): LedgerSnapshot {
+  const remembered = readHouseFiles(userId).filter((file) => !snap.deletedIds?.[file.id]);
+  if (!remembered.length) return snap;
+  return {
+    ...snap,
+    inventoryFiles: mergeInventoryFiles(snap.inventoryFiles, remembered),
+  };
+}
+
 async function doFlush(userId: string) {
+  const stored = withHouseFiles(userId, snapshotFromStore());
+  if (JSON.stringify(stored.inventoryFiles ?? []) !== JSON.stringify(useLedger.getState().inventoryFiles)) {
+    useLedger.setState({ inventoryFiles: stored.inventoryFiles ?? [] });
+  }
   const local = snapshotFromStore();
   const localChanged = hashOf(local) !== lastHash || locksDirty;
   if (!localChanged && (phase === "synced" || phase === "migrated")) return;
@@ -392,7 +406,11 @@ async function pollCloud(userId: string) {
     const mergedHash = hashOf(merged);
     const localHash = hashOf(local);
     if (mergedHash !== localHash) applyMerged(merged, local);
-    rememberPulled(merged, cloud.cloudUpdatedAt);
+    const kept = withHouseFiles(userId, snapshotFromStore());
+    if (JSON.stringify(kept.inventoryFiles ?? []) !== JSON.stringify(useLedger.getState().inventoryFiles)) {
+      useLedger.setState({ inventoryFiles: kept.inventoryFiles ?? [] });
+    }
+    rememberPulled(snapshotFromStore(), cloud.cloudUpdatedAt);
     lastHash = hashOf(snapshotFromStore());
     if (localChanged || locksDirty || mergedHash !== localHash) void flush(userId);
     else if (phase === "loading" || phase === "error") setPhase("synced");
@@ -417,7 +435,7 @@ export async function saveAccountNow(): Promise<
   for (let i = 0; i < 40 && hydrating; i++) {
     await new Promise((r) => setTimeout(r, 50));
   }
-  const local = snapshotFromStore();
+  const local = withHouseFiles(userId, snapshotFromStore());
   setPhase("saving");
   const result = await pushLedger(
     userId,
@@ -519,6 +537,11 @@ export async function hydrateFromCloud(userId: string): Promise<CloudPhase> {
       await useLedger.persist.rehydrate();
     } catch {
       /* keep memory */
+    }
+    const restored = withHouseFiles(userId, snapshotFromStore());
+    const currentFiles = useLedger.getState().inventoryFiles;
+    if (JSON.stringify(restored.inventoryFiles ?? []) !== JSON.stringify(currentFiles)) {
+      useLedger.setState({ inventoryFiles: restored.inventoryFiles ?? [] });
     }
     const local = snapshotFromStore();
     const localScore = ledgerActivityScore(local);
@@ -631,12 +654,13 @@ export async function hydrateFromCloud(userId: string): Promise<CloudPhase> {
 function withLocalSavedFiles(cloud: LedgerSnapshot): LedgerSnapshot {
   const local = useLedger.getState();
   const deleted = mergeSealed(local.deletedIds, cloud.deletedIds);
+  const remembered = readHouseFiles(ledgerOwnerKey()).filter((file) => !deleted[file.id]);
   return {
     ...cloud,
     deletedIds: deleted,
     inventoryFiles: mergeInventoryFiles(
-      cloud.inventoryFiles,
-      local.inventoryFiles,
+      mergeInventoryFiles(cloud.inventoryFiles, local.inventoryFiles),
+      remembered,
     ).filter(
       (file) =>
         (local.inventoryFiles ?? []).some((row) => row.id === file.id) ||

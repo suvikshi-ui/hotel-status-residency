@@ -1060,6 +1060,23 @@ export async function pushLedger(
 
 async function pushInventoryBooks(userId: string, files: InventoryFile[]) {
   const sb = getSupabase();
+  const encoded = files.map((file) => {
+    const row = encodeInventoryFile(file);
+    return {
+      user_id: userId,
+      id: row.id,
+      name: row.name,
+      last_month: row.lastMonth,
+      this_month: row.thisMonth,
+      notes: row.notes,
+    };
+  });
+  if (encoded.length) {
+    const { error: rowErr } = await sb
+      .from("inventory")
+      .upsert(encoded, { onConflict: "user_id,id" });
+    if (rowErr && !isSkippableSealError(rowErr)) return;
+  }
   const meta = await sb
     .from("ledger_meta")
     .select("hotel")

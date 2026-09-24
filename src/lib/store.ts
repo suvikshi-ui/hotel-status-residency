@@ -48,6 +48,7 @@ import {
   type InventoryItem,
 } from "./inventory";
 import { demoComplaints, normalizeComplaints, type RoomComplaint } from "./complaints";
+import { writeHouseFiles } from "./house-files";
 import {
   normalizeReminders,
   remindersFromHotel,
@@ -693,13 +694,16 @@ export const useLedger = create<LedgerState>()(
           sealedIds: withSealed(get().sealedIds, [file.id]),
           deletedIds: omitSealed(get().deletedIds, [file.id]),
         });
+        writeHouseFiles(ledgerOwnerKey(), next);
       },
       deleteInventoryFile: (id) => {
+        const next = get().inventoryFiles.filter((row) => row.id !== id);
         save({
-          inventoryFiles: get().inventoryFiles.filter((row) => row.id !== id),
+          inventoryFiles: next,
           sealedIds: omitSealed(get().sealedIds, [id, sealKey.inventoryMonth(id.split(":").pop() ?? "")]),
           deletedIds: withSealed(get().deletedIds, [id]),
         });
+        writeHouseFiles(ledgerOwnerKey(), next);
       },
       setComplaints: (complaints) =>
         save({
