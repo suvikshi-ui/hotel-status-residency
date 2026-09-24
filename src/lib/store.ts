@@ -772,7 +772,7 @@ export const useLedger = create<LedgerState>()(
           inventoryFiles: mergeInventoryFiles(
             Array.isArray(p.inventoryFiles) ? p.inventoryFiles : [],
             cur.inventoryFiles,
-          ).filter((row) => !p.deletedIds?.[row.id] || cur.inventoryFiles.some((file) => file.id === row.id)),
+          ).filter((row) => !p.deletedIds?.[row.id] && !cur.deletedIds?.[row.id]),
           reminders: Array.isArray(p.reminders)
             ? normalizeReminders(p.reminders)
             : cur.reminders,

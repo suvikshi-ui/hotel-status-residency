@@ -428,15 +428,19 @@ function overlayBooks(snapshot: LedgerSnapshot, hotelRaw: unknown): LedgerSnapsh
   const books = booksFromHotel(hotelRaw);
   if (!books) return snapshot;
   const next = { ...snapshot };
-  if ((books.guests?.length ?? 0) > snapshot.guests.length) next.guests = books.guests ?? snapshot.guests;
-  if ((books.food?.length ?? 0) > snapshot.food.length) next.food = books.food ?? snapshot.food;
-  if ((books.wholesale?.length ?? 0) > snapshot.wholesale.length) {
+  if ((books.guests?.length ?? 0) > 0 && snapshot.guests.length === 0) {
+    next.guests = books.guests ?? snapshot.guests;
+  }
+  if ((books.food?.length ?? 0) > 0 && snapshot.food.length === 0) {
+    next.food = books.food ?? snapshot.food;
+  }
+  if ((books.wholesale?.length ?? 0) > 0 && snapshot.wholesale.length === 0) {
     next.wholesale = books.wholesale ?? snapshot.wholesale;
   }
-  if ((books.expenses?.length ?? 0) > snapshot.expenses.length) {
+  if ((books.expenses?.length ?? 0) > 0 && snapshot.expenses.length === 0) {
     next.expenses = books.expenses ?? snapshot.expenses;
   }
-  if ((books.balReceived?.length ?? 0) > snapshot.balReceived.length) {
+  if ((books.balReceived?.length ?? 0) > 0 && snapshot.balReceived.length === 0) {
     next.balReceived = books.balReceived ?? snapshot.balReceived;
   } else if (books.balReceived?.length) {
     const extra = new Map(books.balReceived.map((r) => [r.id, r]));
@@ -446,21 +450,25 @@ function overlayBooks(snapshot: LedgerSnapshot, hotelRaw: unknown): LedgerSnapsh
       return { ...r, payRef: r.payRef || b.payRef };
     });
   }
-  if ((books.staff?.length ?? 0) > snapshot.staff.length) next.staff = books.staff ?? snapshot.staff;
-  if ((books.staffRegister?.length ?? 0) > (snapshot.staffRegister?.length ?? 0)) {
+  if ((books.staff?.length ?? 0) > 0 && snapshot.staff.length === 0) {
+    next.staff = books.staff ?? snapshot.staff;
+  }
+  if ((books.staffRegister?.length ?? 0) > 0 && (snapshot.staffRegister?.length ?? 0) === 0) {
     next.staffRegister = books.staffRegister;
   }
-  if ((books.payrollFiles?.length ?? 0) > (snapshot.payrollFiles?.length ?? 0)) {
+  if ((books.payrollFiles?.length ?? 0) > 0 && (snapshot.payrollFiles?.length ?? 0) === 0) {
     next.payrollFiles = books.payrollFiles;
   }
   next.inventoryFiles = mergeInventoryFiles(
     snapshot.inventoryFiles,
     books.inventoryFiles,
-  );
-  if ((books.advances?.length ?? 0) > snapshot.advances.length) {
+  ).filter((file) => !snapshot.deletedIds?.[file.id]);
+  if ((books.advances?.length ?? 0) > 0 && snapshot.advances.length === 0) {
     next.advances = books.advances ?? snapshot.advances;
   }
-  if ((books.rooms?.length ?? 0) > snapshot.rooms.length) next.rooms = books.rooms ?? snapshot.rooms;
+  if ((books.rooms?.length ?? 0) > 0 && snapshot.rooms.length === 0) {
+    next.rooms = books.rooms ?? snapshot.rooms;
+  }
   if ((books.savedAt ?? 0) > (snapshot.savedAt ?? 0)) next.savedAt = books.savedAt;
   return next;
 }
@@ -734,6 +742,19 @@ export async function pullLedger(userId: string): Promise<CloudPull> {
     gstBillsFromHotel(hotelRaw),
   );
   snapshot = overlayBooks(snapshot, hotelRaw);
+  snapshot.guests = dropDeletedRows(snapshot.guests, deletedIds, sealKey.guest);
+  snapshot.food = dropDeletedRows(snapshot.food, deletedIds, sealKey.food);
+  snapshot.wholesale = dropDeletedRows(snapshot.wholesale, deletedIds, sealKey.wholesale);
+  snapshot.expenses = dropDeletedRows(snapshot.expenses, deletedIds, sealKey.expense);
+  snapshot.balReceived = dropDeletedRows(snapshot.balReceived, deletedIds, sealKey.balance);
+  snapshot.complaints = dropDeletedRows(
+    snapshot.complaints ?? [],
+    deletedIds,
+    sealKey.complaint,
+  );
+  snapshot.inventoryFiles = (snapshot.inventoryFiles ?? []).filter(
+    (file) => !deletedIds[file.id],
+  );
   snapshot.guests = withGuestGst(
     snapshot.guests,
     gstIdsFromHotel(hotelRaw),
@@ -898,6 +919,45 @@ async function pushSheetSeals(
   return null;
 }
 
+function idsForPrefix(deleted: SealedIds | undefined, prefix: string): string[] {
+  return Object.keys(deleted ?? {})
+    .filter((key) => key.startsWith(prefix))
+    .map((key) => key.slice(prefix.length))
+    .filter(Boolean);
+}
+
+function tombstonePrune(snap: LedgerSnapshot): LedgerPrune {
+  return {
+    rooms: [],
+    staff: [],
+    expenses: idsForPrefix(snap.deletedIds, "exp:"),
+    balance: idsForPrefix(snap.deletedIds, "bal:"),
+    guests: idsForPrefix(snap.deletedIds, "guest:"),
+    food: idsForPrefix(snap.deletedIds, "food:"),
+    wholesale: idsForPrefix(snap.deletedIds, "ws:"),
+    advances: [],
+    complaints: idsForPrefix(snap.deletedIds, "c:"),
+    inventory: Object.keys(snap.deletedIds ?? {}).filter((id) => isInventoryFileId(id)),
+  };
+}
+
+function unionPrune(base: LedgerPrune | undefined, extra: LedgerPrune): LedgerPrune | undefined {
+  if (!base) return undefined;
+  const join = (a?: string[], b?: string[]) => [...new Set([...(a ?? []), ...(b ?? [])])];
+  return {
+    rooms: join(base.rooms, extra.rooms),
+    staff: join(base.staff, extra.staff),
+    expenses: join(base.expenses, extra.expenses),
+    balance: join(base.balance, extra.balance),
+    guests: join(base.guests, extra.guests),
+    food: join(base.food, extra.food),
+    wholesale: join(base.wholesale, extra.wholesale),
+    advances: join(base.advances, extra.advances),
+    complaints: join(base.complaints, extra.complaints),
+    inventory: join(base.inventory, extra.inventory),
+  };
+}
+
 export async function pushLedger(
   userId: string,
   snap: LedgerSnapshot,
@@ -905,6 +965,10 @@ export async function pushLedger(
   role?: string,
   prune?: LedgerPrune,
 ): Promise<{ ok: true } | { ok: false; missingSchema: boolean; message: string }> {
+  const ownerId = await resolveSharedHotelUserId(userId);
+  const tombs = tombstonePrune(snap);
+  const writePrune =
+    prune === undefined && ownerId !== userId ? tombs : unionPrune(prune, tombs);
   const rooms = snap.rooms.map((r, i) => ({
     no: r.no,
     floor: r.floor,
@@ -1008,27 +1072,27 @@ export async function pushLedger(
   const hkOnly = role === "housekeeping";
   const writes: Array<Promise<PostgrestError | null>> = hkOnly
     ? [
-        replaceRows("complaints", userId, "id", complaints, prune?.complaints),
-        replaceRows("inventory", userId, "id", inventory, prune?.inventory),
+        replaceRows("complaints", ownerId, "id", complaints, writePrune?.complaints),
+        replaceRows("inventory", ownerId, "id", inventory, writePrune?.inventory),
       ]
     : [
-        replaceRows("rooms", userId, "no", rooms, prune?.rooms),
-        replaceRows("staff", userId, "id", staff, prune?.staff),
-        replaceRows("expenses", userId, "id", expenses, prune?.expenses),
-        replaceRows("balance_received", userId, "id", balance, prune?.balance),
-        replaceRows("guests", userId, "id", guests, prune?.guests),
-        replaceRows("food", userId, "id", food, prune?.food),
-        replaceRows("wholesale", userId, "id", wholesale, prune?.wholesale),
-        replaceRows("advances", userId, "id", advances, prune?.advances),
-        replaceRows("complaints", userId, "id", complaints, prune?.complaints),
-        replaceRows("inventory", userId, "id", inventory, prune?.inventory),
+        replaceRows("rooms", ownerId, "no", rooms, writePrune?.rooms),
+        replaceRows("staff", ownerId, "id", staff, writePrune?.staff),
+        replaceRows("expenses", ownerId, "id", expenses, writePrune?.expenses),
+        replaceRows("balance_received", ownerId, "id", balance, writePrune?.balance),
+        replaceRows("guests", ownerId, "id", guests, writePrune?.guests),
+        replaceRows("food", ownerId, "id", food, writePrune?.food),
+        replaceRows("wholesale", ownerId, "id", wholesale, writePrune?.wholesale),
+        replaceRows("advances", ownerId, "id", advances, writePrune?.advances),
+        replaceRows("complaints", ownerId, "id", complaints, writePrune?.complaints),
+        replaceRows("inventory", ownerId, "id", inventory, writePrune?.inventory),
       ];
   const results = await Promise.all(writes);
   const tableErr = results.find((e) => e && !isMissingSchema(e) && !isSkippableSealError(e));
 
   if (hkOnly) {
-    await pushSheetSeals(userId, snap.sealedIds);
-    await pushInventoryBooks(userId, snap.inventoryFiles ?? []);
+    await pushSheetSeals(ownerId, snap.sealedIds);
+    await pushInventoryBooks(ownerId, snap.inventoryFiles ?? [], snap.deletedIds);
     if (tableErr) {
       const mapped = asError(tableErr);
       return mapped.ok
@@ -1040,7 +1104,7 @@ export async function pushLedger(
 
   const sb = getSupabase();
   const metaRow = {
-    user_id: userId,
+    user_id: ownerId,
     hotel: {
       ...hotelForCloud(
         snap.hotel,
@@ -1087,12 +1151,16 @@ export async function pushLedger(
       message: mapped.message,
     };
   }
-  await pushSheetSeals(userId, snap.sealedIds);
-  await pushInventoryBooks(userId, snap.inventoryFiles ?? []);
+  await pushSheetSeals(ownerId, snap.sealedIds);
+  await pushInventoryBooks(ownerId, snap.inventoryFiles ?? [], snap.deletedIds);
   return { ok: true };
 }
 
-async function pushInventoryBooks(userId: string, files: InventoryFile[]) {
+async function pushInventoryBooks(
+  userId: string,
+  files: InventoryFile[],
+  deleted?: SealedIds,
+) {
   const sb = getSupabase();
   const ownerId = await resolveSharedHotelUserId(userId);
   const existingRows = await sb
@@ -1105,7 +1173,11 @@ async function pushInventoryBooks(userId: string, files: InventoryFile[]) {
       return decodeInventoryFile({ id: str(rec.id), notes: str(rec.notes) });
     })
     .filter((row): row is InventoryFile => Boolean(row));
-  const merged = mergeInventoryFiles(files, cloudFiles);
+  const gone = cloudFiles.filter((file) => deleted?.[file.id]).map((file) => file.id);
+  if (gone.length) {
+    await sb.from("inventory").delete().eq("user_id", ownerId).in("id", gone);
+  }
+  const merged = mergeInventoryFiles(files, cloudFiles).filter((file) => !deleted?.[file.id]);
   const shared = await sb.rpc("save_shared_inventory", { files: merged });
   if (!shared.error) return;
   const encoded = merged.map((file) => {
