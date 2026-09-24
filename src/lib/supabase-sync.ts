@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { mergeLiveSnapshot } from "./live-merge";
+import { mergeLiveSnapshot, mergeRowsById } from "./live-merge";
 import { clearLocalLedgerCache } from "./ledger-cache";
 import { pullLockState } from "./pull-locks";
 import {
@@ -25,6 +25,7 @@ import {
   parseLockedDates,
   writeStoredLocks,
 } from "./register-lock";
+import { dropDeletedRows, mergeSealed } from "./sheet-seal";
 
 export type CloudPhase =
   | "off"
@@ -564,15 +565,27 @@ export async function hydrateFromCloud(userId: string): Promise<CloudPhase> {
         return "synced";
       }
       clearLocalLedgerCache();
+      const kept = withLocalSavedFiles(cloud);
+      const savedMore =
+        (kept.inventoryFiles?.length ?? 0) > (cloud.inventoryFiles?.length ?? 0) ||
+        (kept.payrollFiles?.length ?? 0) > (cloud.payrollFiles?.length ?? 0);
       useLedger.getState().applyCloudBooks({
-        ...cloud,
-        lockedDates: parseLockedDates(cloud.lockedDates),
-        lockRev: parseLockRev(cloud.lockRev),
-        savedAt: cloud.savedAt ?? Date.now(),
+        ...kept,
+        lockedDates: parseLockedDates(kept.lockedDates),
+        lockRev: parseLockRev(kept.lockRev),
+        savedAt: kept.savedAt ?? Date.now(),
       });
-      writeStoredLocks(ledgerOwnerKey(), parseLockedDates(cloud.lockedDates));
+      writeStoredLocks(ledgerOwnerKey(), parseLockedDates(kept.lockedDates));
       claimAnonymousLedger(userId);
       openOnToday();
+      if (savedMore) {
+        await pushLedger(
+          userId,
+          { ...snapshotFromStore(), savedAt: Date.now() + 2_000 },
+          undefined,
+          useLedger.getState().appRole,
+        );
+      }
       rememberPulled(snapshotFromStore(), cloud.cloudUpdatedAt);
       lastHash = hashOf(snapshotFromStore());
       setPhase("synced");
@@ -606,6 +619,25 @@ export async function hydrateFromCloud(userId: string): Promise<CloudPhase> {
   } finally {
     hydrating = false;
   }
+}
+
+function withLocalSavedFiles(cloud: LedgerSnapshot): LedgerSnapshot {
+  const local = useLedger.getState();
+  const deleted = mergeSealed(local.deletedIds, cloud.deletedIds);
+  return {
+    ...cloud,
+    deletedIds: deleted,
+    inventoryFiles: dropDeletedRows(
+      mergeRowsById(cloud.inventoryFiles ?? [], local.inventoryFiles ?? []),
+      deleted,
+      (id) => id,
+    ),
+    payrollFiles: dropDeletedRows(
+      mergeRowsById(cloud.payrollFiles ?? [], local.payrollFiles ?? []),
+      deleted,
+      (id) => id,
+    ),
+  };
 }
 
 export function useCloudSync() {

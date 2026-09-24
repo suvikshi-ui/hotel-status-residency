@@ -389,6 +389,9 @@ export function booksFromHotel(hotel: unknown): Partial<LedgerSnapshot> | null {
   const payrollFiles = Array.isArray(b.payrollFiles)
     ? (b.payrollFiles as PayrollFile[])
     : [];
+  const inventoryFiles = Array.isArray(b.inventoryFiles)
+    ? normalizeInventoryFiles(b.inventoryFiles as InventoryFile[])
+    : [];
   const advances = Array.isArray(b.advances) ? (b.advances as AdvanceRow[]) : [];
   const rooms = Array.isArray(b.rooms) ? (b.rooms as RoomDef[]) : [];
   if (
@@ -398,7 +401,8 @@ export function booksFromHotel(hotel: unknown): Partial<LedgerSnapshot> | null {
     !expenses.length &&
     !balReceived.length &&
     !staffRegister.length &&
-    !payrollFiles.length
+    !payrollFiles.length &&
+    !inventoryFiles.length
   ) {
     return null;
   }
@@ -411,6 +415,7 @@ export function booksFromHotel(hotel: unknown): Partial<LedgerSnapshot> | null {
     staff,
     staffRegister,
     payrollFiles,
+    inventoryFiles,
     advances,
     rooms,
     savedAt: num(b.savedAt) || undefined,
@@ -446,6 +451,10 @@ function overlayBooks(snapshot: LedgerSnapshot, hotelRaw: unknown): LedgerSnapsh
   if ((books.payrollFiles?.length ?? 0) > (snapshot.payrollFiles?.length ?? 0)) {
     next.payrollFiles = books.payrollFiles;
   }
+  next.inventoryFiles = normalizeInventoryFiles([
+    ...(snapshot.inventoryFiles ?? []),
+    ...(books.inventoryFiles ?? []),
+  ]);
   if ((books.advances?.length ?? 0) > snapshot.advances.length) {
     next.advances = books.advances ?? snapshot.advances;
   }
@@ -464,6 +473,7 @@ function booksForHotel(snap: LedgerSnapshot) {
     staff: snap.staff,
     staffRegister: snap.staffRegister ?? [],
     payrollFiles: snap.payrollFiles ?? [],
+    inventoryFiles: snap.inventoryFiles ?? [],
     advances: snap.advances,
     rooms: snap.rooms,
     savedAt: snap.savedAt ?? Date.now(),
