@@ -5,6 +5,7 @@ import {
   encodeInventoryFile,
   normalizeInventory,
   normalizeInventoryFiles,
+  mergeInventoryFiles,
   splitInventoryRows,
   type InventoryFile,
   type InventoryItem,
@@ -451,10 +452,10 @@ function overlayBooks(snapshot: LedgerSnapshot, hotelRaw: unknown): LedgerSnapsh
   if ((books.payrollFiles?.length ?? 0) > (snapshot.payrollFiles?.length ?? 0)) {
     next.payrollFiles = books.payrollFiles;
   }
-  next.inventoryFiles = normalizeInventoryFiles([
-    ...(snapshot.inventoryFiles ?? []),
-    ...(books.inventoryFiles ?? []),
-  ]);
+  next.inventoryFiles = mergeInventoryFiles(
+    snapshot.inventoryFiles,
+    books.inventoryFiles,
+  );
   if ((books.advances?.length ?? 0) > snapshot.advances.length) {
     next.advances = books.advances ?? snapshot.advances;
   }
@@ -1000,6 +1001,7 @@ export async function pushLedger(
         : { ok: false, missingSchema: mapped.missingSchema, message: mapped.message };
     }
     await pushSheetSeals(userId, snap.sealedIds);
+    await pushInventoryBooks(userId, snap.inventoryFiles ?? []);
     return { ok: true };
   }
 
@@ -1054,6 +1056,37 @@ export async function pushLedger(
   }
   await pushSheetSeals(userId, snap.sealedIds);
   return { ok: true };
+}
+
+async function pushInventoryBooks(userId: string, files: InventoryFile[]) {
+  const sb = getSupabase();
+  const meta = await sb
+    .from("ledger_meta")
+    .select("hotel")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (meta.error || !meta.data) return;
+  const hotel = ((meta.data as { hotel?: unknown }).hotel ?? {}) as Record<string, unknown>;
+  const rawBooks =
+    hotel._books && typeof hotel._books === "object" && !Array.isArray(hotel._books)
+      ? (hotel._books as Record<string, unknown>)
+      : {};
+  const existing = Array.isArray(rawBooks.inventoryFiles)
+    ? (rawBooks.inventoryFiles as InventoryFile[])
+    : [];
+  const { error } = await sb
+    .from("ledger_meta")
+    .update({
+      hotel: {
+        ...hotel,
+        _books: {
+          ...rawBooks,
+          inventoryFiles: mergeInventoryFiles(files, existing),
+        },
+      },
+    })
+    .eq("user_id", userId);
+  if (error && !isSkippableSealError(error)) return;
 }
 
 function withRowId<T extends { id: string }>(row: T, prefix: string, i: number): T {

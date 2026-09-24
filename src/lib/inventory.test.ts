@@ -6,6 +6,7 @@ import {
   encodeInventoryFile,
   inventoryDifference,
   inventoryFileId,
+  mergeInventoryFiles,
   normalizeInventory,
   seedBook,
   seedInventory,
@@ -100,5 +101,32 @@ describe("inventory sheet", () => {
     assert.equal(next[0]?.name, "Water");
     assert.equal(next[0]?.lastMonth, 9);
     assert.equal(next[0]?.thisMonth, 0);
+  });
+
+  it("keeps items written on either desk", () => {
+    const id = inventoryFileId("ws", "2026-09-24");
+    const merged = mergeInventoryFiles(
+      [
+        {
+          id,
+          kind: "ws",
+          period: "2026-09-24",
+          createdAt: "2026-09-24",
+          lines: [{ id: "a", name: "Soap", lastMonth: 1, thisMonth: 4, notes: "" }],
+        },
+      ],
+      [
+        {
+          id,
+          kind: "ws",
+          period: "2026-09-24",
+          createdAt: "2026-09-24",
+          lines: [{ id: "b", name: "Bucket", lastMonth: 2, thisMonth: 3, notes: "new" }],
+        },
+      ],
+    );
+    const lines = merged[0]?.lines ?? [];
+    assert.equal(lines.find((row) => row.name === "Soap")?.thisMonth, 4);
+    assert.equal(lines.find((row) => row.name === "Bucket")?.thisMonth, 3);
   });
 });

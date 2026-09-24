@@ -270,6 +270,54 @@ export function filesForBook(files: InventoryFile[], kind: InventoryBook) {
   return files.filter((file) => file.kind === kind);
 }
 
+/** Keep every item name. When both desks saved the same file, keep the counts that were filled in. */
+export function mergeInventoryFiles(
+  local: InventoryFile[] | undefined,
+  cloud: InventoryFile[] | undefined,
+): InventoryFile[] {
+  const byId = new Map<string, InventoryFile>();
+  for (const file of [
+    ...normalizeInventoryFiles(cloud),
+    ...normalizeInventoryFiles(local),
+  ]) {
+    const prev = byId.get(file.id);
+    if (!prev) {
+      byId.set(file.id, file);
+      continue;
+    }
+    byId.set(file.id, mergeOneInventoryFile(prev, file));
+  }
+  return normalizeInventoryFiles([...byId.values()]);
+}
+
+function mergeOneInventoryFile(cloud: InventoryFile, local: InventoryFile): InventoryFile {
+  const lines: InventoryItem[] = [];
+  const index = new Map<string, number>();
+  const add = (line: InventoryItem) => {
+    const key = line.name.trim().toLowerCase();
+    if (!key) return;
+    const at = index.get(key);
+    if (at === undefined) {
+      index.set(key, lines.length);
+      lines.push(line);
+      return;
+    }
+    const prev = lines[at];
+    if (!prev) return;
+    lines[at] = {
+      ...prev,
+      id: line.id || prev.id,
+      name: line.name || prev.name,
+      lastMonth: line.lastMonth || prev.lastMonth,
+      thisMonth: line.thisMonth || prev.thisMonth,
+      notes: line.notes || prev.notes,
+    };
+  };
+  for (const line of cloud.lines) add(line);
+  for (const line of local.lines) add(line);
+  return { ...local, lines };
+}
+
 export function seedInventory(): InventoryItem[] {
   return LINEN_CATALOG.map((row) => emptyInventoryItem(row.id, row.name));
 }

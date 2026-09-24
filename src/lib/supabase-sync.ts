@@ -26,6 +26,7 @@ import {
   writeStoredLocks,
 } from "./register-lock";
 import { dropDeletedRows, mergeSealed } from "./sheet-seal";
+import { mergeInventoryFiles } from "./inventory";
 
 export type CloudPhase =
   | "off"
@@ -627,10 +628,13 @@ function withLocalSavedFiles(cloud: LedgerSnapshot): LedgerSnapshot {
   return {
     ...cloud,
     deletedIds: deleted,
-    inventoryFiles: dropDeletedRows(
-      mergeRowsById(cloud.inventoryFiles ?? [], local.inventoryFiles ?? []),
-      deleted,
-      (id) => id,
+    inventoryFiles: mergeInventoryFiles(
+      cloud.inventoryFiles,
+      local.inventoryFiles,
+    ).filter(
+      (file) =>
+        (local.inventoryFiles ?? []).some((row) => row.id === file.id) ||
+        !deleted[file.id],
     ),
     payrollFiles: dropDeletedRows(
       mergeRowsById(cloud.payrollFiles ?? [], local.payrollFiles ?? []),

@@ -40,6 +40,7 @@ import {
   type SealedIds,
 } from "./sheet-seal";
 import {
+  mergeInventoryFiles,
   normalizeInventory,
   normalizeInventoryFiles,
   seedInventory,
@@ -764,10 +765,10 @@ export const useLedger = create<LedgerState>()(
             ...(Array.isArray(p.payrollFiles) ? p.payrollFiles : cur.payrollFiles),
             ...cur.payrollFiles,
           ]).filter((row) => !p.deletedIds?.[row.id] && !cur.deletedIds?.[row.id]),
-          inventoryFiles: normalizeInventoryFiles([
-            ...(Array.isArray(p.inventoryFiles) ? p.inventoryFiles : cur.inventoryFiles),
-            ...cur.inventoryFiles,
-          ]).filter((row) => !p.deletedIds?.[row.id] && !cur.deletedIds?.[row.id]),
+          inventoryFiles: mergeInventoryFiles(
+            Array.isArray(p.inventoryFiles) ? p.inventoryFiles : [],
+            cur.inventoryFiles,
+          ).filter((row) => !p.deletedIds?.[row.id] || cur.inventoryFiles.some((file) => file.id === row.id)),
           reminders: Array.isArray(p.reminders)
             ? normalizeReminders(p.reminders)
             : cur.reminders,

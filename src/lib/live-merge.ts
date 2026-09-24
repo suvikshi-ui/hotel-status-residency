@@ -7,6 +7,7 @@ import {
 import { mergeBankRows } from "./bank-recon.ts";
 import { mergeGuestGst } from "./invoice.ts";
 import { mergeSealed, parseSealedIds, dropDeletedRows, sealKey } from "./sheet-seal.ts";
+import { mergeInventoryFiles } from "./inventory.ts";
 import type { LedgerSnapshot } from "./supabase-db.ts";
 
 export function rowEq(a: unknown, b: unknown) {
@@ -143,6 +144,15 @@ export function mergeLiveSnapshot(
   const localRev = parseLockRev(local.lockRev);
   const cloudRev = parseLockRev(cloud.lockRev);
   const locked = locks.locked;
+  const inventoryFiles = mergeInventoryFiles(
+    local.inventoryFiles,
+    cloud.inventoryFiles,
+  ).filter(
+    (file) =>
+      (local.inventoryFiles ?? []).some((row) => row.id === file.id) ||
+      !deletedIds[file.id],
+  );
+  for (const file of inventoryFiles) delete deletedIds[file.id];
   return {
     hotel: pick3(b.hotel, local.hotel, cloud.hotel),
     opening: pick3(b.opening, local.opening, cloud.opening),
@@ -247,11 +257,7 @@ export function mergeLiveSnapshot(
     ),
     deletedIds,
     inventory: mergeRowsById(local.inventory ?? [], cloud.inventory ?? []),
-    inventoryFiles: dropDeletedRows(
-      mergeRowsById(local.inventoryFiles ?? [], cloud.inventoryFiles ?? []),
-      deletedIds,
-      (id) => id,
-    ),
+    inventoryFiles,
     complaints: dropDeletedRows(
       mergeRowsById(local.complaints ?? [], cloud.complaints ?? []),
       deletedIds,
