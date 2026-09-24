@@ -13,8 +13,8 @@ export const REPORT_TAB: { id: ReportView; label: string }[] = [
   { id: "daily", label: "Daily report" },
   { id: "detail", label: "Detailed daily" },
   { id: "month", label: "Monthly report" },
-  { id: "inventory", label: "Inventory report" },
-  { id: "salary", label: "Salary" },
+  { id: "inventory", label: "Linen report" },
+  { id: "salary", label: "Salary report" },
   { id: "advance", label: "Staff advance" },
 ];
 

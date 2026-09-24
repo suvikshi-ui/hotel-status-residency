@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   Bar,
@@ -9,6 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { format, isValid, parseISO } from "date-fns";
 import { Printer } from "lucide-react";
 import { toast } from "sonner";
 import { DailyA4 } from "@/components/daily-a4";
@@ -19,7 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { buildDayTake } from "@/lib/day-report";
 import { sumByBucket, expenseBucket } from "@/lib/expense-tally";
-import { formatDay, formatDayShort, money, moneyCompact, salaryPayMonth, salaryPayMonthName } from "@/lib/format";
+import { formatDay, formatDayShort, money, moneyCompact, salaryPayMonth, salaryPayMonthKey } from "@/lib/format";
 import {
   inventoryDifference,
   signedCount,
@@ -446,9 +448,23 @@ function DetailDailyPanel() {
   );
 }
 
+function periodTitle(period: string) {
+  const d = parseISO(`${period.slice(0, 7)}-01`);
+  return isValid(d) ? format(d, "MMMM yyyy") : period;
+}
+
 function InventoryReportPanel() {
   const hotel = useLedger((s) => s.hotel);
-  const inventory = useLedger((s) => s.inventory);
+  const date = useLedger((s) => s.selectedDate);
+  const files = useLedger((s) => s.inventoryFiles).filter((file) => file.kind === "linen");
+  const period = date.slice(0, 7);
+  const [picked, setPicked] = useState<string | null>(null);
+  const file =
+    files.find((row) => row.id === picked) ??
+    files.find((row) => row.period === period) ??
+    files[0] ??
+    null;
+  const inventory = file?.lines ?? [];
   const lastTotal = inventory.reduce((s, r) => s + r.lastMonth, 0);
   const thisTotal = inventory.reduce((s, r) => s + r.thisMonth, 0);
   const diffTotal = thisTotal - lastTotal;
@@ -460,17 +476,36 @@ function InventoryReportPanel() {
             {hotel.name}
           </p>
           <h2 className="mt-1 font-display text-2xl font-semibold tracking-tight">
-            Inventory report
+            Linen report
           </h2>
           <p className="mt-1 text-sm text-muted">
-            Last month vs this month. Counts are entered on Inventory.
+            {file
+              ? `Saved linen file · ${periodTitle(file.period)}`
+              : "No linen file saved yet. Save the month on Inventory."}
           </p>
         </div>
-        <Button type="button" onClick={() => window.print()}>
+        <Button type="button" onClick={() => window.print()} disabled={!file}>
           <Printer className="size-4" />
           Print
         </Button>
       </div>
+      {files.length ? (
+        <div className="flex flex-wrap gap-2 print:hidden">
+          {files.map((row) => (
+            <Button
+              key={row.id}
+              type="button"
+              size="sm"
+              variant={file?.id === row.id ? "default" : "outline"}
+              onClick={() => setPicked(row.id)}
+            >
+              {periodTitle(row.period)}
+            </Button>
+          ))}
+        </div>
+      ) : null}
+      {file ? (
+        <>
       <div className="grid grid-cols-3 gap-3">
         <Stat label="Last month" value={String(lastTotal)} />
         <Stat label="This month" value={String(thisTotal)} />
@@ -512,6 +547,8 @@ function InventoryReportPanel() {
           </table>
         </CardContent>
       </Card>
+        </>
+      ) : null}
     </div>
   );
 }
@@ -519,10 +556,16 @@ function InventoryReportPanel() {
 function SalaryReportPanel() {
   const hotel = useLedger((s) => s.hotel);
   const date = useLedger((s) => s.selectedDate);
-  const staff = useLedger((s) => s.staff);
+  const files = useLedger((s) => s.payrollFiles).filter((file) => file.kind === "salary");
+  const period = salaryPayMonthKey(date);
+  const [picked, setPicked] = useState<string | null>(null);
+  const file =
+    files.find((row) => row.id === picked) ??
+    files.find((row) => row.period === period) ??
+    files[0] ??
+    null;
   const monthDays = 30;
-  const payMonth = salaryPayMonth(date);
-  const payName = salaryPayMonthName(date);
+  const staff = file?.staff ?? [];
   const rows = staff.map((r) => {
     const { earned, payable } = staffPay(
       r.salary,
@@ -537,6 +580,7 @@ function SalaryReportPanel() {
   const earnedTotal = rows.reduce((s, r) => s + r.earned, 0);
   const extraTotal = rows.reduce((s, r) => s + (r.extra ?? 0), 0);
   const salaryAdv = rows.reduce((s, r) => s + r.advance, 0);
+  const title = file ? periodTitle(file.period) : salaryPayMonth(date);
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -545,17 +589,36 @@ function SalaryReportPanel() {
             {hotel.name}
           </p>
           <h2 className="mt-1 font-display text-2xl font-semibold tracking-tight">
-            Salary of {payName}
+            Salary report
           </h2>
           <p className="mt-1 text-sm text-muted">
-            Payment of {payMonth}. Basic ÷ {monthDays} × (working + extra) − advance.
+            {file
+              ? `Saved salary file · ${title}`
+              : "No salary file saved yet. Save the month on Staff."}
           </p>
         </div>
-        <Button type="button" onClick={() => window.print()}>
+        <Button type="button" onClick={() => window.print()} disabled={!file}>
           <Printer className="size-4" />
           Print
         </Button>
       </div>
+      {files.length ? (
+        <div className="flex flex-wrap gap-2 print:hidden">
+          {files.map((row) => (
+            <Button
+              key={row.id}
+              type="button"
+              size="sm"
+              variant={file?.id === row.id ? "default" : "outline"}
+              onClick={() => setPicked(row.id)}
+            >
+              {periodTitle(row.period)}
+            </Button>
+          ))}
+        </div>
+      ) : null}
+      {file ? (
+        <>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         <Stat label="Earned" value={money(earnedTotal)} />
         <Stat label="Advance minus" value={money(salaryAdv)} />
@@ -613,6 +676,8 @@ function SalaryReportPanel() {
           </table>
         </CardContent>
       </Card>
+        </>
+      ) : null}
     </div>
   );
 }
