@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Plus, Printer } from "lucide-react";
+import { format, isValid, parseISO } from "date-fns";
+import { Plus, Printer, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,13 @@ import { staffPay } from "@/lib/staff-pay";
 import { useLedger } from "@/lib/store";
 import { HotelLogo } from "@/components/hotel-logo";
 import { SaveCube, useAccountSave } from "@/components/save-cube";
-import { isSealed, sealKey } from "@/lib/sheet-seal";
+import { useGate } from "@/components/security-gate";
+import {
+  blankAdvanceMonth,
+  blankSalaryMonth,
+  payrollFileId,
+  type PayrollFile,
+} from "@/lib/payroll-files";
 import type { AdvanceRow, StaffProfile, StaffRow } from "@/lib/types";
 
 export const Route = createFileRoute("/staff")({ component: StaffPage });
@@ -29,9 +36,12 @@ function StaffPage() {
   const advances = useLedger((s) => s.advances);
   const setStaff = useLedger((s) => s.setStaff);
   const setStaffRegister = useLedger((s) => s.setStaffRegister);
+  const payrollFiles = useLedger((s) => s.payrollFiles);
+  const savePayrollFile = useLedger((s) => s.savePayrollFile);
+  const deletePayrollFile = useLedger((s) => s.deletePayrollFile);
   const setAdvances = useLedger((s) => s.setAdvances);
-  const sealedIds = useLedger((s) => s.sealedIds);
   const { busy: saving, saveToServer } = useAccountSave();
+  const { gate } = useGate();
   const [sheet, setSheet] = useState<Sheet>("register");
   const [regDraft, setRegDraft] = useState<StaffProfile[]>(staffRegister);
   const [draft, setDraft] = useState<StaffRow[]>(staff);
@@ -40,16 +50,59 @@ function StaffPage() {
   useEffect(() => {
     setRegDraft(staffRegister);
   }, [staffRegister]);
-  useEffect(() => {
-    setDraft(staff);
-  }, [staff]);
-  useEffect(() => {
-    setAdvDraft(advances);
-  }, [advances]);
 
+  const salaryPeriod = salaryPayMonthKey(date);
+  const advancePeriod = date.slice(0, 7);
+  const salaryFiles = useMemo(
+    () => payrollFiles.filter((file) => file.kind === "salary"),
+    [payrollFiles],
+  );
+  const advanceFiles = useMemo(
+    () => payrollFiles.filter((file) => file.kind === "advance"),
+    [payrollFiles],
+  );
+  const salarySaved = salaryFiles.find((file) => file.period === salaryPeriod) ?? null;
+  const advanceSaved = advanceFiles.find((file) => file.period === advancePeriod) ?? null;
+  const [salaryOpen, setSalaryOpen] = useState("draft");
+  const [advanceOpen, setAdvanceOpen] = useState("draft");
+  const payMonth = salaryPayMonth(date);
+  const payName = salaryPayMonthName(date);
+  const salaryFileOpen =
+    salaryOpen === "draft"
+      ? null
+      : (salaryFiles.find((file) => file.id === salaryOpen) ?? null);
+  const advanceFileOpen =
+    advanceOpen === "draft"
+      ? null
+      : (advanceFiles.find((file) => file.id === advanceOpen) ?? null);
+  const salaryLocked = Boolean(salaryFileOpen);
+  const advanceLocked = Boolean(advanceFileOpen);
+
+  useEffect(() => {
+    const current = salaryFiles.find((file) => file.period === salaryPeriod);
+    setSalaryOpen(current?.id ?? "draft");
+    if (!current) {
+      const previous = salaryFiles.find((file) => file.period < salaryPeriod);
+      setDraft(previous ? blankSalaryMonth(previous.staff, salaryPeriod) : staff);
+    }
+  }, [salaryFiles, salaryPeriod, staff]);
+
+  useEffect(() => {
+    const current = advanceFiles.find((file) => file.period === advancePeriod);
+    setAdvanceOpen(current?.id ?? "draft");
+    if (!current) {
+      const previous = advanceFiles.find((file) => file.period < advancePeriod);
+      setAdvDraft(
+        previous ? blankAdvanceMonth(previous.advances, advancePeriod) : advances,
+      );
+    }
+  }, [advanceFiles, advancePeriod, advances]);
+
+  const salaryLines = salaryFileOpen?.staff ?? draft;
+  const advanceLines = advanceFileOpen?.advances ?? advDraft;
   const rows = useMemo(
     () =>
-      draft.map((r) => {
+      salaryLines.map((r) => {
         const { earned, payable } = staffPay(
           r.salary,
           r.working,
@@ -59,22 +112,15 @@ function StaffPage() {
         );
         return { ...r, extra: r.extra ?? 0, earned, payable };
       }),
-    [draft],
+    [salaryLines],
   );
 
   const payroll = rows.reduce((s, r) => s + r.payable, 0);
   const earnedTotal = rows.reduce((s, r) => s + r.earned, 0);
   const extraTotal = rows.reduce((s, r) => s + (r.extra ?? 0), 0);
   const salaryAdv = rows.reduce((s, r) => s + r.advance, 0);
-  const advCash = advDraft.reduce((s, r) => s + r.cash, 0);
-  const advQr = advDraft.reduce((s, r) => s + r.qrs, 0);
-  const staffDirty = JSON.stringify(draft) !== JSON.stringify(staff);
-  const advDirty = JSON.stringify(advDraft) !== JSON.stringify(advances);
-  const monthKey = date.slice(0, 7);
-  const salaryFrozen = isSealed(sealedIds, sealKey.staffMonth(monthKey));
-  const advFrozen = isSealed(sealedIds, sealKey.advanceMonth(monthKey));
-  const payMonth = salaryPayMonth(date);
-  const payName = salaryPayMonthName(date);
+  const advCash = advanceLines.reduce((s, r) => s + r.cash, 0);
+  const advQr = advanceLines.reduce((s, r) => s + r.qrs, 0);
 
   function addProfile() {
     setRegDraft((prev) => [
@@ -118,7 +164,7 @@ function StaffPage() {
   }
 
   function addStaff() {
-    if (salaryFrozen) return;
+    if (salaryLocked) return;
     setDraft((prev) => [
       ...prev,
       {
@@ -140,7 +186,7 @@ function StaffPage() {
   }
 
   function patchStaff(id: string, field: keyof StaffRow, value: string) {
-    if (salaryFrozen) return;
+    if (salaryLocked) return;
     setDraft((prev) =>
       prev.map((r) => {
         if (r.id !== id) return r;
@@ -154,7 +200,7 @@ function StaffPage() {
   }
 
   function patchAdv(id: string, field: keyof AdvanceRow, value: string) {
-    if (advFrozen) return;
+    if (advanceLocked) return;
     setAdvDraft((prev) =>
       prev.map((r) => {
         if (r.id !== id) return r;
@@ -204,13 +250,30 @@ function StaffPage() {
     });
   }
 
+  function removePayroll(file: PayrollFile, label: string) {
+    gate(
+      () => {
+        deletePayrollFile(file.id);
+        toast.success(`${label} deleted`);
+        void saveToServer();
+      },
+      {
+        title: `Delete ${label}?`,
+        message: "The month file will be removed. You can enter it again after delete.",
+        confirmLabel: "Delete",
+        danger: true,
+        requireCode: true,
+      },
+    );
+  }
+
   function printAdvance() {
     const body = `<table>
       <thead><tr>
         <th>Name</th><th class="num">Cash</th><th class="num">QR</th><th class="num">Total</th>
       </tr></thead>
       <tbody>
-        ${advDraft
+        ${advanceLines
           .map(
             (r) => `<tr>
           <td>${escapeHtml(r.name)}</td>
@@ -269,28 +332,59 @@ function StaffPage() {
             {sheet === "register"
               ? "Name, two mobiles, address, and the post you write."
               : sheet === "salary"
-                ? `Salary of ${payName} · Payment of ${payMonth}`
-                : "Advance given in cash or QR."}
+                ? "Enter the month, then Save. The file locks. Open an old month from the list."
+                : "Enter the month, then Save. The file locks. Open an old month from the list."}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {(sheet === "register" ||
+          (sheet === "salary" && !salaryLocked) ||
+          (sheet === "advance" && !advanceLocked)) ? (
           <SaveCube
             busy={saving}
             onSave={() => {
               if (sheet === "salary") {
+                if (salarySaved) {
+                  toast.message("This month is already saved");
+                  return;
+                }
                 const next = rows.map(({ earned, payable, ...r }) => ({
                   ...r,
+                  month: salaryPeriod,
                   total: payable,
                 }));
-                setStaff(next);
+                const file: PayrollFile = {
+                  id: payrollFileId("salary", salaryPeriod),
+                  kind: "salary",
+                  period: salaryPeriod,
+                  createdAt: date.slice(0, 10),
+                  staff: next,
+                  advances: [],
+                };
+                savePayrollFile(file);
+                toast.success(`${payMonth} salary file saved`);
               } else if (sheet === "advance") {
-                setAdvances(advDraft);
+                if (advanceSaved) {
+                  toast.message("This month is already saved");
+                  return;
+                }
+                const file: PayrollFile = {
+                  id: payrollFileId("advance", advancePeriod),
+                  kind: "advance",
+                  period: advancePeriod,
+                  createdAt: date.slice(0, 10),
+                  staff: [],
+                  advances: advDraft.map((row) => ({ ...row, month: advancePeriod })),
+                };
+                savePayrollFile(file);
+                toast.success(`${monthLabel(advancePeriod)} advance file saved`);
               } else {
                 setStaffRegister(regDraft);
               }
               void saveToServer();
             }}
           />
+          ) : null}
           {sheet === "register" ? null : (
             <ReportsLink view={sheet === "advance" ? "advance" : "salary"} />
           )}
@@ -381,18 +475,24 @@ function StaffPage() {
         </TabsContent>
 
         <TabsContent value="salary" className="flex flex-col gap-5">
+          <MonthFiles
+            current={salaryPeriod}
+            openId={salaryOpen}
+            saved={Boolean(salarySaved)}
+            files={salaryFiles}
+            onOpen={setSalaryOpen}
+            onDelete={(file) => removePayroll(file, `${monthLabel(file.period)} salary`)}
+          />
+          <div className="flex justify-end print:hidden">
+            <Button type="button" variant="outline" onClick={printSalary}>
+              <Printer className="size-4" />
+              Print
+            </Button>
+          </div>
           <fieldset
-            disabled={salaryFrozen}
+            disabled={salaryLocked}
             className="flex min-w-0 flex-col gap-5 border-0 p-0"
           >
-          <div className="flex flex-wrap items-end justify-end gap-3 print:hidden">
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" onClick={printSalary}>
-                <Printer className="size-4" />
-                Print
-              </Button>
-            </div>
-          </div>
 
           <div className="grid grid-cols-2 gap-3 print:hidden lg:grid-cols-3">
             <Card className="p-4">
@@ -515,7 +615,7 @@ function StaffPage() {
                   type="button"
                   variant="outline"
                   onClick={addStaff}
-                  disabled={salaryFrozen}
+                  disabled={salaryLocked}
                 >
                   <Plus className="size-4" />
                   Add
@@ -527,8 +627,22 @@ function StaffPage() {
         </TabsContent>
 
         <TabsContent value="advance" className="flex flex-col gap-5">
+          <MonthFiles
+            current={advancePeriod}
+            openId={advanceOpen}
+            saved={Boolean(advanceSaved)}
+            files={advanceFiles}
+            onOpen={setAdvanceOpen}
+            onDelete={(file) => removePayroll(file, `${monthLabel(file.period)} advance`)}
+          />
+          <div className="flex justify-end print:hidden">
+            <Button type="button" variant="outline" onClick={printAdvance}>
+              <Printer className="size-4" />
+              Print
+            </Button>
+          </div>
           <fieldset
-            disabled={advFrozen}
+            disabled={advanceLocked}
             className="flex min-w-0 flex-col gap-5 border-0 p-0"
           >
           <div className="flex flex-wrap items-end justify-end gap-2 print:hidden">
@@ -549,10 +663,6 @@ function StaffPage() {
               }}
             >
               Add advance
-            </Button>
-            <Button type="button" variant="outline" onClick={printAdvance}>
-              <Printer className="size-4" />
-              Print
             </Button>
           </div>
 
@@ -595,7 +705,7 @@ function StaffPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {advDraft.map((r) => (
+                  {advanceLines.map((r) => (
                     <tr key={r.id} className="border-b border-border/70">
                       <td className="px-3 py-2">
                         <Input
@@ -648,6 +758,66 @@ function StaffPage() {
           </fieldset>
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function monthLabel(period: string) {
+  const d = parseISO(`${period}-01`);
+  return isValid(d) ? format(d, "MMMM yyyy") : period;
+}
+
+function MonthFiles({
+  current,
+  openId,
+  saved,
+  files,
+  onOpen,
+  onDelete,
+}: {
+  current: string;
+  openId: string;
+  saved: boolean;
+  files: PayrollFile[];
+  onOpen: (id: string) => void;
+  onDelete: (file: PayrollFile) => void;
+}) {
+  const open = files.find((file) => file.id === openId) ?? null;
+  return (
+    <div className="flex flex-col gap-2 print:hidden">
+      <div className="flex flex-wrap gap-2">
+        {!saved ? (
+          <Button
+            type="button"
+            size="sm"
+            variant={openId === "draft" ? "default" : "outline"}
+            onClick={() => onOpen("draft")}
+          >
+            {monthLabel(current)} · new
+          </Button>
+        ) : null}
+        {files.map((file) => (
+          <Button
+            key={file.id}
+            type="button"
+            size="sm"
+            variant={openId === file.id ? "default" : "outline"}
+            onClick={() => onOpen(file.id)}
+          >
+            {monthLabel(file.period)}
+          </Button>
+        ))}
+      </div>
+      {open ? (
+        <div className="flex justify-end">
+          <Button type="button" variant="danger" onClick={() => onDelete(open)}>
+            <Trash2 className="size-4" />
+            Delete file
+          </Button>
+        </div>
+      ) : (
+        <p className="text-sm text-muted">{monthLabel(current)} is not saved yet.</p>
+      )}
     </div>
   );
 }

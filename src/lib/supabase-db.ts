@@ -66,6 +66,7 @@ import type {
   StaffProfile,
 } from "./types";
 import { normalizeStaffProfiles } from "./types";
+import { normalizePayrollFiles, type PayrollFile } from "./payroll-files";
 
 export const LEDGER_TABLES = [
   "ledger_meta",
@@ -94,6 +95,7 @@ export type LedgerSnapshot = {
   balReceived: NamedAmount[];
   staff: StaffRow[];
   staffRegister?: StaffProfile[];
+  payrollFiles?: PayrollFile[];
   advances: AdvanceRow[];
   ota: OtaRow[];
   janSales: JanSale[];
@@ -240,6 +242,9 @@ export function snapshotFromUnknown(
       (p as { staffRegister?: StaffProfile[] }).staffRegister ??
         fallback.staffRegister,
     ),
+    payrollFiles: normalizePayrollFiles(
+      (p as { payrollFiles?: PayrollFile[] }).payrollFiles ?? fallback.payrollFiles,
+    ),
     advances: (p.advances ?? fallback.advances).map(advanceOf),
     ota: (p.ota ?? fallback.ota) as OtaRow[],
     janSales: (p.janSales ?? fallback.janSales) as JanSale[],
@@ -381,6 +386,9 @@ export function booksFromHotel(hotel: unknown): Partial<LedgerSnapshot> | null {
   const staffRegister = Array.isArray(b.staffRegister)
     ? (b.staffRegister as StaffProfile[])
     : [];
+  const payrollFiles = Array.isArray(b.payrollFiles)
+    ? (b.payrollFiles as PayrollFile[])
+    : [];
   const advances = Array.isArray(b.advances) ? (b.advances as AdvanceRow[]) : [];
   const rooms = Array.isArray(b.rooms) ? (b.rooms as RoomDef[]) : [];
   if (
@@ -389,7 +397,8 @@ export function booksFromHotel(hotel: unknown): Partial<LedgerSnapshot> | null {
     !wholesale.length &&
     !expenses.length &&
     !balReceived.length &&
-    !staffRegister.length
+    !staffRegister.length &&
+    !payrollFiles.length
   ) {
     return null;
   }
@@ -401,6 +410,7 @@ export function booksFromHotel(hotel: unknown): Partial<LedgerSnapshot> | null {
     balReceived,
     staff,
     staffRegister,
+    payrollFiles,
     advances,
     rooms,
     savedAt: num(b.savedAt) || undefined,
@@ -433,6 +443,9 @@ function overlayBooks(snapshot: LedgerSnapshot, hotelRaw: unknown): LedgerSnapsh
   if ((books.staffRegister?.length ?? 0) > (snapshot.staffRegister?.length ?? 0)) {
     next.staffRegister = books.staffRegister;
   }
+  if ((books.payrollFiles?.length ?? 0) > (snapshot.payrollFiles?.length ?? 0)) {
+    next.payrollFiles = books.payrollFiles;
+  }
   if ((books.advances?.length ?? 0) > snapshot.advances.length) {
     next.advances = books.advances ?? snapshot.advances;
   }
@@ -450,6 +463,7 @@ function booksForHotel(snap: LedgerSnapshot) {
     balReceived: snap.balReceived,
     staff: snap.staff,
     staffRegister: snap.staffRegister ?? [],
+    payrollFiles: snap.payrollFiles ?? [],
     advances: snap.advances,
     rooms: snap.rooms,
     savedAt: snap.savedAt ?? Date.now(),

@@ -18,6 +18,10 @@ import type {
   StaffRow,
 } from "./types";
 import { normalizeStaffProfiles, type StaffProfile } from "./types";
+import {
+  normalizePayrollFiles,
+  type PayrollFile,
+} from "./payroll-files";
 import { uid } from "./format";
 import { applyGuestPatch, applyStay, applyYesterdayRoll } from "./stay";
 import { rebuildDayBooks } from "./ledger";
@@ -90,6 +94,7 @@ export interface LedgerState {
   days: DayBooks[];
   staff: StaffRow[];
   staffRegister: StaffProfile[];
+  payrollFiles: PayrollFile[];
   advances: AdvanceRow[];
   ota: OtaRow[];
   janSales: JanSale[];
@@ -133,6 +138,8 @@ export interface LedgerState {
   restoreSeed: () => void;
   setStaff: (staff: StaffRow[]) => void;
   setStaffRegister: (rows: StaffProfile[]) => void;
+  savePayrollFile: (file: PayrollFile) => void;
+  deletePayrollFile: (id: string) => void;
   setAdvances: (advances: AdvanceRow[]) => void;
   setInventory: (inventory: InventoryItem[]) => void;
   saveInventoryFile: (file: InventoryFile) => void;
@@ -172,6 +179,8 @@ function seedState(): Omit<
   | "restoreSeed"
   | "setStaff"
   | "setStaffRegister"
+  | "savePayrollFile"
+  | "deletePayrollFile"
   | "setAdvances"
   | "setInventory"
   | "saveInventoryFile"
@@ -197,6 +206,7 @@ function seedState(): Omit<
     days: seed.days as DayBooks[],
     staff: normalizeStaff(seed.staff as StaffRow[]),
     staffRegister: [],
+    payrollFiles: [],
     advances: normalizeAdvances(seed.advances as AdvanceRow[]),
     ota: seed.ota,
     janSales: seed.janSales,
@@ -268,6 +278,9 @@ function mergeSnapshot(
   const staff = normalizeStaff(persisted.staff ?? current.staff);
   const staffRegister = normalizeStaffProfiles(
     persisted.staffRegister ?? current.staffRegister,
+  );
+  const payrollFiles = normalizePayrollFiles(
+    persisted.payrollFiles ?? current.payrollFiles,
   );
   const advances = normalizeAdvances(persisted.advances ?? current.advances);
   const rooms = (persisted.rooms?.length ? persisted.rooms : current.rooms) as RoomDef[];
@@ -355,6 +368,7 @@ function mergeSnapshot(
     ...persisted,
     staff,
     staffRegister,
+    payrollFiles,
     advances,
     rooms,
     inventory,
@@ -622,6 +636,37 @@ export const useLedger = create<LedgerState>()(
       setStaffRegister: (rows) => {
         save({ staffRegister: normalizeStaffProfiles(rows) });
       },
+      savePayrollFile: (file) => {
+        const next = normalizePayrollFiles([
+          ...get().payrollFiles.filter((row) => row.id !== file.id),
+          file,
+        ]);
+        const seal =
+          file.kind === "salary"
+            ? sealKey.staffMonth(file.period)
+            : sealKey.advanceMonth(file.period);
+        save({
+          payrollFiles: next,
+          staff: file.kind === "salary" ? normalizeStaff(file.staff) : get().staff,
+          advances:
+            file.kind === "advance" ? normalizeAdvances(file.advances) : get().advances,
+          sealedIds: withSealed(get().sealedIds, [file.id, seal]),
+          deletedIds: omitSealed(get().deletedIds, [file.id]),
+        });
+      },
+      deletePayrollFile: (id) => {
+        const file = get().payrollFiles.find((row) => row.id === id);
+        const seal = file
+          ? file.kind === "salary"
+            ? sealKey.staffMonth(file.period)
+            : sealKey.advanceMonth(file.period)
+          : "";
+        save({
+          payrollFiles: get().payrollFiles.filter((row) => row.id !== id),
+          sealedIds: omitSealed(get().sealedIds, seal ? [id, seal] : [id]),
+          deletedIds: withSealed(get().deletedIds, [id]),
+        });
+      },
       setAdvances: (advances) => {
         const month = get().selectedDate.slice(0, 7);
         if (isSealed(get().sealedIds, sealKey.advanceMonth(month))) return;
@@ -715,6 +760,9 @@ export const useLedger = create<LedgerState>()(
           staffRegister: Array.isArray(p.staffRegister)
             ? normalizeStaffProfiles(p.staffRegister)
             : cur.staffRegister,
+          payrollFiles: Array.isArray(p.payrollFiles)
+            ? normalizePayrollFiles(p.payrollFiles)
+            : cur.payrollFiles,
           reminders: Array.isArray(p.reminders)
             ? normalizeReminders(p.reminders)
             : cur.reminders,
@@ -767,6 +815,7 @@ export const useLedger = create<LedgerState>()(
         advances: s.advances,
         staff: s.staff,
         staffRegister: s.staffRegister,
+        payrollFiles: s.payrollFiles,
         rooms: s.rooms,
         securityCode: s.securityCode,
         inventory: s.inventory,
