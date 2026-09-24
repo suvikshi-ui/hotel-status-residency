@@ -19,11 +19,12 @@ describe("housekeeping role", () => {
     assert.equal(canOpenPath("housekeeping", "/complaints"), true);
     assert.equal(canOpenPath("housekeeping", "/inventory"), true);
     assert.equal(canOpenPath("housekeeping", "/profile"), true);
+    assert.equal(canOpenPath("housekeeping", "/reports"), true);
     assert.equal(canOpenPath("housekeeping", "/register"), false);
     assert.equal(canOpenPath("housekeeping", "/"), false);
     assert.equal(canCountInventory("housekeeping"), true);
-    assert.equal(roleAccess("housekeeping"), "Complaints + Inventory");
-    assert.deepEqual(bottomNavPaths("housekeeping"), ["/complaints", "/inventory"]);
+    assert.equal(roleAccess("housekeeping"), "Complaints + inventory reports");
+    assert.deepEqual(bottomNavPaths("housekeeping"), ["/complaints", "/inventory", "/reports"]);
   });
 
   it("lands housekeeping on complaints", () => {

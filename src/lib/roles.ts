@@ -8,7 +8,7 @@ export const ROLE_LABEL: Record<AppRole, string> = {
   housekeeping: "Housekeeping",
 };
 
-export const HOUSEKEEPING_PATHS = ["/complaints", "/inventory", "/profile", "/login"] as const;
+export const HOUSEKEEPING_PATHS = ["/complaints", "/inventory", "/reports", "/profile", "/login"] as const;
 
 export function parseAppRole(value: unknown): AppRole {
   if (value === "housekeeping") return "housekeeping";
@@ -34,7 +34,7 @@ export function navFor(role: AppRole, items: readonly { to: string }[]) {
 }
 
 export function bottomNavPaths(role: AppRole): readonly string[] {
-  if (role === "housekeeping") return ["/complaints", "/inventory"];
+  if (role === "housekeeping") return ["/complaints", "/inventory", "/reports"];
   if (role === "staff") return ["/", "/register", "/complaints", "/profile"];
   return ["/", "/register", "/balance", "/reports"];
 }
@@ -56,7 +56,7 @@ export function canAddUsers(role: AppRole) {
 }
 
 export function roleAccess(role: AppRole) {
-  if (role === "housekeeping") return "Complaints + Inventory";
+  if (role === "housekeeping") return "Complaints + inventory reports";
   if (role === "staff") return "Register";
   return "Full books";
 }

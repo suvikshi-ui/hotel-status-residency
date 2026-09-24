@@ -3,6 +3,8 @@ export const REPORT_VIEWS = [
   "detail",
   "month",
   "inventory",
+  "ws",
+  "kitchen",
   "salary",
   "advance",
 ] as const;
@@ -14,9 +16,13 @@ export const REPORT_TAB: { id: ReportView; label: string }[] = [
   { id: "detail", label: "Detailed daily" },
   { id: "month", label: "Monthly report" },
   { id: "inventory", label: "Linen report" },
+  { id: "ws", label: "WS report" },
+  { id: "kitchen", label: "Kitchen report" },
   { id: "salary", label: "Salary report" },
   { id: "advance", label: "Staff advance" },
 ];
+
+export const HOUSEKEEPING_REPORTS: ReportView[] = ["inventory", "ws", "kitchen"];
 
 export function parseReportView(value: unknown): ReportView {
   return REPORT_VIEWS.includes(value as ReportView)

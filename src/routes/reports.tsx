@@ -25,9 +25,10 @@ import { formatDay, formatDayShort, money, moneyCompact, salaryPayMonth, salaryP
 import {
   inventoryDifference,
   signedCount,
+  type InventoryBook,
 } from "@/lib/inventory";
 import { printHtmlDocument } from "@/lib/print-sheet";
-import { REPORT_TAB, parseReportView } from "@/lib/report-views";
+import { HOUSEKEEPING_REPORTS, REPORT_TAB, parseReportView } from "@/lib/report-views";
 import { staffPay } from "@/lib/staff-pay";
 import { useLedger, useDayBooks } from "@/lib/store";
 import { useGate } from "@/components/security-gate";
@@ -43,6 +44,7 @@ export const Route = createFileRoute("/reports")({
 function ReportsPage() {
   const { view } = Route.useSearch();
   const navigate = Route.useNavigate();
+  const role = useLedger((s) => s.appRole);
   const days = useLedger((s) => s.days);
   const guests = useLedger((s) => s.guests);
   const food = useLedger((s) => s.food);
@@ -122,9 +124,15 @@ function ReportsPage() {
     Due: r.take.due.rooms,
   }));
 
+  const tabs =
+    role === "housekeeping"
+      ? REPORT_TAB.filter((tab) => HOUSEKEEPING_REPORTS.includes(tab.id))
+      : REPORT_TAB;
+  const shown = tabs.some((tab) => tab.id === view) ? view : tabs[0]?.id ?? "inventory";
+
   return (
     <Tabs
-      value={view}
+      value={shown}
       onValueChange={(next) =>
         void navigate({ search: { view: parseReportView(next) } })
       }
@@ -140,7 +148,7 @@ function ReportsPage() {
           </h1>
         </div>
         <TabsList className="flex h-auto min-h-11 w-full flex-wrap justify-start sm:w-auto">
-          {REPORT_TAB.map((tab) => (
+          {tabs.map((tab) => (
             <TabsTrigger key={tab.id} value={tab.id}>
               {tab.label}
             </TabsTrigger>
@@ -148,6 +156,8 @@ function ReportsPage() {
         </TabsList>
       </div>
 
+      {role === "housekeeping" ? null : (
+      <>
       <TabsContent value="daily" className="flex flex-col gap-5">
         <DailyReportPanel />
       </TabsContent>
@@ -386,16 +396,28 @@ function ReportsPage() {
         </CardContent>
       </Card>
       </TabsContent>
+      </>
+      )}
 
       <TabsContent value="inventory" className="flex flex-col gap-5">
-        <InventoryReportPanel />
+        <InventoryReportPanel kind="linen" />
       </TabsContent>
+      <TabsContent value="ws" className="flex flex-col gap-5">
+        <InventoryReportPanel kind="ws" />
+      </TabsContent>
+      <TabsContent value="kitchen" className="flex flex-col gap-5">
+        <InventoryReportPanel kind="kitchen" />
+      </TabsContent>
+      {role === "housekeeping" ? null : (
+      <>
       <TabsContent value="salary" className="flex flex-col gap-5">
         <SalaryReportPanel />
       </TabsContent>
       <TabsContent value="advance" className="flex flex-col gap-5">
         <AdvanceReportPanel />
       </TabsContent>
+      </>
+      )}
     </Tabs>
   );
 }
@@ -448,16 +470,24 @@ function DetailDailyPanel() {
   );
 }
 
-function periodTitle(period: string) {
-  const d = parseISO(`${period.slice(0, 7)}-01`);
-  return isValid(d) ? format(d, "MMMM yyyy") : period;
+function fileTitle(kind: InventoryBook, period: string) {
+  const iso = kind === "ws" ? period.slice(0, 10) : `${period.slice(0, 7)}-01`;
+  const d = parseISO(iso);
+  if (!isValid(d)) return period;
+  return kind === "ws" ? format(d, "d MMM yyyy") : format(d, "MMMM yyyy");
 }
 
-function InventoryReportPanel() {
+const BOOK_LABEL: Record<InventoryBook, string> = {
+  linen: "Linen",
+  ws: "WS",
+  kitchen: "Kitchen",
+};
+
+function InventoryReportPanel({ kind }: { kind: InventoryBook }) {
   const hotel = useLedger((s) => s.hotel);
   const date = useLedger((s) => s.selectedDate);
-  const files = useLedger((s) => s.inventoryFiles).filter((file) => file.kind === "linen");
-  const period = date.slice(0, 7);
+  const files = useLedger((s) => s.inventoryFiles).filter((file) => file.kind === kind);
+  const period = kind === "ws" ? date.slice(0, 10) : date.slice(0, 7);
   const [picked, setPicked] = useState<string | null>(null);
   const file =
     files.find((row) => row.id === picked) ??
@@ -468,6 +498,9 @@ function InventoryReportPanel() {
   const lastTotal = inventory.reduce((s, r) => s + r.lastMonth, 0);
   const thisTotal = inventory.reduce((s, r) => s + r.thisMonth, 0);
   const diffTotal = thisTotal - lastTotal;
+  const lastLabel = kind === "ws" ? "Last count" : "Last month";
+  const nowLabel = kind === "ws" ? "Today" : "This month";
+  const cadence = kind === "ws" ? "day" : "month";
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -476,12 +509,12 @@ function InventoryReportPanel() {
             {hotel.name}
           </p>
           <h2 className="mt-1 font-display text-2xl font-semibold tracking-tight">
-            Linen report
+            {BOOK_LABEL[kind]} report
           </h2>
           <p className="mt-1 text-sm text-muted">
             {file
-              ? `Saved linen file · ${periodTitle(file.period)}`
-              : "No linen file saved yet. Save the month on Inventory."}
+              ? `Saved ${BOOK_LABEL[kind]} file · ${fileTitle(kind, file.period)}`
+              : `No ${BOOK_LABEL[kind]} file saved yet. Save the ${cadence} on Inventory.`}
           </p>
         </div>
         <Button type="button" onClick={() => window.print()} disabled={!file}>
@@ -499,7 +532,7 @@ function InventoryReportPanel() {
               variant={file?.id === row.id ? "default" : "outline"}
               onClick={() => setPicked(row.id)}
             >
-              {periodTitle(row.period)}
+              {fileTitle(kind, row.period)}
             </Button>
           ))}
         </div>
@@ -507,8 +540,8 @@ function InventoryReportPanel() {
       {file ? (
         <>
       <div className="grid grid-cols-3 gap-3">
-        <Stat label="Last month" value={String(lastTotal)} />
-        <Stat label="This month" value={String(thisTotal)} />
+        <Stat label={lastLabel} value={String(lastTotal)} />
+        <Stat label={nowLabel} value={String(thisTotal)} />
         <Stat label="Difference" value={signedCount(diffTotal)} />
       </div>
       <Card>
@@ -517,8 +550,8 @@ function InventoryReportPanel() {
             <thead className="text-xs uppercase tracking-wide text-muted">
               <tr className="border-y border-border">
                 <th className="px-5 py-2 font-medium">Item</th>
-                <th className="px-3 py-2 text-right font-medium">Last month</th>
-                <th className="px-3 py-2 text-right font-medium">This month</th>
+                <th className="px-3 py-2 text-right font-medium">{lastLabel}</th>
+                <th className="px-3 py-2 text-right font-medium">{nowLabel}</th>
                 <th className="px-3 py-2 text-right font-medium">Difference</th>
                 <th className="px-5 py-2 font-medium">Notes</th>
               </tr>
@@ -580,7 +613,7 @@ function SalaryReportPanel() {
   const earnedTotal = rows.reduce((s, r) => s + r.earned, 0);
   const extraTotal = rows.reduce((s, r) => s + (r.extra ?? 0), 0);
   const salaryAdv = rows.reduce((s, r) => s + r.advance, 0);
-  const title = file ? periodTitle(file.period) : salaryPayMonth(date);
+  const title = file ? fileTitle("linen", file.period) : salaryPayMonth(date);
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -612,7 +645,7 @@ function SalaryReportPanel() {
               variant={file?.id === row.id ? "default" : "outline"}
               onClick={() => setPicked(row.id)}
             >
-              {periodTitle(row.period)}
+              {fileTitle("linen", row.period)}
             </Button>
           ))}
         </div>

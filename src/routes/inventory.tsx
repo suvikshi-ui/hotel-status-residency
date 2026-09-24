@@ -62,7 +62,8 @@ function InventoryPage() {
         </h1>
         <p className="mt-1 text-sm text-muted">
           Linen and kitchen files are monthly. WS is one file per day. Save
-          locks the file. Delete it if you need to enter again.
+          locks the file. Open Reports to see the saved files. Housekeeping
+          can view them, not delete them.
         </p>
       </div>
       <Tabs defaultValue="linen">
