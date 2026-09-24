@@ -344,7 +344,7 @@ function ReportsPage() {
         <CardContent className="h-64">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={compare}>
-              <CartesianGrid stroke="#c3dbe8" vertical={false} />
+              <CartesianGrid stroke="#e3d7c6" vertical={false} />
               <XAxis dataKey="name" tick={{ fill: "#6f675c", fontSize: 12 }} axisLine={false} tickLine={false} />
               <YAxis
                 tickFormatter={(v) => moneyCompact(Number(v))}
@@ -355,11 +355,11 @@ function ReportsPage() {
               />
               <Tooltip
                 formatter={(v: number) => money(v)}
-                contentStyle={{ background: "#f5fbfe", border: "1px solid #c3dbe8", borderRadius: 12 }}
+                contentStyle={{ background: "#fffdf8", border: "1px solid #e3d7c6", borderRadius: 12 }}
               />
               <Legend />
               <Bar dataKey="Jan" fill="#c4b8a1" radius={[6, 6, 0, 0]} />
-              <Bar dataKey="Feb" fill="#1f5c54" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="Feb" fill="#123f38" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>
@@ -372,7 +372,7 @@ function ReportsPage() {
         <CardContent className="h-72">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={daily}>
-              <CartesianGrid stroke="#c3dbe8" vertical={false} />
+              <CartesianGrid stroke="#e3d7c6" vertical={false} />
               <XAxis dataKey="date" tick={{ fill: "#6f675c", fontSize: 10 }} interval={3} axisLine={false} tickLine={false} />
               <YAxis
                 tickFormatter={(v) => moneyCompact(Number(v))}
@@ -383,11 +383,11 @@ function ReportsPage() {
               />
               <Tooltip
                 formatter={(v: number) => money(v)}
-                contentStyle={{ background: "#f5fbfe", border: "1px solid #c3dbe8", borderRadius: 12 }}
+                contentStyle={{ background: "#fffdf8", border: "1px solid #e3d7c6", borderRadius: 12 }}
               />
               <Legend />
               <Bar dataKey="Cash" stackId="a" fill="#2f6b4f" />
-              <Bar dataKey="QR" stackId="a" fill="#1f5c54" />
+              <Bar dataKey="QR" stackId="a" fill="#123f38" />
               <Bar dataKey="PK" stackId="a" fill="#3d5a80" />
               <Bar dataKey="Online" stackId="a" fill="#6f675c" />
               <Bar dataKey="Due" stackId="a" fill="#8a5a22" />

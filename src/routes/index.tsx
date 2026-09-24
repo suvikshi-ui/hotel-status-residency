@@ -139,11 +139,11 @@ function Overview() {
             <AreaChart data={chart} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="salesFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#1f5c54" stopOpacity={0.28} />
-                  <stop offset="100%" stopColor="#1f5c54" stopOpacity={0.02} />
+                  <stop offset="0%" stopColor="#123f38" stopOpacity={0.28} />
+                  <stop offset="100%" stopColor="#123f38" stopOpacity={0.02} />
                 </linearGradient>
               </defs>
-              <CartesianGrid stroke="#c3dbe8" vertical={false} />
+              <CartesianGrid stroke="#e3d7c6" vertical={false} />
               <XAxis
                 dataKey="date"
                 tick={{ fill: "#6f675c", fontSize: 11 }}
@@ -161,8 +161,8 @@ function Overview() {
               <Tooltip
                 formatter={(v: number) => money(v)}
                 contentStyle={{
-                  background: "#f5fbfe",
-                  border: "1px solid #c3dbe8",
+                  background: "#fffdf8",
+                  border: "1px solid #e3d7c6",
                   borderRadius: 12,
                   fontSize: 12,
                 }}
@@ -178,7 +178,7 @@ function Overview() {
               <Area
                 type="monotone"
                 dataKey="sales"
-                stroke="#1f5c54"
+                stroke="#123f38"
                 strokeWidth={2}
                 fill="url(#salesFill)"
                 name="Sales"

@@ -3,22 +3,27 @@
 @import "tw-animate-css";
 
 @theme {
-  --color-bg: #d7eefb;
-  --color-bg-warm: #c5e6f6;
-  --color-fg: #1c2430;
-  --color-card: #f5fbfe;
-  --color-muted: #5d7080;
-  --color-muted-fg: #5d7080;
-  --color-border: #c3dbe8;
-  --color-primary: #1f5c54;
-  --color-primary-fg: #f4efe4;
-  --color-accent: #1f5c54;
-  --color-accent-fg: #f4efe4;
-  --color-ring: #1f5c54;
-  --color-sidebar: #152724;
-  --color-sidebar-fg: #e7e1d4;
-  --color-sidebar-muted: #9aa8a4;
-  --color-sidebar-line: #2a3f3b;
+  --color-bg: #f6f1e8;
+  --color-bg-warm: #ebe3d4;
+  --color-fg: #1c1914;
+  --color-card: #fffdf8;
+  --color-muted: #6e665c;
+  --color-muted-fg: #6e665c;
+  --color-border: #e3d7c6;
+  --color-primary: #123f38;
+  --color-primary-fg: #f8f3ea;
+  --color-accent: #8d6a32;
+  --color-accent-fg: #fffdf8;
+  --color-ring: #123f38;
+  --color-sidebar: #0e2622;
+  --color-sidebar-fg: #f6f0e6;
+  --color-sidebar-muted: #d4c4a0;
+  --color-sidebar-line: #1c3d36;
+  --color-danger: #9b3d32;
+  --color-warn: #8a5a22;
+  --color-ok: #2f6b4f;
+  --color-due: #8a5a22;
+  --color-ota: #3d5a80;
   --color-danger: #9b3d32;
   --color-warn: #8a5a22;
   --color-ok: #2f6b4f;
@@ -54,13 +59,8 @@
     font-family: var(--font-sans);
     min-height: 100dvh;
     background-image:
-      radial-gradient(1.4px 1.4px at 18px 22px, rgba(255, 255, 255, 0.95), transparent),
-      radial-gradient(1px 1px at 72px 64px, rgba(255, 255, 255, 0.8), transparent),
-      radial-gradient(1.6px 1.6px at 128px 36px, rgba(255, 255, 255, 0.9), transparent),
-      radial-gradient(1px 1px at 46px 112px, rgba(255, 255, 255, 0.75), transparent),
-      radial-gradient(1.2px 1.2px at 156px 108px, rgba(255, 255, 255, 0.85), transparent),
-      radial-gradient(circle at 80% -10%, rgba(255, 255, 255, 0.55), transparent 42%);
-    background-size: 190px 150px, 190px 150px, 190px 150px, 190px 150px, 190px 150px, 100% 100%;
+      radial-gradient(ellipse at top, rgba(255, 250, 242, 0.9), transparent 58%);
+    background-size: 100% 100%;
   }
 
   h1, h2, h3, h4 {
@@ -115,8 +115,8 @@
 }
 
 .daily-a4-head {
-  background: #14352c !important;
-  color: #f4efe4 !important;
+  background: #123f38 !important;
+  color: #f6f0e6 !important;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
@@ -160,6 +160,6 @@
   }
 
   .daily-a4-head {
-    background: #14352c !important;
+    background: #123f38 !important;
   }
 }
