@@ -1,10 +1,16 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  carryForward,
+  decodeInventoryFile,
+  encodeInventoryFile,
   inventoryDifference,
+  inventoryFileId,
   normalizeInventory,
+  seedBook,
   seedInventory,
   signedCount,
+  splitInventoryRows,
 } from "./inventory.ts";
 
 describe("inventory sheet", () => {
@@ -68,5 +74,26 @@ describe("inventory sheet", () => {
     assert.equal(extra?.thisMonth, 6);
     assert.equal(extra?.notes, "2 torn, replace");
     assert.equal(rows[0]?.id, "inv-single-sheet");
+  });
+
+  it("keeps a saved WS file out of the linen sheet", () => {
+    const file = {
+      id: inventoryFileId("ws", "2026-09-24"),
+      kind: "ws" as const,
+      period: "2026-09-24",
+      createdAt: "2026-09-24",
+      lines: seedBook("ws"),
+    };
+    const encoded = encodeInventoryFile(file);
+    const split = splitInventoryRows([
+      ...seedInventory(),
+      encoded,
+    ]);
+    assert.equal(split.files.length, 1);
+    assert.equal(split.files[0]?.kind, "ws");
+    assert.equal(normalizeInventory(split.items).some((row) => row.id.startsWith("ifile:")), false);
+    assert.equal(decodeInventoryFile(encoded)?.period, "2026-09-24");
+    const next = carryForward(file.lines, seedBook("ws"));
+    assert.equal(next[0]?.thisMonth, 0);
   });
 });

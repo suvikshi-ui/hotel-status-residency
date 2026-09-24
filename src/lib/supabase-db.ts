@@ -1,6 +1,14 @@
 import type { PostgrestError } from "@supabase/supabase-js";
 import { normalizeComplaints, type RoomComplaint } from "./complaints";
-import { normalizeInventory, type InventoryItem } from "./inventory";
+import {
+  decodeInventoryFile,
+  encodeInventoryFile,
+  normalizeInventory,
+  normalizeInventoryFiles,
+  splitInventoryRows,
+  type InventoryFile,
+  type InventoryItem,
+} from "./inventory";
 import {
   bankRowsFromHotel,
   normalizeBankRows,
@@ -96,6 +104,7 @@ export type LedgerSnapshot = {
   sealedIds?: SealedIds;
   deletedIds?: SealedIds;
   inventory?: InventoryItem[];
+  inventoryFiles?: InventoryFile[];
   complaints?: RoomComplaint[];
   reminders?: HotelReminder[];
   bankRows?: BankRow[];
@@ -239,7 +248,15 @@ export function snapshotFromUnknown(
       (p as { deletedIds?: unknown }).deletedIds ?? deletedFromHotel(p.hotel),
     ),
     inventory: normalizeInventory(
-      (p as { inventory?: InventoryItem[] }).inventory ?? fallback.inventory,
+      splitInventoryRows(
+        (p as { inventory?: InventoryItem[] }).inventory ?? fallback.inventory,
+      ).items,
+    ),
+    inventoryFiles: normalizeInventoryFiles(
+      (p as { inventoryFiles?: InventoryFile[] }).inventoryFiles ??
+        splitInventoryRows(
+          (p as { inventory?: InventoryItem[] }).inventory ?? fallback.inventory,
+        ).files,
     ),
     complaints: normalizeComplaints(
       (p as { complaints?: RoomComplaint[] }).complaints ?? fallback.complaints,
@@ -594,16 +611,31 @@ export async function pullLedger(userId: string): Promise<CloudPull> {
     inventory: isSkippableSealError(inventory.error)
       ? []
       : normalizeInventory(
-          (inventory.data ?? []).map((r) => {
-            const row = r as Record<string, unknown>;
-            return {
-              id: str(row.id),
-              name: str(row.name),
-              lastMonth: num(row.last_month),
-              thisMonth: num(row.this_month),
-              notes: str(row.notes),
-            };
-          }),
+          splitInventoryRows(
+            (inventory.data ?? []).map((r) => {
+              const row = r as Record<string, unknown>;
+              return {
+                id: str(row.id),
+                name: str(row.name),
+                lastMonth: num(row.last_month),
+                thisMonth: num(row.this_month),
+                notes: str(row.notes),
+              };
+            }),
+          ).items,
+        ),
+    inventoryFiles: isSkippableSealError(inventory.error)
+      ? []
+      : normalizeInventoryFiles(
+          (inventory.data ?? [])
+            .map((r) => {
+              const row = r as Record<string, unknown>;
+              return decodeInventoryFile({
+                id: str(row.id),
+                notes: str(row.notes),
+              });
+            })
+            .filter((row): row is InventoryFile => Boolean(row)),
         ),
     savedAt: Date.parse(str(row.updated_at)) || 0,
     reminders: remindersFromHotel(hotelRaw),
@@ -766,8 +798,14 @@ export function pruneFromBase(
       (snap.complaints ?? []).map((r) => r.id),
     ),
     inventory: goneIds(
-      (base.inventory ?? []).map((r) => r.id),
-      (snap.inventory ?? []).map((r) => r.id),
+      [
+        ...(base.inventory ?? []).map((r) => r.id),
+        ...(base.inventoryFiles ?? []).map((r) => r.id),
+      ],
+      [
+        ...(snap.inventory ?? []).map((r) => r.id),
+        ...(snap.inventoryFiles ?? []).map((r) => r.id),
+      ],
     ),
   };
 }
@@ -873,13 +911,25 @@ export async function pushLedger(
     level: r.level,
     created_at: r.createdAt,
   }));
-  const inventory = (snap.inventory ?? []).map((r) => ({
-    id: r.id,
-    name: r.name,
-    last_month: num(r.lastMonth),
-    this_month: num(r.thisMonth),
-    notes: r.notes,
-  }));
+  const inventory = [
+    ...(snap.inventory ?? []).map((r) => ({
+      id: r.id,
+      name: r.name,
+      last_month: num(r.lastMonth),
+      this_month: num(r.thisMonth),
+      notes: r.notes,
+    })),
+    ...(snap.inventoryFiles ?? []).map((file) => {
+      const row = encodeInventoryFile(file);
+      return {
+        id: row.id,
+        name: row.name,
+        last_month: row.lastMonth,
+        this_month: row.thisMonth,
+        notes: row.notes,
+      };
+    }),
+  ];
 
   const hkOnly = role === "housekeeping";
   const writes: Array<Promise<PostgrestError | null>> = hkOnly

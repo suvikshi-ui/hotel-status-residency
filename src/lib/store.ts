@@ -36,7 +36,9 @@ import {
 } from "./sheet-seal";
 import {
   normalizeInventory,
+  normalizeInventoryFiles,
   seedInventory,
+  type InventoryFile,
   type InventoryItem,
 } from "./inventory";
 import { demoComplaints, normalizeComplaints, type RoomComplaint } from "./complaints";
@@ -92,6 +94,7 @@ export interface LedgerState {
   janFood: JanFood[];
   creditGuests: CreditGuest[];
   inventory: InventoryItem[];
+  inventoryFiles: InventoryFile[];
   complaints: RoomComplaint[];
   reminders: HotelReminder[];
   bankRows: BankRow[];
@@ -129,6 +132,8 @@ export interface LedgerState {
   setStaff: (staff: StaffRow[]) => void;
   setAdvances: (advances: AdvanceRow[]) => void;
   setInventory: (inventory: InventoryItem[]) => void;
+  saveInventoryFile: (file: InventoryFile) => void;
+  deleteInventoryFile: (id: string) => void;
   setComplaints: (complaints: RoomComplaint[]) => void;
   removeComplaint: (id: string, opts?: BypassGuard) => void;
   setReminders: (reminders: HotelReminder[]) => void;
@@ -165,6 +170,8 @@ function seedState(): Omit<
   | "setStaff"
   | "setAdvances"
   | "setInventory"
+  | "saveInventoryFile"
+  | "deleteInventoryFile"
   | "setComplaints"
   | "removeComplaint"
   | "setReminders"
@@ -191,6 +198,7 @@ function seedState(): Omit<
     janFood: seed.janFood,
     creditGuests: seed.creditGuests,
     inventory: seedInventory(),
+    inventoryFiles: [],
     complaints: demoComplaints(),
     reminders: [],
     bankRows: [],
@@ -256,6 +264,9 @@ function mergeSnapshot(
   const advances = normalizeAdvances(persisted.advances ?? current.advances);
   const rooms = (persisted.rooms?.length ? persisted.rooms : current.rooms) as RoomDef[];
   const inventory = normalizeInventory(persisted.inventory ?? current.inventory);
+  const inventoryFiles = normalizeInventoryFiles(
+    persisted.inventoryFiles ?? current.inventoryFiles,
+  );
   const complaints = normalizeComplaints(persisted.complaints ?? current.complaints);
   const reminders = Array.isArray(persisted.reminders)
     ? normalizeReminders(persisted.reminders)
@@ -338,6 +349,7 @@ function mergeSnapshot(
     advances,
     rooms,
     inventory,
+    inventoryFiles,
     complaints,
     reminders,
     bankRows,
@@ -606,7 +618,30 @@ export const useLedger = create<LedgerState>()(
       setInventory: (inventory) => {
         const month = get().selectedDate.slice(0, 7);
         if (isSealed(get().sealedIds, sealKey.inventoryMonth(month))) return;
+        if (get().inventoryFiles.some((file) => file.kind === "linen" && file.period === month)) {
+          return;
+        }
         save({ inventory: normalizeInventory(inventory) });
+      },
+      saveInventoryFile: (file) => {
+        const next = normalizeInventoryFiles([
+          ...get().inventoryFiles.filter((row) => row.id !== file.id),
+          file,
+        ]);
+        save({
+          inventoryFiles: next,
+          inventory:
+            file.kind === "linen" ? normalizeInventory(file.lines) : get().inventory,
+          sealedIds: withSealed(get().sealedIds, [file.id]),
+          deletedIds: omitSealed(get().deletedIds, [file.id]),
+        });
+      },
+      deleteInventoryFile: (id) => {
+        save({
+          inventoryFiles: get().inventoryFiles.filter((row) => row.id !== id),
+          sealedIds: omitSealed(get().sealedIds, [id, sealKey.inventoryMonth(id.split(":").pop() ?? "")]),
+          deletedIds: withSealed(get().deletedIds, [id]),
+        });
       },
       setComplaints: (complaints) =>
         save({
@@ -719,6 +754,7 @@ export const useLedger = create<LedgerState>()(
         rooms: s.rooms,
         securityCode: s.securityCode,
         inventory: s.inventory,
+        inventoryFiles: s.inventoryFiles,
         complaints: s.complaints,
         reminders: s.reminders,
         bankRows: s.bankRows,

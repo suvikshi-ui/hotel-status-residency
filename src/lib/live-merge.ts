@@ -82,6 +82,7 @@ function emptyRows(s: LedgerSnapshot): LedgerSnapshot {
     advances: [],
     rooms: [],
     inventory: [],
+    inventoryFiles: [],
     complaints: [],
     reminders: [],
     bankRows: [],
@@ -228,6 +229,11 @@ export function mergeLiveSnapshot(
     ),
     deletedIds,
     inventory: mergeRowsById(local.inventory ?? [], cloud.inventory ?? []),
+    inventoryFiles: dropDeletedRows(
+      mergeRowsById(local.inventoryFiles ?? [], cloud.inventoryFiles ?? []),
+      deletedIds,
+      (id) => id,
+    ),
     complaints: dropDeletedRows(
       mergeRowsById(local.complaints ?? [], cloud.complaints ?? []),
       deletedIds,
