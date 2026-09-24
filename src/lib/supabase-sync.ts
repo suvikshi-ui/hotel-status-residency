@@ -317,8 +317,14 @@ async function doFlush(userId: string) {
     return;
   }
   disarmRetry();
-  rememberPulled(snapshotFromStore(), new Date().toISOString());
-  lastHash = hashOf(snapshotFromStore());
+  const pushedHash = hashOf(toPush);
+  const now = snapshotFromStore();
+  rememberPulled(
+    hashOf(now) === pushedHash ? now : toPush,
+    new Date().toISOString(),
+  );
+  lastHash = pushedHash;
+  if (hashOf(now) !== pushedHash) queued = true;
   setPhase("synced");
   locksDirty = false;
 }

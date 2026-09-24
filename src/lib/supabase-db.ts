@@ -994,14 +994,14 @@ export async function pushLedger(
   const tableErr = results.find((e) => e && !isMissingSchema(e) && !isSkippableSealError(e));
 
   if (hkOnly) {
+    await pushSheetSeals(userId, snap.sealedIds);
+    await pushInventoryBooks(userId, snap.inventoryFiles ?? []);
     if (tableErr) {
       const mapped = asError(tableErr);
       return mapped.ok
         ? { ok: false, missingSchema: false, message: "Unknown error" }
         : { ok: false, missingSchema: mapped.missingSchema, message: mapped.message };
     }
-    await pushSheetSeals(userId, snap.sealedIds);
-    await pushInventoryBooks(userId, snap.inventoryFiles ?? []);
     return { ok: true };
   }
 

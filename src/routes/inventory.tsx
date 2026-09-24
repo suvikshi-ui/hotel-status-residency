@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { format, isValid, parseISO } from "date-fns";
 import { Printer, Trash2 } from "lucide-react";
@@ -88,6 +88,7 @@ function InventoryBookPanel({ kind }: { kind: InventoryBook }) {
   const hotel = useLedger((s) => s.hotel);
   const date = useLedger((s) => s.selectedDate);
   const files = useLedger((s) => s.inventoryFiles);
+  const deletedIds = useLedger((s) => s.deletedIds);
   const saveInventoryFile = useLedger((s) => s.saveInventoryFile);
   const deleteInventoryFile = useLedger((s) => s.deleteInventoryFile);
   const role = useLedger((s) => s.appRole);
@@ -103,15 +104,27 @@ function InventoryBookPanel({ kind }: { kind: InventoryBook }) {
   const [openId, setOpenId] = useState<string>("draft");
   const [draft, setDraft] = useState<InventoryItem[]>(() => seedBook(kind));
   const [newName, setNewName] = useState("");
+  const kept = useRef<InventoryFile | null>(null);
+
+  useEffect(() => {
+    const previous = filesForBook(files, kind).find((file) => file.period < period);
+    setOpenId("draft");
+    setDraft(carryForward(previous?.lines, seedBook(kind)));
+    kept.current = null;
+  }, [kind, period]);
 
   useEffect(() => {
     const current = filesForBook(files, kind).find((file) => file.period === period);
-    setOpenId(current?.id ?? "draft");
-    if (!current) {
-      const previous = filesForBook(files, kind).find((file) => file.period < period);
-      setDraft(carryForward(previous?.lines, seedBook(kind)));
+    if (current) {
+      setOpenId(current.id);
+      kept.current = current;
+      return;
     }
-  }, [files, kind, period]);
+    const saved = kept.current;
+    if (!saved || saved.kind !== kind || saved.period !== period) return;
+    if (deletedIds?.[saved.id]) return;
+    saveInventoryFile(saved);
+  }, [files, kind, period, saveInventoryFile, deletedIds]);
 
   const openFile =
     openId === "draft" ? null : (bookFiles.find((file) => file.id === openId) ?? null);
@@ -164,6 +177,7 @@ function InventoryBookPanel({ kind }: { kind: InventoryBook }) {
       lines: rows,
     };
     saveInventoryFile(file);
+    kept.current = file;
     setOpenId(file.id);
     toast.success(`${periodLabel(kind, period)} file saved`);
     void saveToServer();
