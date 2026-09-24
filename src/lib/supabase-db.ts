@@ -3,6 +3,7 @@ import { normalizeComplaints, packComplaintNote, type RoomComplaint } from "./co
 import {
   decodeInventoryFile,
   encodeInventoryFile,
+  isInventoryFileId,
   normalizeInventory,
   normalizeInventoryFiles,
   mergeInventoryFiles,
@@ -481,12 +482,43 @@ function booksForHotel(snap: LedgerSnapshot) {
   };
 }
 
+async function resolveSharedHotelUserId(preferred: string): Promise<string> {
+  const sb = getSupabase();
+  const [metas, rows] = await Promise.all([
+    sb.from("ledger_meta").select("user_id,hotel"),
+    sb.from("inventory").select("user_id,id"),
+  ]);
+  const counts = new Map<string, number>();
+  const bump = (id: string, n: number) => {
+    if (!id || n <= 0) return;
+    counts.set(id, (counts.get(id) ?? 0) + n);
+  };
+  for (const row of metas.data ?? []) {
+    const rec = row as { user_id?: unknown; hotel?: unknown };
+    bump(str(rec.user_id), booksFromHotel(rec.hotel)?.inventoryFiles?.length ?? 0);
+  }
+  for (const row of rows.data ?? []) {
+    const rec = row as { user_id?: unknown; id?: unknown };
+    if (isInventoryFileId(str(rec.id))) bump(str(rec.user_id), 1);
+  }
+  let best = preferred;
+  let bestN = counts.get(preferred) ?? 0;
+  for (const [id, n] of counts) {
+    if (n > bestN) {
+      best = id;
+      bestN = n;
+    }
+  }
+  return best;
+}
+
 export async function pullLedgerStamp(userId: string): Promise<string | null> {
   const sb = getSupabase();
+  const ownerId = await resolveSharedHotelUserId(userId);
   const { data, error } = await sb
     .from("ledger_meta")
     .select("updated_at")
-    .eq("user_id", userId)
+    .eq("user_id", ownerId)
     .maybeSingle();
   if (error || !data) return null;
   const stamp = str((data as { updated_at?: unknown }).updated_at);
@@ -495,10 +527,11 @@ export async function pullLedgerStamp(userId: string): Promise<string | null> {
 
 export async function pullLedger(userId: string): Promise<CloudPull> {
   const sb = getSupabase();
+  const ownerId = await resolveSharedHotelUserId(userId);
   const meta = await sb
     .from("ledger_meta")
     .select("*")
-    .eq("user_id", userId)
+    .eq("user_id", ownerId)
     .maybeSingle();
 
   if (meta.error) return asError(meta.error);
@@ -517,17 +550,17 @@ export async function pullLedger(userId: string): Promise<CloudPull> {
     inventory,
     seals,
   ] = await Promise.all([
-    sb.from("rooms").select("no, floor, sort_index").eq("user_id", userId).order("sort_index"),
-    sb.from("staff").select("*").eq("user_id", userId),
-    sb.from("expenses").select("*").eq("user_id", userId),
-    sb.from("balance_received").select("*").eq("user_id", userId),
-    sb.from("guests").select("*").eq("user_id", userId),
-    sb.from("food").select("*").eq("user_id", userId),
-    sb.from("wholesale").select("*").eq("user_id", userId),
-    sb.from("advances").select("*").eq("user_id", userId),
-    sb.from("complaints").select("*").eq("user_id", userId),
-    sb.from("inventory").select("*").eq("user_id", userId),
-    sb.from("sheet_seals").select("id").eq("user_id", userId),
+    sb.from("rooms").select("no, floor, sort_index").eq("user_id", ownerId).order("sort_index"),
+    sb.from("staff").select("*").eq("user_id", ownerId),
+    sb.from("expenses").select("*").eq("user_id", ownerId),
+    sb.from("balance_received").select("*").eq("user_id", ownerId),
+    sb.from("guests").select("*").eq("user_id", ownerId),
+    sb.from("food").select("*").eq("user_id", ownerId),
+    sb.from("wholesale").select("*").eq("user_id", ownerId),
+    sb.from("advances").select("*").eq("user_id", ownerId),
+    sb.from("complaints").select("*").eq("user_id", ownerId),
+    sb.from("inventory").select("*").eq("user_id", ownerId),
+    sb.from("sheet_seals").select("id").eq("user_id", ownerId),
   ]);
 
   const firstErr =
@@ -838,7 +871,7 @@ export function pruneFromBase(
       (base.complaints ?? []).map((r) => r.id),
       (snap.complaints ?? []).map((r) => r.id),
     ),
-    inventory: goneIds(
+    inventory: (goneIds(
       [
         ...(base.inventory ?? []).map((r) => r.id),
         ...(base.inventoryFiles ?? []).map((r) => r.id),
@@ -847,7 +880,7 @@ export function pruneFromBase(
         ...(snap.inventory ?? []).map((r) => r.id),
         ...(snap.inventoryFiles ?? []).map((r) => r.id),
       ],
-    ),
+    ) ?? []).filter((id) => !isInventoryFileId(id) || Boolean(snap.deletedIds?.[id])),
   };
 }
 
@@ -1061,12 +1094,24 @@ export async function pushLedger(
 
 async function pushInventoryBooks(userId: string, files: InventoryFile[]) {
   const sb = getSupabase();
-  const shared = await sb.rpc("save_shared_inventory", { files });
+  const ownerId = await resolveSharedHotelUserId(userId);
+  const existingRows = await sb
+    .from("inventory")
+    .select("id,notes")
+    .eq("user_id", ownerId);
+  const cloudFiles = (existingRows.data ?? [])
+    .map((row) => {
+      const rec = row as { id?: unknown; notes?: unknown };
+      return decodeInventoryFile({ id: str(rec.id), notes: str(rec.notes) });
+    })
+    .filter((row): row is InventoryFile => Boolean(row));
+  const merged = mergeInventoryFiles(files, cloudFiles);
+  const shared = await sb.rpc("save_shared_inventory", { files: merged });
   if (!shared.error) return;
-  const encoded = files.map((file) => {
+  const encoded = merged.map((file) => {
     const row = encodeInventoryFile(file);
     return {
-      user_id: userId,
+      user_id: ownerId,
       id: row.id,
       name: row.name,
       last_month: row.lastMonth,
@@ -1083,7 +1128,7 @@ async function pushInventoryBooks(userId: string, files: InventoryFile[]) {
   const meta = await sb
     .from("ledger_meta")
     .select("hotel")
-    .eq("user_id", userId)
+    .eq("user_id", ownerId)
     .maybeSingle();
   if (meta.error || !meta.data) return;
   const hotel = ((meta.data as { hotel?: unknown }).hotel ?? {}) as Record<string, unknown>;
@@ -1101,11 +1146,11 @@ async function pushInventoryBooks(userId: string, files: InventoryFile[]) {
         ...hotel,
         _books: {
           ...rawBooks,
-          inventoryFiles: mergeInventoryFiles(files, existing),
+          inventoryFiles: mergeInventoryFiles(merged, existing),
         },
       },
     })
-    .eq("user_id", userId);
+    .eq("user_id", ownerId);
   if (error && !isSkippableSealError(error)) return;
 }
 
