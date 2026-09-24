@@ -99,13 +99,7 @@ export const KITCHEN_CATALOG: { id: string; name: string }[] = [
   { id: "kit-masala", name: "Masala" },
 ];
 
-export const WS_CATALOG: { id: string; name: string }[] = [
-  { id: "ws-water", name: "Water" },
-  { id: "ws-soft-drink", name: "Soft drink" },
-  { id: "ws-juice", name: "Juice" },
-  { id: "ws-chips", name: "Chips" },
-  { id: "ws-biscuit", name: "Biscuit" },
-];
+export const WS_CATALOG: { id: string; name: string }[] = [];
 
 export function inventoryPeriod(kind: InventoryBook, date: string) {
   return kind === "ws" ? date.slice(0, 10) : date.slice(0, 7);

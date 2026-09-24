@@ -37,6 +37,7 @@ import {
 } from "@/lib/complaint-report";
 import { formatDayShort } from "@/lib/format";
 import { useLedger } from "@/lib/store";
+import { useStaffSession } from "@/lib/supabase-auth";
 import type { RoomDef } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { SaveCube, useAccountSave } from "@/components/save-cube";
@@ -68,6 +69,8 @@ function ComplaintsPage() {
   const sealedIds = useLedger((s) => s.sealedIds);
   const { busy: saving, saveToServer } = useAccountSave();
   const role = useLedger((s) => s.appRole);
+  const { user } = useStaffSession();
+  const who = (user?.name || user?.username || "").trim();
   const { gate } = useGate();
   const [open, setOpen] = useState<{
     roomNo: string;
@@ -128,7 +131,7 @@ function ComplaintsPage() {
         );
         toast.success(`${complaintPlaceLabel(roomNo)} updated`);
       } else {
-        setComplaints([...complaints, emptyComplaint(roomNo, level, text)]);
+        setComplaints([...complaints, emptyComplaint(roomNo, level, text, who)]);
         toast.success(`${complaintPlaceLabel(roomNo)} complaint logged`);
       }
       setOpen(null);
@@ -283,7 +286,7 @@ function ComplaintsPage() {
               </div>
             </div>
             <div className="flex justify-end gap-2">
-              {open?.existing ? (
+              {open?.existing && role !== "housekeeping" ? (
                 <Button type="button" variant="danger" onClick={remove}>
                   Delete
                 </Button>
@@ -528,7 +531,7 @@ function ComplaintList({
                 : "All complaints"}
           </CardTitle>
           <p className="text-sm text-muted">
-            {rows.length} {rows.length === 1 ? "entry" : "entries"} · room, problem, status
+            {rows.length} {rows.length === 1 ? "entry" : "entries"} · room, problem, status, by
           </p>
         </CardHeader>
         <CardContent className="overflow-x-auto p-0">
@@ -538,6 +541,7 @@ function ComplaintList({
                 <th className="px-5 py-2 font-medium">Room</th>
                 <th className="px-3 py-2 font-medium">Problem</th>
                 <th className="px-3 py-2 font-medium">Status</th>
+                <th className="px-3 py-2 font-medium">By</th>
                 <th className="px-5 py-2 font-medium">Date</th>
               </tr>
             </thead>
@@ -548,6 +552,7 @@ function ComplaintList({
                     <td className="px-5 py-2 font-medium tabular">{c.roomNo}</td>
                     <td className="px-3 py-2">{c.note || "—"}</td>
                     <td className="px-3 py-2">{complaintStatus(c.level)}</td>
+                    <td className="px-3 py-2">{c.by || "—"}</td>
                     <td className="px-5 py-2 tabular text-muted">
                       {c.createdAt ? formatDayShort(c.createdAt) : ""}
                     </td>
@@ -555,7 +560,7 @@ function ComplaintList({
                 ))
               ) : (
                 <tr>
-                  <td className="px-5 py-6 text-muted" colSpan={4}>
+                  <td className="px-5 py-6 text-muted" colSpan={5}>
                     No complaints in this list
                   </td>
                 </tr>

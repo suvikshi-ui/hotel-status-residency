@@ -8,6 +8,19 @@ export interface RoomComplaint {
   note: string;
   level: ComplaintLevel;
   createdAt: string;
+  by?: string;
+}
+
+export function packComplaintNote(note: string, by: string) {
+  const clean = note.replace(/\n?\[\[by:[\s\S]*?\]\]\s*$/g, "").trim();
+  const who = by.trim().replace(/[[\]]/g, "");
+  return who ? `${clean}\n[[by:${who}]]` : clean;
+}
+
+export function unpackComplaintNote(note: string) {
+  const match = note.match(/^(.*)\[\[by:([^\]\n]*)\]\]\s*$/s);
+  if (!match) return { note: note.trim(), by: "" };
+  return { note: match[1].trim(), by: match[2].trim() };
 }
 
 export const COMPLAINT_LEVELS: {
@@ -23,26 +36,37 @@ export const COMPLAINT_LEVELS: {
 const LIVE = 2;
 export const FRONT_SLOTS = 3;
 
-export function emptyComplaint(roomNo: string, level: ComplaintLevel, note: string): RoomComplaint {
+export function emptyComplaint(
+  roomNo: string,
+  level: ComplaintLevel,
+  note: string,
+  by = "",
+): RoomComplaint {
   return {
     id: uid("c"),
     roomNo,
     note: note.trim(),
     level,
     createdAt: new Date().toISOString().slice(0, 10),
+    by: by.trim(),
   };
 }
 
 export function normalizeComplaints(rows: RoomComplaint[] | undefined): RoomComplaint[] {
   return (rows ?? [])
     .filter((r) => r && typeof r.roomNo === "string" && r.roomNo.trim())
-    .map((r) => ({
-      id: r.id || uid("c"),
-      roomNo: r.roomNo.trim(),
-      note: (r.note ?? "").trim(),
-      level: r.level === "red" || r.level === "green" ? r.level : "yellow",
-      createdAt: (r.createdAt ?? "").slice(0, 10),
-    }));
+    .map((r) => {
+      const packed = unpackComplaintNote(r.note ?? "");
+      const by = (typeof r.by === "string" ? r.by.trim() : "") || packed.by;
+      return {
+        id: r.id || uid("c"),
+        roomNo: r.roomNo.trim(),
+        note: packed.note,
+        level: r.level === "red" || r.level === "green" ? r.level : "yellow",
+        createdAt: (r.createdAt ?? "").slice(0, 10),
+        by,
+      };
+    });
 }
 
 export function complaintsForRoom(rows: RoomComplaint[], roomNo: string) {

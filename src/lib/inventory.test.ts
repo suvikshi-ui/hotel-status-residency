@@ -93,7 +93,12 @@ describe("inventory sheet", () => {
     assert.equal(split.files[0]?.kind, "ws");
     assert.equal(normalizeInventory(split.items).some((row) => row.id.startsWith("ifile:")), false);
     assert.equal(decodeInventoryFile(encoded)?.period, "2026-09-24");
-    const next = carryForward(file.lines, seedBook("ws"));
+    const next = carryForward(
+      [{ id: "ws-water", name: "Water", lastMonth: 4, thisMonth: 9, notes: "" }],
+      seedBook("ws"),
+    );
+    assert.equal(next[0]?.name, "Water");
+    assert.equal(next[0]?.lastMonth, 9);
     assert.equal(next[0]?.thisMonth, 0);
   });
 });

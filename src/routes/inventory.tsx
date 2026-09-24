@@ -89,6 +89,8 @@ function InventoryBookPanel({ kind }: { kind: InventoryBook }) {
   const files = useLedger((s) => s.inventoryFiles);
   const saveInventoryFile = useLedger((s) => s.saveInventoryFile);
   const deleteInventoryFile = useLedger((s) => s.deleteInventoryFile);
+  const role = useLedger((s) => s.appRole);
+  const canDelete = role !== "housekeeping";
   const { busy: saving, saveToServer } = useAccountSave();
   const { gate } = useGate();
   const period = inventoryPeriod(kind, date);
@@ -126,8 +128,8 @@ function InventoryBookPanel({ kind }: { kind: InventoryBook }) {
       prev.map((row) => {
         if (row.id !== id) return row;
         if (field === "name" || field === "notes") return { ...row, [field]: value };
-        const n = Number(value);
-        return { ...row, [field]: Number.isFinite(n) && n >= 0 ? Math.round(n) : 0 };
+        const digits = value.replace(/\D/g, "");
+        return { ...row, [field]: digits ? Math.round(Number(digits)) : 0 };
       }),
     );
   }
@@ -302,10 +304,9 @@ function InventoryBookPanel({ kind }: { kind: InventoryBook }) {
                     {(["lastMonth", "thisMonth"] as const).map((field) => (
                       <td key={field} className="px-3 py-1.5">
                         <Input
-                          className="h-11 min-h-11 text-right tabular"
-                          type="number"
+                          className="h-11 min-h-11 text-right tabular [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                          type="text"
                           inputMode="numeric"
-                          min={0}
                           value={row[field]}
                           disabled={locked}
                           onChange={(e) => patch(row.id, field, e.target.value)}
@@ -333,7 +334,7 @@ function InventoryBookPanel({ kind }: { kind: InventoryBook }) {
                       />
                     </td>
                     <td className="px-3 py-2.5 text-right">
-                      {!locked && !CATALOG_IDS.has(row.id) ? (
+                      {!locked && canDelete && !CATALOG_IDS.has(row.id) ? (
                         <Button
                           variant="ghost"
                           size="icon"
@@ -371,7 +372,7 @@ function InventoryBookPanel({ kind }: { kind: InventoryBook }) {
             </Button>
           </CardContent>
         </Card>
-      ) : openFile ? (
+      ) : openFile && canDelete ? (
         <div className="flex justify-end">
           <Button type="button" variant="danger" onClick={() => removeFile(openFile)}>
             <Trash2 className="size-4" />

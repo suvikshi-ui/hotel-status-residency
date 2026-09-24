@@ -1,5 +1,5 @@
 import type { PostgrestError } from "@supabase/supabase-js";
-import { normalizeComplaints, type RoomComplaint } from "./complaints";
+import { normalizeComplaints, packComplaintNote, type RoomComplaint } from "./complaints";
 import {
   decodeInventoryFile,
   encodeInventoryFile,
@@ -907,7 +907,7 @@ export async function pushLedger(
   const complaints = (snap.complaints ?? []).map((r) => ({
     id: r.id,
     room_no: r.roomNo,
-    note: r.note,
+    note: packComplaintNote(r.note, r.by ?? ""),
     level: r.level,
     created_at: r.createdAt,
   }));

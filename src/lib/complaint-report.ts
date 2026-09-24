@@ -41,7 +41,7 @@ export function complaintTableHtml(rows: RoomComplaint[], rooms: RoomDef[]) {
   const list = sortComplaints(rows, rooms);
   return `<table>
     <thead><tr>
-      <th>Room</th><th>Problem</th><th>Status</th><th>Date</th>
+      <th>Room</th><th>Problem</th><th>Status</th><th>By</th><th>Date</th>
     </tr></thead>
     <tbody>
       ${
@@ -52,15 +52,16 @@ export function complaintTableHtml(rows: RoomComplaint[], rooms: RoomDef[]) {
         <td>${escapeHtml(c.roomNo)}</td>
         <td>${escapeHtml(c.note || "—")}</td>
         <td>${escapeHtml(complaintStatus(c.level))}</td>
+        <td>${escapeHtml(c.by || "—")}</td>
         <td>${escapeHtml(c.createdAt || "")}</td>
       </tr>`,
               )
               .join("")
-          : `<tr><td colspan="4">No complaints</td></tr>`
+          : `<tr><td colspan="5">No complaints</td></tr>`
       }
     </tbody>
     <tfoot><tr>
-      <td colspan="3">Total</td>
+      <td colspan="4">Total</td>
       <td class="num">${list.length}</td>
     </tr></tfoot>
   </table>`;
@@ -97,9 +98,10 @@ export async function complaintListPdf(input: {
   const margin = 14;
   const bottom = 287;
   const cols = [
-    { x: margin, w: 28, key: "room" as const },
-    { x: margin + 28, w: 96, key: "note" as const },
-    { x: margin + 124, w: 32, key: "status" as const },
+    { x: margin, w: 18, key: "room" as const },
+    { x: margin + 18, w: 78, key: "note" as const },
+    { x: margin + 96, w: 28, key: "status" as const },
+    { x: margin + 124, w: 32, key: "by" as const },
     { x: margin + 156, w: 26, key: "date" as const },
   ];
 
@@ -126,7 +128,8 @@ export async function complaintListPdf(input: {
     pdf.text("Room", cols[0].x, y);
     pdf.text("Problem", cols[1].x, y);
     pdf.text("Status", cols[2].x, y);
-    pdf.text("Date", cols[3].x, y);
+    pdf.text("By", cols[3].x, y);
+    pdf.text("Date", cols[4].x, y);
     y += 2;
     pdf.line(margin, y, pageW - margin, y);
     y += 5;
@@ -151,7 +154,8 @@ export async function complaintListPdf(input: {
     pdf.text(c.roomNo, cols[0].x, y);
     pdf.text(note, cols[1].x, y);
     pdf.text(complaintStatus(c.level), cols[2].x, y);
-    pdf.text(c.createdAt || "", cols[3].x, y);
+    pdf.text(c.by || "—", cols[3].x, y);
+    pdf.text(c.createdAt || "", cols[4].x, y);
     y += h;
   }
 
