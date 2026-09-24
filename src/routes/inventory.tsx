@@ -146,7 +146,7 @@ function InventoryBookPanel({ kind }: { kind: InventoryBook }) {
   }
 
   function removeItem(id: string) {
-    if (locked || CATALOG_IDS.has(id)) return;
+    if (!canDelete || locked || CATALOG_IDS.has(id)) return;
     setDraft((prev) => prev.filter((row) => row.id !== id));
   }
 
@@ -169,6 +169,7 @@ function InventoryBookPanel({ kind }: { kind: InventoryBook }) {
   }
 
   function removeFile(file: InventoryFile) {
+    if (!canDelete) return;
     gate(
       () => {
         deleteInventoryFile(file.id);

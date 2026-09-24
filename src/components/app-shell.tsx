@@ -236,7 +236,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               {hotel.name}
             </div>
           </div>
-          {role === "housekeeping" ? null : <DateNav />}
+          <DateNav />
           {user ? (
             <Button
               variant="ghost"

@@ -82,7 +82,7 @@ function ComplaintsPage() {
   const openCount = complaints.filter((c) => c.level !== "green").length;
   const redCount = complaints.filter((c) => c.level === "red").length;
   const solvedCount = complaints.filter((c) => c.level === "green").length;
-  const isAdmin = role === "admin";
+  const showList = role === "admin" || role === "housekeeping";
 
   const byFloor = useMemo(
     () =>
@@ -150,6 +150,7 @@ function ComplaintsPage() {
   }
 
   function remove() {
+    if (role === "housekeeping") return;
     const existing = open?.existing;
     const roomNo = open?.roomNo;
     if (!existing || !roomNo) return;
@@ -184,8 +185,8 @@ function ComplaintsPage() {
           Complaints
         </h1>
         <p className="mt-1 text-sm text-muted">
-          {isAdmin
-            ? "Cubes for the floor. List tab for the full report, print and PDF."
+          {showList
+            ? "Register a complaint. List shows every room. Housekeeping cannot delete."
             : "Log a cube, then press Save to send the books to the server."}
         </p>
       </div>
@@ -199,7 +200,7 @@ function ComplaintsPage() {
         <Stat label="Logged" value={complaints.length} />
       </div>
 
-      {isAdmin ? (
+      {showList ? (
         <Tabs defaultValue="cubes">
           <TabsList className="grid w-full grid-cols-2 print:hidden" aria-label="Complaint views">
             <TabsTrigger value="cubes" className="w-full">
