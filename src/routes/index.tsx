@@ -143,7 +143,7 @@ function Overview() {
                   <stop offset="100%" stopColor="#1f5c54" stopOpacity={0.02} />
                 </linearGradient>
               </defs>
-              <CartesianGrid stroke="#ddd4c2" vertical={false} />
+              <CartesianGrid stroke="#c3dbe8" vertical={false} />
               <XAxis
                 dataKey="date"
                 tick={{ fill: "#6f675c", fontSize: 11 }}
@@ -161,8 +161,8 @@ function Overview() {
               <Tooltip
                 formatter={(v: number) => money(v)}
                 contentStyle={{
-                  background: "#faf6ee",
-                  border: "1px solid #ddd4c2",
+                  background: "#f5fbfe",
+                  border: "1px solid #c3dbe8",
                   borderRadius: 12,
                   fontSize: 12,
                 }}
