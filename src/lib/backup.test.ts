@@ -91,4 +91,25 @@ describe("ledger backup", () => {
     assert.equal(hotel._lockedDates["2026-09-12"], true);
     assert.equal(hotel._sealedIds["guest:g1"], true);
   });
+
+  it("keeps staff, payroll and inventory files", () => {
+    const file = buildBackupFile({
+      guests: [],
+      rooms: [{ no: "101", floor: "First" }],
+      staffRegister: [{ id: "s1", name: "Raju" }],
+      payrollFiles: [{ id: "pay-2026-09", kind: "salary" }],
+      inventoryFiles: [{ id: "ifile:ws:2026-09-24", kind: "ws" }],
+      bankRows: [{ id: "b1" }],
+      deletedIds: { "ifile:ws:2026-09-01": true },
+    });
+    const parsed = parseBackupFile(JSON.parse(JSON.stringify(file)));
+    assert.equal(parsed.tables.staffRegister?.length, 1);
+    assert.equal(parsed.tables.payrollFiles?.length, 1);
+    assert.equal(parsed.tables.inventoryFiles?.length, 1);
+    assert.equal(parsed.tables.bankRows?.length, 1);
+    const counts = backupCounts(parsed.tables);
+    assert.equal(counts.inventoryFiles, 1);
+    assert.equal(counts.payrollFiles, 1);
+    assert.equal(counts.staffRegister, 1);
+  });
 });

@@ -51,6 +51,8 @@ function snapshotNow(): LedgerSnapshot {
     expenses: s.expenses,
     balReceived: s.balReceived,
     staff: s.staff,
+    staffRegister: s.staffRegister,
+    payrollFiles: s.payrollFiles,
     advances: s.advances,
     ota: s.ota,
     janSales: s.janSales,
@@ -64,6 +66,7 @@ function snapshotNow(): LedgerSnapshot {
     sealedIds: s.sealedIds ?? {},
     deletedIds: s.deletedIds ?? {},
     inventory: s.inventory,
+    inventoryFiles: s.inventoryFiles,
     complaints: s.complaints,
     reminders: s.reminders,
     bankRows: s.bankRows,
@@ -89,7 +92,7 @@ function BackupCard() {
       const n = backupCounts(snap);
       if (account.ok) {
         toast.success(
-          `Account saved · file saved · ${n.guests} guests · ${n.dates.length || 0} days`,
+          `Account saved · file saved · ${n.guests} guests · ${n.inventoryFiles} inventory files · ${n.payrollFiles} salary files · ${n.dates.length || 0} days`,
         );
       } else {
         toast.error(

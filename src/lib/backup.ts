@@ -11,6 +11,8 @@ export type BackupTables = {
   expenses?: unknown[];
   balReceived?: unknown[];
   staff?: unknown[];
+  staffRegister?: unknown[];
+  payrollFiles?: unknown[];
   advances?: unknown[];
   ota?: unknown[];
   janSales?: unknown[];
@@ -22,9 +24,12 @@ export type BackupTables = {
   lockedDates?: unknown;
   lockRev?: unknown;
   inventory?: unknown[];
+  inventoryFiles?: unknown[];
   complaints?: unknown[];
   reminders?: unknown[];
+  bankRows?: unknown[];
   sealedIds?: unknown;
+  deletedIds?: unknown;
   savedAt?: number;
 };
 
@@ -76,8 +81,11 @@ export function backupCounts(s: {
   expenses?: unknown[];
   balReceived?: unknown[];
   staff?: unknown[];
+  staffRegister?: unknown[];
+  payrollFiles?: unknown[];
   rooms?: unknown[];
   inventory?: unknown[];
+  inventoryFiles?: unknown[];
   complaints?: unknown[];
 }) {
   const dated = [
@@ -94,8 +102,11 @@ export function backupCounts(s: {
     expenses: s.expenses?.length ?? 0,
     balReceived: s.balReceived?.length ?? 0,
     staff: s.staff?.length ?? 0,
+    staffRegister: s.staffRegister?.length ?? 0,
+    payrollFiles: s.payrollFiles?.length ?? 0,
     rooms: s.rooms?.length ?? 0,
     inventory: s.inventory?.length ?? 0,
+    inventoryFiles: s.inventoryFiles?.length ?? 0,
     complaints: s.complaints?.length ?? 0,
     dates: [
       ...new Set(dated.map((r) => (r.date ?? "").slice(0, 10)).filter(Boolean)),
