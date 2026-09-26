@@ -1179,34 +1179,31 @@ async function pushInventoryBooks(
       | null)?.hotel,
   );
   const blocked = { ...(remoteDeleted ?? {}), ...(deleted ?? {}) };
-  const gone = [
-    ...new Set([
-      ...cloudFiles.filter((file) => blocked[file.id]).map((file) => file.id),
-      ...Object.keys(blocked).filter((id) => isInventoryFileId(id)),
-    ]),
-  ];
+  for (const file of files) delete blocked[file.id];
+  const gone = cloudFiles.filter((file) => blocked[file.id]).map((file) => file.id);
   if (gone.length) {
     await sb.from("inventory").delete().eq("user_id", ownerId).in("id", gone);
   }
   const merged = mergeInventoryFiles(files, cloudFiles).filter((file) => !blocked[file.id]);
   const shared = await sb.rpc("save_shared_inventory", { files: merged });
-  if (!shared.error) return;
-  const encoded = merged.map((file) => {
-    const row = encodeInventoryFile(file);
-    return {
-      user_id: ownerId,
-      id: row.id,
-      name: row.name,
-      last_month: row.lastMonth,
-      this_month: row.thisMonth,
-      notes: row.notes,
-    };
-  });
-  if (encoded.length) {
-    const { error: rowErr } = await sb
-      .from("inventory")
-      .upsert(encoded, { onConflict: "user_id,id" });
-    if (rowErr && !isSkippableSealError(rowErr)) return;
+  if (shared.error) {
+    const encoded = merged.map((file) => {
+      const row = encodeInventoryFile(file);
+      return {
+        user_id: ownerId,
+        id: row.id,
+        name: row.name,
+        last_month: row.lastMonth,
+        this_month: row.thisMonth,
+        notes: row.notes,
+      };
+    });
+    if (encoded.length) {
+      const { error: rowErr } = await sb
+        .from("inventory")
+        .upsert(encoded, { onConflict: "user_id,id" });
+      if (rowErr && !isSkippableSealError(rowErr)) return;
+    }
   }
   const meta = await sb
     .from("ledger_meta")
@@ -1222,15 +1219,18 @@ async function pushInventoryBooks(
   const existing = Array.isArray(rawBooks.inventoryFiles)
     ? (rawBooks.inventoryFiles as InventoryFile[])
     : [];
+  const hotelDeleted = { ...(deletedFromHotel(hotel) ?? {}) };
+  for (const file of merged) delete hotelDeleted[file.id];
   const { error } = await sb
     .from("ledger_meta")
     .update({
       hotel: {
         ...hotel,
+        _deletedIds: hotelDeleted,
         _books: {
           ...rawBooks,
           inventoryFiles: mergeInventoryFiles(merged, existing).filter(
-            (file) => !blocked[file.id],
+            (file) => !blocked[file.id] && !hotelDeleted[file.id],
           ),
         },
       },

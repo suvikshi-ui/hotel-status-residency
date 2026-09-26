@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { mergeLiveSnapshot, mergeRowsById } from "./live-merge";
+import { mergeLiveSnapshot, mergeRowsById, inventoryDeletedIds } from "./live-merge";
 import { clearLocalLedgerCache } from "./ledger-cache";
 import { pullLockState } from "./pull-locks";
 import {
@@ -25,7 +25,7 @@ import {
   parseLockedDates,
   writeStoredLocks,
 } from "./register-lock";
-import { dropDeletedRows, mergeSealed, sealKey } from "./sheet-seal";
+import { dropDeletedRows, sealKey } from "./sheet-seal";
 import { mergeInventoryFiles } from "./inventory";
 import { readHouseFiles, writeHouseFiles } from "./house-files";
 
@@ -293,7 +293,13 @@ async function doFlush(userId: string) {
   const base = lastPulled;
   if (pulled.kind === "data") {
     const cloud = pulled.snapshot;
-    const deleted = mergeSealed(local.deletedIds, cloud.deletedIds);
+    const deleted = inventoryDeletedIds(
+      local.deletedIds,
+      cloud.deletedIds,
+      local.inventoryFiles,
+      local.savedAt,
+      cloud.savedAt,
+    );
     const remembered = readHouseFiles(ledgerOwnerKey()).filter((file) => !deleted[file.id]);
     const files = mergeInventoryFiles(
       mergeInventoryFiles(local.inventoryFiles, cloud.inventoryFiles),
@@ -673,7 +679,13 @@ export async function hydrateFromCloud(userId: string): Promise<CloudPhase> {
 
 function withLocalSavedFiles(cloud: LedgerSnapshot): LedgerSnapshot {
   const local = useLedger.getState();
-  const deleted = mergeSealed(local.deletedIds, cloud.deletedIds);
+  const deleted = inventoryDeletedIds(
+    local.deletedIds,
+    cloud.deletedIds,
+    local.inventoryFiles,
+    local.savedAt,
+    cloud.savedAt,
+  );
   const remembered = readHouseFiles(ledgerOwnerKey()).filter((file) => !deleted[file.id]);
   return {
     ...cloud,

@@ -10,6 +10,22 @@ import { mergeSealed, parseSealedIds, dropDeletedRows, sealKey } from "./sheet-s
 import { mergeInventoryFiles } from "./inventory.ts";
 import type { LedgerSnapshot } from "./supabase-db.ts";
 
+export function inventoryDeletedIds(
+  localDeleted: Record<string, true> | undefined,
+  cloudDeleted: Record<string, true> | undefined,
+  localFiles: { id: string }[] | undefined,
+  localSavedAt: number | undefined,
+  cloudSavedAt: number | undefined,
+) {
+  const deleted = mergeSealed(localDeleted, cloudDeleted);
+  if ((localSavedAt ?? 0) < (cloudSavedAt ?? 0)) return deleted;
+  const next = { ...deleted };
+  for (const file of localFiles ?? []) {
+    if (file?.id && !localDeleted?.[file.id]) delete next[file.id];
+  }
+  return next;
+}
+
 export function rowEq(a: unknown, b: unknown) {
   return JSON.stringify(a) === JSON.stringify(b);
 }
@@ -137,9 +153,12 @@ export function mergeLiveSnapshot(
       rev: parseLockRev(cloud.lockRev),
     },
   );
-  const deletedIds = mergeSealed(
+  const deletedIds = inventoryDeletedIds(
     parseSealedIds(local.deletedIds),
     parseSealedIds(cloud.deletedIds),
+    local.inventoryFiles,
+    local.savedAt,
+    cloud.savedAt,
   );
   const localRev = parseLockRev(local.lockRev);
   const cloudRev = parseLockRev(cloud.lockRev);
