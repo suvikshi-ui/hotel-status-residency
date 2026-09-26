@@ -147,12 +147,7 @@ export function mergeLiveSnapshot(
   const inventoryFiles = mergeInventoryFiles(
     local.inventoryFiles,
     cloud.inventoryFiles,
-  ).filter(
-    (file) =>
-      (local.inventoryFiles ?? []).some((row) => row.id === file.id) ||
-      !deletedIds[file.id],
-  );
-  for (const file of inventoryFiles) delete deletedIds[file.id];
+  ).filter((file) => !deletedIds[file.id]);
   return {
     hotel: pick3(b.hotel, local.hotel, cloud.hotel),
     opening: pick3(b.opening, local.opening, cloud.opening),

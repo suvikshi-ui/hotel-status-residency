@@ -1173,11 +1173,22 @@ async function pushInventoryBooks(
       return decodeInventoryFile({ id: str(rec.id), notes: str(rec.notes) });
     })
     .filter((row): row is InventoryFile => Boolean(row));
-  const gone = cloudFiles.filter((file) => deleted?.[file.id]).map((file) => file.id);
+  const remoteDeleted = deletedFromHotel(
+    ((await sb.from("ledger_meta").select("hotel").eq("user_id", ownerId).maybeSingle()).data as
+      | { hotel?: unknown }
+      | null)?.hotel,
+  );
+  const blocked = { ...(remoteDeleted ?? {}), ...(deleted ?? {}) };
+  const gone = [
+    ...new Set([
+      ...cloudFiles.filter((file) => blocked[file.id]).map((file) => file.id),
+      ...Object.keys(blocked).filter((id) => isInventoryFileId(id)),
+    ]),
+  ];
   if (gone.length) {
     await sb.from("inventory").delete().eq("user_id", ownerId).in("id", gone);
   }
-  const merged = mergeInventoryFiles(files, cloudFiles).filter((file) => !deleted?.[file.id]);
+  const merged = mergeInventoryFiles(files, cloudFiles).filter((file) => !blocked[file.id]);
   const shared = await sb.rpc("save_shared_inventory", { files: merged });
   if (!shared.error) return;
   const encoded = merged.map((file) => {
@@ -1218,7 +1229,9 @@ async function pushInventoryBooks(
         ...hotel,
         _books: {
           ...rawBooks,
-          inventoryFiles: mergeInventoryFiles(merged, existing),
+          inventoryFiles: mergeInventoryFiles(merged, existing).filter(
+            (file) => !blocked[file.id],
+          ),
         },
       },
     })

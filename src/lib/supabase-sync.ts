@@ -27,7 +27,7 @@ import {
 } from "./register-lock";
 import { dropDeletedRows, mergeSealed, sealKey } from "./sheet-seal";
 import { mergeInventoryFiles } from "./inventory";
-import { readHouseFiles } from "./house-files";
+import { readHouseFiles, writeHouseFiles } from "./house-files";
 
 export type CloudPhase =
   | "off"
@@ -212,6 +212,7 @@ function applyMerged(merged: LedgerSnapshot, previous: LedgerSnapshot) {
     savedAt: merged.savedAt,
   });
   writeStoredLocks(ledgerOwnerKey(), merged.lockedDates ?? {});
+  writeHouseFiles(ledgerOwnerKey(), merged.inventoryFiles ?? []);
   noteRemoteLockChange(wasLocked, nowLocked);
 }
 
@@ -292,18 +293,22 @@ async function doFlush(userId: string) {
   const base = lastPulled;
   if (pulled.kind === "data") {
     const cloud = pulled.snapshot;
-    const deleted = local.deletedIds ?? {};
-    const files = mergeInventoryFiles(local.inventoryFiles, cloud.inventoryFiles).filter(
-      (file) => !deleted[file.id],
-    );
+    const deleted = mergeSealed(local.deletedIds, cloud.deletedIds);
+    const remembered = readHouseFiles(ledgerOwnerKey()).filter((file) => !deleted[file.id]);
+    const files = mergeInventoryFiles(
+      mergeInventoryFiles(local.inventoryFiles, cloud.inventoryFiles),
+      remembered,
+    ).filter((file) => !deleted[file.id]);
     const complaints = mergeRowsById(local.complaints ?? [], cloud.complaints ?? []).filter(
       (row) => !deleted[row.id] && !deleted[sealKey.complaint(row.id)],
     );
     if (
       JSON.stringify(files) !== JSON.stringify(local.inventoryFiles ?? []) ||
+      JSON.stringify(deleted) !== JSON.stringify(local.deletedIds ?? {}) ||
       complaints.length !== (local.complaints ?? []).length
     ) {
-      useLedger.setState({ inventoryFiles: files, complaints });
+      useLedger.setState({ inventoryFiles: files, deletedIds: deleted, complaints });
+      writeHouseFiles(ledgerOwnerKey(), files);
     }
     const keepLocal = preferLocalOverCloud({
       localSavedAt: local.savedAt ?? 0,
@@ -676,11 +681,7 @@ function withLocalSavedFiles(cloud: LedgerSnapshot): LedgerSnapshot {
     inventoryFiles: mergeInventoryFiles(
       mergeInventoryFiles(cloud.inventoryFiles, local.inventoryFiles),
       remembered,
-    ).filter(
-      (file) =>
-        (local.inventoryFiles ?? []).some((row) => row.id === file.id) ||
-        !deleted[file.id],
-    ),
+    ).filter((file) => !deleted[file.id]),
     payrollFiles: dropDeletedRows(
       mergeRowsById(cloud.payrollFiles ?? [], local.payrollFiles ?? []),
       deleted,
