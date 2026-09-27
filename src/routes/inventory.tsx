@@ -93,6 +93,7 @@ function InventoryBookPanel({ kind }: { kind: InventoryBook }) {
   const deleteInventoryFile = useLedger((s) => s.deleteInventoryFile);
   const role = useLedger((s) => s.appRole);
   const canDelete = role !== "housekeeping";
+  const canEdit = role === "admin" || role === "supervisor";
   const { busy: saving, saveToServer } = useAccountSave();
   const { gate } = useGate();
   const period = inventoryPeriod(kind, date);
@@ -104,12 +105,14 @@ function InventoryBookPanel({ kind }: { kind: InventoryBook }) {
   const [openId, setOpenId] = useState<string>("draft");
   const [draft, setDraft] = useState<InventoryItem[]>(() => seedBook(kind));
   const [newName, setNewName] = useState("");
+  const [editing, setEditing] = useState(false);
   const kept = useRef<InventoryFile | null>(null);
 
   useEffect(() => {
     const previous = filesForBook(files, kind).find((file) => file.period < period);
     setOpenId("draft");
     setDraft(carryForward(previous?.lines, seedBook(kind)));
+    setEditing(false);
     kept.current = null;
   }, [kind, period]);
 
@@ -128,8 +131,8 @@ function InventoryBookPanel({ kind }: { kind: InventoryBook }) {
 
   const openFile =
     openId === "draft" ? null : (bookFiles.find((file) => file.id === openId) ?? null);
-  const locked = Boolean(openFile);
-  const rows = openFile?.lines ?? draft;
+  const locked = Boolean(openFile) && !editing;
+  const rows = editing || !openFile ? draft : openFile.lines;
   const lastLabel = kind === "ws" ? "Last count" : "Last month";
   const nowLabel = kind === "ws" ? "Today" : "This month";
   const lastTotal = rows.reduce((sum, row) => sum + row.lastMonth, 0);
@@ -181,6 +184,33 @@ function InventoryBookPanel({ kind }: { kind: InventoryBook }) {
     setOpenId(file.id);
     toast.success(`${periodLabel(kind, period)} file saved`);
     void saveToServer();
+  }
+
+  function saveEdits() {
+    if (!openFile || !editing) return;
+    const file: InventoryFile = { ...openFile, lines: draft };
+    saveInventoryFile(file);
+    kept.current = file;
+    setEditing(false);
+    toast.success(`${periodLabel(kind, file.period)} file updated`);
+    void saveToServer();
+  }
+
+  function beginEdit(file: InventoryFile) {
+    if (!canEdit) return;
+    gate(
+      () => {
+        setDraft(file.lines.map((row) => ({ ...row })));
+        setOpenId(file.id);
+        setEditing(true);
+      },
+      {
+        title: `Edit ${periodLabel(kind, file.period)}?`,
+        message: "Security code ke baad is saved file ko change kar sakte ho.",
+        confirmLabel: "Edit",
+        requireCode: true,
+      },
+    );
   }
 
   function removeFile(file: InventoryFile) {
@@ -239,11 +269,23 @@ function InventoryBookPanel({ kind }: { kind: InventoryBook }) {
         <p className="text-sm text-muted">
           {locked
             ? `${periodLabel(kind, openFile?.period ?? period)} file is locked.`
-            : `${periodLabel(kind, period)} is not saved yet.`}
+            : editing
+              ? `${periodLabel(kind, openFile?.period ?? period)} — editing.`
+              : `${periodLabel(kind, period)} is not saved yet.`}
         </p>
         <div className="flex flex-wrap gap-2">
           {!saved && openId === "draft" ? (
             <SaveCube busy={saving} onSave={saveFile} />
+          ) : null}
+          {editing ? (
+            <>
+              <Button type="button" disabled={saving} onClick={saveEdits}>
+                {saving ? "Saving…" : "Save"}
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setEditing(false)}>
+                Cancel
+              </Button>
+            </>
           ) : null}
           <Button type="button" variant="outline" onClick={printSheet}>
             <Printer className="size-4" />
@@ -258,7 +300,10 @@ function InventoryBookPanel({ kind }: { kind: InventoryBook }) {
             type="button"
             size="sm"
             variant={openId === "draft" ? "default" : "outline"}
-            onClick={() => setOpenId("draft")}
+            onClick={() => {
+              setEditing(false);
+              setOpenId("draft");
+            }}
           >
             {periodLabel(kind, period)} · new
           </Button>
@@ -269,7 +314,10 @@ function InventoryBookPanel({ kind }: { kind: InventoryBook }) {
             type="button"
             size="sm"
             variant={openId === file.id ? "default" : "outline"}
-            onClick={() => setOpenId(file.id)}
+            onClick={() => {
+              setEditing(false);
+              setOpenId(file.id);
+            }}
           >
             {periodLabel(kind, file.period)}
           </Button>
@@ -388,12 +436,19 @@ function InventoryBookPanel({ kind }: { kind: InventoryBook }) {
             </Button>
           </CardContent>
         </Card>
-      ) : openFile && canDelete ? (
-        <div className="flex justify-end">
-          <Button type="button" variant="danger" onClick={() => removeFile(openFile)}>
-            <Trash2 className="size-4" />
-            Delete file
-          </Button>
+      ) : openFile && (canEdit || canDelete) ? (
+        <div className="flex justify-end gap-2">
+          {canEdit ? (
+            <Button type="button" variant="outline" onClick={() => beginEdit(openFile)}>
+              Edit
+            </Button>
+          ) : null}
+          {canDelete ? (
+            <Button type="button" variant="danger" onClick={() => removeFile(openFile)}>
+              <Trash2 className="size-4" />
+              Delete file
+            </Button>
+          ) : null}
         </div>
       ) : null}
     </div>
