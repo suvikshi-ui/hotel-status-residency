@@ -293,16 +293,17 @@ async function doFlush(userId: string) {
   const base = lastPulled;
   if (pulled.kind === "data") {
     const cloud = pulled.snapshot;
+    const latest = snapshotFromStore();
     const deleted = inventoryDeletedIds(
-      local.deletedIds,
+      latest.deletedIds,
       cloud.deletedIds,
-      local.inventoryFiles,
-      local.savedAt,
+      latest.inventoryFiles,
+      latest.savedAt,
       cloud.savedAt,
     );
     const remembered = readHouseFiles(ledgerOwnerKey()).filter((file) => !deleted[file.id]);
     const files = mergeInventoryFiles(
-      mergeInventoryFiles(local.inventoryFiles, cloud.inventoryFiles),
+      mergeInventoryFiles(latest.inventoryFiles, cloud.inventoryFiles),
       remembered,
     ).filter((file) => !deleted[file.id]);
     const complaints = mergeRowsById(local.complaints ?? [], cloud.complaints ?? []).filter(
@@ -317,9 +318,9 @@ async function doFlush(userId: string) {
       writeHouseFiles(ledgerOwnerKey(), files);
     }
     const keepLocal = preferLocalOverCloud({
-      localSavedAt: local.savedAt ?? 0,
+      localSavedAt: Math.max(local.savedAt ?? 0, latest.savedAt ?? 0),
       cloudUpdatedAt: cloud.savedAt ?? 0,
-      localScore: ledgerActivityScore(local),
+      localScore: ledgerActivityScore(latest),
       cloudScore: ledgerActivityScore(cloud),
     });
     if (!keepLocal) {
@@ -691,7 +692,7 @@ function withLocalSavedFiles(cloud: LedgerSnapshot): LedgerSnapshot {
     ...cloud,
     deletedIds: deleted,
     inventoryFiles: mergeInventoryFiles(
-      mergeInventoryFiles(cloud.inventoryFiles, local.inventoryFiles),
+      mergeInventoryFiles(local.inventoryFiles, cloud.inventoryFiles),
       remembered,
     ).filter((file) => !deleted[file.id]),
     payrollFiles: dropDeletedRows(

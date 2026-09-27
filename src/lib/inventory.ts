@@ -85,6 +85,7 @@ export interface InventoryFile {
   kind: InventoryBook;
   period: string;
   createdAt: string;
+  updatedAt?: number;
   lines: InventoryItem[];
 }
 
@@ -167,6 +168,7 @@ export function encodeInventoryFile(file: InventoryFile): InventoryItem {
       kind: file.kind,
       period: file.period,
       createdAt: file.createdAt,
+      updatedAt: file.updatedAt ?? 0,
       lines: file.lines,
     }),
   };
@@ -183,6 +185,7 @@ export function decodeInventoryFile(row: {
       kind?: string;
       period?: string;
       createdAt?: string;
+      updatedAt?: number;
       lines?: RawInventory[];
     };
     const kind =
@@ -195,11 +198,13 @@ export function decodeInventoryFile(row: {
             : "linen";
     const period = (parsed.period || id.split(":").slice(2).join(":")).slice(0, 10);
     if (!period) return null;
+    const updatedAt = Number(parsed.updatedAt);
     return {
       id,
       kind,
       period: kind === "ws" ? period.slice(0, 10) : period.slice(0, 7),
       createdAt: (parsed.createdAt || period).slice(0, 10),
+      updatedAt: Number.isFinite(updatedAt) ? updatedAt : 0,
       lines:
         kind === "linen"
           ? normalizeInventory(parsed.lines)
@@ -249,6 +254,7 @@ export function normalizeInventoryFiles(rows: InventoryFile[] | undefined | null
       kind: row.kind,
       period,
       createdAt: (row.createdAt || period).slice(0, 10),
+      updatedAt: Number.isFinite(row.updatedAt) ? row.updatedAt : 0,
       lines:
         row.kind === "linen"
           ? normalizeInventory(row.lines)
@@ -270,7 +276,7 @@ export function filesForBook(files: InventoryFile[], kind: InventoryBook) {
   return files.filter((file) => file.kind === kind);
 }
 
-/** Keep every item name. When both desks saved the same file, keep the counts that were filled in. */
+/** Same file from two desks: the later save wins, including a count changed to zero. */
 export function mergeInventoryFiles(
   local: InventoryFile[] | undefined,
   cloud: InventoryFile[] | undefined,
@@ -290,10 +296,13 @@ export function mergeInventoryFiles(
   return normalizeInventoryFiles([...byId.values()]);
 }
 
-function mergeOneInventoryFile(cloud: InventoryFile, local: InventoryFile): InventoryFile {
+function mergeOneInventoryFile(older: InventoryFile, newer: InventoryFile): InventoryFile {
+  const olderAt = older.updatedAt ?? 0;
+  const newerAt = newer.updatedAt ?? 0;
+  if (newerAt !== olderAt) return newerAt > olderAt ? newer : older;
   const lines: InventoryItem[] = [];
   const index = new Map<string, number>();
-  const add = (line: InventoryItem) => {
+  const add = (line: InventoryItem, replace: boolean) => {
     const key = line.name.trim().toLowerCase();
     if (!key) return;
     const at = index.get(key);
@@ -302,20 +311,21 @@ function mergeOneInventoryFile(cloud: InventoryFile, local: InventoryFile): Inve
       lines.push(line);
       return;
     }
+    if (!replace) return;
     const prev = lines[at];
     if (!prev) return;
     lines[at] = {
       ...prev,
       id: line.id || prev.id,
       name: line.name || prev.name,
-      lastMonth: line.lastMonth || prev.lastMonth,
-      thisMonth: line.thisMonth || prev.thisMonth,
-      notes: line.notes || prev.notes,
+      lastMonth: line.lastMonth,
+      thisMonth: line.thisMonth,
+      notes: line.notes,
     };
   };
-  for (const line of cloud.lines) add(line);
-  for (const line of local.lines) add(line);
-  return { ...local, lines };
+  for (const line of older.lines) add(line, false);
+  for (const line of newer.lines) add(line, true);
+  return { ...newer, lines };
 }
 
 export function seedInventory(): InventoryItem[] {

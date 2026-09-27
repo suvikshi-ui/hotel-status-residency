@@ -683,16 +683,17 @@ export const useLedger = create<LedgerState>()(
         save({ inventory: normalizeInventory(inventory) });
       },
       saveInventoryFile: (file) => {
+        const stamped = { ...file, updatedAt: Date.now() };
         const next = normalizeInventoryFiles([
-          ...get().inventoryFiles.filter((row) => row.id !== file.id),
-          file,
+          ...get().inventoryFiles.filter((row) => row.id !== stamped.id),
+          stamped,
         ]);
         save({
           inventoryFiles: next,
           inventory:
-            file.kind === "linen" ? normalizeInventory(file.lines) : get().inventory,
-          sealedIds: withSealed(get().sealedIds, [file.id]),
-          deletedIds: omitSealed(get().deletedIds, [file.id]),
+            stamped.kind === "linen" ? normalizeInventory(stamped.lines) : get().inventory,
+          sealedIds: withSealed(get().sealedIds, [stamped.id]),
+          deletedIds: omitSealed(get().deletedIds, [stamped.id]),
         });
         writeHouseFiles(ledgerOwnerKey(), next);
       },

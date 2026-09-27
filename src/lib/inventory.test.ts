@@ -129,4 +129,34 @@ describe("inventory sheet", () => {
     assert.equal(lines.find((row) => row.name === "Soap")?.thisMonth, 4);
     assert.equal(lines.find((row) => row.name === "Bucket")?.thisMonth, 3);
   });
+
+  it("keeps an edited count, including zero, over the older file", () => {
+    const id = inventoryFileId("ws", "2026-09-24");
+    const merged = mergeInventoryFiles(
+      [
+        {
+          id,
+          kind: "ws",
+          period: "2026-09-24",
+          createdAt: "2026-09-24",
+          updatedAt: 200,
+          lines: [{ id: "a", name: "Soap", lastMonth: 0, thisMonth: 2, notes: "edited" }],
+        },
+      ],
+      [
+        {
+          id,
+          kind: "ws",
+          period: "2026-09-24",
+          createdAt: "2026-09-24",
+          updatedAt: 100,
+          lines: [{ id: "a", name: "Soap", lastMonth: 4, thisMonth: 9, notes: "old" }],
+        },
+      ],
+    );
+    const soap = merged[0]?.lines.find((row) => row.name === "Soap");
+    assert.equal(soap?.thisMonth, 2);
+    assert.equal(soap?.lastMonth, 0);
+    assert.equal(soap?.notes, "edited");
+  });
 });
