@@ -48,19 +48,20 @@ function roomsFor(
   return out.length ? ` (${out.join(",")})` : "";
 }
 
-const SIZE = { fs: 12.5, pad: "5px 8px", head: 13, title: 34, date: 16 };
+const SIZE = { fs: 13, pad: "4px 7px", head: 13, title: 32, date: 15 };
 
-const B = "1px solid #1a1a1a";
-const FRAME = "2px solid #1a1a1a";
-const SPLIT = "1px solid #d8d0c0";
-const BODY = '"Source Serif 4", Georgia, "Times New Roman", serif';
-const DISPLAY = '"Fraunces", "Times New Roman", serif';
+const B = "1px solid #111";
+const FRAME = "2.5px solid #111";
+const BODY = 'Arial, "Nimbus Sans", "Liberation Sans", sans-serif';
+const DISPLAY = '"Times New Roman", Times, serif';
+const HEAD = "#0f3d2a";
+const GOLD = "#f0c040";
 
 const fill = {
-  ob: "#f4c430",
+  ob: "#f5c400",
   ok: "#548235",
   bad: "#c00000",
-  sub: "#efe8d8",
+  sub: "#f3ead3",
 };
 
 function Row({
@@ -138,10 +139,10 @@ function BlockTitle({ children }: { children: string }) {
           padding: "8px 8px",
           textAlign: "center",
           fontWeight: 700,
-          letterSpacing: "0.04em",
-          fontSize: 14,
-          fontFamily: DISPLAY,
-          background: "#f3ead4",
+          letterSpacing: "0.06em",
+          fontSize: 13,
+          fontFamily: BODY,
+          background: "#f6efdc",
           color: "#111",
           textDecoration: "underline",
           WebkitPrintColorAdjust: "exact",
@@ -167,12 +168,11 @@ function MiniTable({ children }: { children: ReactNode }) {
   );
 }
 
-function Block({ children, last }: { children: ReactNode; last?: boolean }) {
+function Block({ children }: { children: ReactNode; last?: boolean }) {
   return (
     <div
       style={{
-        padding: "8px 6px",
-        borderBottom: last ? undefined : SPLIT,
+        padding: "6px 4px 0",
         background: "#fff",
       }}
     >
@@ -247,8 +247,8 @@ export function DailyA4({
         style={{
           padding: "8px 10px",
           borderBottom: B,
-          background: "#1b2622",
-          color: "#f6f0e6",
+          background: HEAD,
+          color: "#fff",
           WebkitPrintColorAdjust: "exact",
         }}
       >
@@ -276,12 +276,9 @@ export function DailyA4({
                 fontFamily: DISPLAY,
                 fontWeight: 700,
                 fontSize: SIZE.title,
-                letterSpacing: "0.05em",
-                lineHeight: 1.05,
-                color: "#f4c430",
-                fontOpticalSizing: "auto",
-                transform: "scaleX(0.94)",
-                transformOrigin: "center",
+                letterSpacing: "0.01em",
+                lineHeight: 1,
+                color: GOLD,
                 whiteSpace: "nowrap",
               }}
             >
@@ -290,10 +287,11 @@ export function DailyA4({
             <div
               style={{
                 marginTop: 2,
-                fontFamily: DISPLAY,
-                fontWeight: 600,
-                fontSize: 13,
-                letterSpacing: "-0.02em",
+                fontFamily: BODY,
+                fontWeight: 700,
+                fontSize: 12,
+                letterSpacing: "0.01em",
+                color: "#fff",
                 lineHeight: 1.2,
               }}
             >
@@ -302,11 +300,12 @@ export function DailyA4({
           </div>
           <div
             style={{
-              fontFamily: DISPLAY,
+              fontFamily: BODY,
               fontWeight: 700,
               fontSize: SIZE.date,
+              color: "#fff",
+              letterSpacing: "0.02em",
               whiteSpace: "nowrap",
-              letterSpacing: "-0.02em",
               flexShrink: 0,
             }}
           >
@@ -327,7 +326,7 @@ export function DailyA4({
           style={{
             display: "flex",
             flexDirection: "column",
-            borderRight: SPLIT,
+            borderRight: "8px solid #fff",
           }}
         >
           <Block>
