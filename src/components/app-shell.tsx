@@ -70,7 +70,7 @@ function NavLinks({
               onClick={onNavigate}
               className={cn(
                 "flex min-h-12 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg text-[11px] font-medium",
-                active ? "text-[#e7f0ea]" : "text-[#c9c2b4]",
+                active ? "bg-white/25 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.45)]" : "text-[#e7cfc6]",
               )}
             >
               <Icon className="size-5" />
@@ -96,9 +96,9 @@ function NavLinks({
               variant === "top" ? "px-3" : "gap-3 px-3",
               variant === "top"
                 ? active
-                  ? "bg-[#e7f0ea] text-[#123f38]"
+                  ? "bg-white/28 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.5)]"
                   : onDark
-                    ? "text-[#f3eee4] hover:bg-white/10"
+                    ? "text-[#fff6f2] hover:bg-white/12"
                     : "text-fg hover:bg-bg-warm"
                 : active
                   ? "bg-sidebar-line text-sidebar-fg"
@@ -133,16 +133,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-dvh bg-[#1b2622] text-[#f3eee4]">
+    <div className="min-h-dvh text-[#fff6f2]">
       <div className="flex min-w-0 flex-col pb-20 md:pb-0">
-        <header className="sticky top-0 z-30 border-b border-white/10 bg-[#1b2622]/95 text-[#f3eee4] backdrop-blur-md print:hidden">
+        <header className="liquid-bar sticky top-0 z-30 border-b text-[#fff6f2] print:hidden">
           <div className="flex items-center gap-2 px-3 py-2 md:px-6">
             <Sheet open={menu} onOpenChange={setMenu}>
               <SheetTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="!text-[#f3eee4] hover:!bg-white/10 md:hidden"
+                  className="!text-[#fff6f2] hover:!bg-white/12 md:hidden"
                   aria-label="Open menu"
                 >
                   <Menu className="size-5" />
@@ -180,7 +180,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <div className="truncate font-display text-base font-semibold">
                   {hotel.name}
                 </div>
-                <div className="hidden truncate text-[10px] uppercase tracking-[0.12em] text-[#c9c2b4] md:block">
+                <div className="hidden truncate text-[10px] uppercase tracking-[0.12em] text-[#e7cfc6] md:block">
                   {cloud.phase === "saving"
                     ? "Sending to other desks…"
                     : cloud.phase === "missing-schema"
@@ -198,7 +198,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Button
                 variant="ghost"
                 size="icon"
-                className="shrink-0 !text-[#f3eee4] hover:!bg-white/10"
+                className="shrink-0 !text-[#fff6f2] hover:!bg-white/12"
                 aria-label={leaving ? "Signing out" : "Sign out"}
                 onClick={onSignOut}
                 disabled={leaving}
@@ -216,14 +216,14 @@ export function AppShell({ children }: { children: ReactNode }) {
         </main>
       </div>
 
-      <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-white/10 bg-[#1b2622]/95 px-1 pb-[env(safe-area-inset-bottom)] pt-1 text-[#f3eee4] backdrop-blur-md print:hidden md:hidden">
+      <nav className="liquid-bar fixed inset-x-0 bottom-0 z-30 flex border-t px-1 pb-[env(safe-area-inset-bottom)] pt-1 text-[#fff6f2] print:hidden md:hidden">
         <NavLinks variant="bottom" />
         {role === "housekeeping" ? null : (
         <Sheet>
           <SheetTrigger asChild>
             <button
               type="button"
-              className="flex min-h-12 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-[#c9c2b4]"
+              className="flex min-h-12 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-[#e7cfc6]"
             >
               <Menu className="size-5" />
               More

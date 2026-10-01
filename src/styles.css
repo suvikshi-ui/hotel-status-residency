@@ -15,10 +15,10 @@
   --color-accent: #8d6a32;
   --color-accent-fg: #fffdf8;
   --color-ring: #123f38;
-  --color-sidebar: #0e2622;
-  --color-sidebar-fg: #f6f0e6;
-  --color-sidebar-muted: #d4c4a0;
-  --color-sidebar-line: #1c3d36;
+  --color-sidebar: #2a0c16;
+  --color-sidebar-fg: #fff6f2;
+  --color-sidebar-muted: #e7cfc6;
+  --color-sidebar-line: #5c1830;
   --color-danger: #9b3d32;
   --color-warn: #8a5a22;
   --color-ok: #2f6b4f;
@@ -54,10 +54,15 @@
   }
 
   body {
-    background-color: #1b2622;
-    color: #f3eee4;
-    --color-fg: #f3eee4;
-    --color-muted: #c9c2b4;
+    background-color: #3a1020;
+    background-image:
+      radial-gradient(ellipse 90% 55% at 0% 0%, rgba(184, 74, 98, 0.45), transparent 52%),
+      radial-gradient(ellipse 70% 45% at 100% 6%, rgba(120, 32, 58, 0.55), transparent 50%),
+      radial-gradient(ellipse 80% 50% at 50% 100%, rgba(22, 4, 12, 0.72), transparent 58%);
+    background-attachment: fixed;
+    color: #fff6f2;
+    --color-fg: #fff6f2;
+    --color-muted: #e7cfc6;
     font-family: var(--font-sans);
     min-height: 100dvh;
   }
@@ -99,17 +104,51 @@
   font-variant-numeric: tabular-nums;
 }
 
+.liquid-glass {
+  background: linear-gradient(180deg, rgba(255, 248, 246, 0.5), rgba(255, 236, 232, 0.22));
+  backdrop-filter: blur(22px) saturate(1.45);
+  -webkit-backdrop-filter: blur(22px) saturate(1.45);
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.62),
+    0 14px 36px rgba(48, 8, 18, 0.22);
+  --color-fg: #2c1218;
+  --color-muted: #6e4550;
+  color: #2c1218;
+}
+
+.liquid-bar {
+  background: rgba(74, 16, 32, 0.42);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
 .paper-card {
-  background: var(--color-card);
-  box-shadow: var(--shadow-border);
-  --color-fg: #1c1914;
-  --color-muted: #6e665c;
-  color: #1c1914;
+  background: linear-gradient(180deg, rgba(255, 248, 246, 0.5), rgba(255, 236, 232, 0.22));
+  backdrop-filter: blur(22px) saturate(1.45);
+  -webkit-backdrop-filter: blur(22px) saturate(1.45);
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.62),
+    0 14px 36px rgba(48, 8, 18, 0.22);
+  --color-fg: #2c1218;
+  --color-muted: #6e4550;
+  color: #2c1218;
 }
 
 .bg-card,
-.bg-bg,
 .bg-bg-warm {
+  background: linear-gradient(180deg, rgba(255, 248, 246, 0.55), rgba(255, 236, 232, 0.28));
+  backdrop-filter: blur(16px) saturate(1.3);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  --color-fg: #2c1218;
+  --color-muted: #6e4550;
+  color: #2c1218;
+}
+
+.bg-bg {
   --color-fg: #1c1914;
   --color-muted: #6e665c;
   color: #1c1914;
@@ -149,9 +188,16 @@
     print-color-adjust: exact;
   }
 
-  .paper-card {
+  .paper-card,
+  .liquid-glass {
+    background: #fff !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
     box-shadow: none;
     border: 1px solid #ddd4c2;
+    color: #1c1914 !important;
+    --color-fg: #1c1914;
+    --color-muted: #6e665c;
     break-inside: avoid;
   }
 
