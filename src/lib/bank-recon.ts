@@ -252,16 +252,31 @@ function pickOffice(
     cellByHeader(bank, REF_HEAD) ||
     extractRef(bank.particular);
   if (!ref) return null;
+  const bankKey = normalizeRef(ref);
+  if (used.has(bankKey)) return null;
   const hits = offices.filter(
-    (o) => !used.has(o.id + o.ref) && refsMatch(ref, o.ref),
+    (o) => !used.has(normalizeRef(o.ref)) && refsMatch(ref, o.ref),
   );
   if (!hits.length) return null;
-  const bankAmt = signedAmount(bank);
-  const sameAmt = hits.find((h) => Math.abs(h.amount - bankAmt) < 0.51);
-  const sameDay = hits.find((h) => h.date === bank.date);
-  const hit = sameAmt ?? sameDay ?? hits[0];
-  used.add(hit.id + hit.ref);
-  return hit;
+  const seen = new Set<string>();
+  const kept: OfficeHit[] = [];
+  for (const hit of hits) {
+    const key = hit.reason.trim().toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    kept.push(hit);
+  }
+  if (!kept.length) return null;
+  used.add(bankKey);
+  for (const hit of hits) used.add(normalizeRef(hit.ref));
+  const names = [...new Set(kept.map((hit) => hit.name.trim()).filter(Boolean))];
+  return {
+    ...kept[0],
+    id: kept.map((hit) => hit.id).join("+"),
+    name: names.join(", "),
+    reason: kept.map((hit) => hit.reason).join(", "),
+    amount: kept.reduce((sum, hit) => sum + hit.amount, 0),
+  };
 }
 
 export function refsMatch(a: string, b: string) {

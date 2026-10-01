@@ -231,6 +231,74 @@ describe("bank recon", () => {
     assert.equal(lines[2]?.office?.date, "2026-09-15");
   });
 
+  it("keeps every place for one reference, but not the same place twice", () => {
+    const bank = parseStatementText(
+      "Date,Narration,Ch./Ref. no.,Withdrawal,Deposit\n26/09/2026,UPI,REF9988776655,0,5000",
+      "2026-09",
+    );
+    const lines = reconcileBank(
+      bank,
+      [
+        {
+          id: "g1",
+          date: "2026-09-26",
+          slNo: 1,
+          name: "NITYA",
+          roomNo: "105",
+          mode: "QRPK",
+          amount: 2000,
+          payRefNo: "REF9988776655",
+        },
+        {
+          id: "g2",
+          date: "2026-09-26",
+          slNo: 2,
+          name: "AMIT",
+          roomNo: "106",
+          mode: "QRPK",
+          amount: 1500,
+          payRefNo: "REF9988776655",
+        },
+      ],
+      {
+        food: [
+          {
+            id: "f1",
+            date: "2026-09-26",
+            mode: "QRPK",
+            amount: 400,
+            payRef: "REF9988776655",
+          },
+        ],
+        wholesale: [
+          {
+            id: "w1",
+            date: "2026-09-26",
+            mode: "QRPK",
+            amount: 300,
+            payRef: "REF9988776655",
+          },
+        ],
+        expenses: [
+          {
+            id: "e1",
+            date: "2026-09-26",
+            mode: "QRPK",
+            amount: 800,
+            particular: "electricity bill payment",
+            payRef: "REF9988776655",
+          },
+        ],
+      },
+    );
+    assert.equal(lines.length, 1);
+    assert.equal(lines[0]?.office?.name, "NITYA");
+    assert.equal(
+      lines[0]?.office?.reason,
+      "room rent, food bill, WS, electricity bill payment",
+    );
+  });
+
   it("pulls UPI/IMPS numbers out of narration", () => {
     assert.equal(extractRef("TO TRANSFER UPI/DR/412345678901/RAMESH/SBIN"), "412345678901");
   });

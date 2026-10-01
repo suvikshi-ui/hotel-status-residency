@@ -242,6 +242,7 @@ function RegisterPage() {
                     {g.mode === "QRPK" ? (
                       <PkRefField
                         value={g.payRefNo}
+                        disabled={locked}
                         onSave={(ref) => setLineRef("guest", g.id, ref)}
                       />
                     ) : (

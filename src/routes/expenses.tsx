@@ -4,9 +4,10 @@ import { Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ModeBadge } from "@/components/mode-badge";
-import { PkRefField } from "@/components/pk-ref";
+import { GuardedPkRef } from "@/components/pk-ref";
 import { sumByDay, sumByHead, sumByMode } from "@/lib/expense-tally";
 import { formatDayShort, money } from "@/lib/format";
+import { isDayLocked } from "@/lib/register-lock";
 import { useLedger } from "@/lib/store";
 import { ReportsLink } from "@/components/reports-link";
 
@@ -16,6 +17,7 @@ function ExpensesPage() {
   const date = useLedger((s) => s.selectedDate);
   const all = useLedger((s) => s.expenses);
   const setLineRef = useLedger((s) => s.setLineRef);
+  const lockedDates = useLedger((s) => s.lockedDates);
   const month = date.slice(0, 7);
   const monthRows = useMemo(
     () => all.filter((e) => e.date.startsWith(month)),
@@ -183,9 +185,17 @@ function ExpensesPage() {
                   </td>
                   <td className="px-3 py-2.5">
                     {e.mode === "QRPK" ? (
-                      <PkRefField
+                      <GuardedPkRef
+                        locked={isDayLocked(lockedDates, e.date)}
                         value={e.payRef}
-                        onSave={(ref) => setLineRef("expense", e.id, ref)}
+                        onSave={(ref, bypass) =>
+                          setLineRef(
+                            "expense",
+                            e.id,
+                            ref,
+                            bypass ? { bypass: true } : undefined,
+                          )
+                        }
                       />
                     ) : (
                       "—"

@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ModeBadge } from "@/components/mode-badge";
-import { PkRefField } from "@/components/pk-ref";
+import { GuardedPkRef } from "@/components/pk-ref";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -118,13 +118,15 @@ function ModeLineCard({
               <div className="min-w-0">
                 <ModeBadge mode={r.mode} />
                 {r.mode === "QRPK" ? (
-                  <PkRefField
+                  <GuardedPkRef
+                    locked={Boolean(addDisabled)}
                     value={r.payRef}
-                    onSave={(ref) =>
+                    onSave={(ref, bypass) =>
                       useLedger.getState().setLineRef(
                         title === "Food" ? "food" : "wholesale",
                         r.id,
                         ref,
+                        bypass ? { bypass: true } : undefined,
                       )
                     }
                   />
@@ -269,10 +271,16 @@ function ExpenseLineCard({
                 <div className="truncate text-sm font-medium">{r.particular}</div>
                 <ModeBadge mode={r.mode} />
                 {r.mode === "QRPK" ? (
-                  <PkRefField
+                  <GuardedPkRef
+                    locked={Boolean(addDisabled)}
                     value={r.payRef}
-                    onSave={(ref) =>
-                      useLedger.getState().setLineRef("expense", r.id, ref)
+                    onSave={(ref, bypass) =>
+                      useLedger.getState().setLineRef(
+                        "expense",
+                        r.id,
+                        ref,
+                        bypass ? { bypass: true } : undefined,
+                      )
                     }
                   />
                 ) : null}
@@ -327,10 +335,16 @@ function ReceiptList({
               {r.kind === "ota" ? "Online · to P.K. QR" : MODE_LABEL[r.mode]}
             </div>
             {r.mode === "QRPK" ? (
-              <PkRefField
+              <GuardedPkRef
+                locked={Boolean(locked)}
                 value={r.payRef}
-                onSave={(ref) =>
-                  useLedger.getState().setLineRef("receipt", r.id, ref)
+                onSave={(ref, bypass) =>
+                  useLedger.getState().setLineRef(
+                    "receipt",
+                    r.id,
+                    ref,
+                    bypass ? { bypass: true } : undefined,
+                  )
                 }
               />
             ) : null}

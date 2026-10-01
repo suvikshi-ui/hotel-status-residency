@@ -141,6 +141,7 @@ export interface LedgerState {
     kind: "guest" | "food" | "wholesale" | "expense" | "receipt",
     id: string,
     ref: string,
+    opts?: { bypass?: boolean },
   ) => void;
   restoreSeed: () => void;
   setStaff: (staff: StaffRow[]) => void;
@@ -632,9 +633,11 @@ export const useLedger = create<LedgerState>()(
           ...rebuildFrom(next, row?.date ?? get().selectedDate),
         });
       },
-      setLineRef: (kind, id, ref) => {
+      setLineRef: (kind, id, ref, opts) => {
         const value = ref.trim() || null;
         if (kind === "guest") {
+          const current = get().guests.find((g) => g.id === id);
+          if (current?.date && dayIsLocked(get(), current.date) && !opts?.bypass) return;
           const guests = get().guests.map((g) =>
             g.id === id ? { ...g, payRefNo: value } : g,
           );
@@ -651,6 +654,8 @@ export const useLedger = create<LedgerState>()(
               : kind === "expense"
                 ? "expenses"
                 : "balReceived";
+        const current = get()[key].find((row) => row.id === id);
+        if (current?.date && dayIsLocked(get(), current.date) && !opts?.bypass) return;
         const rows = get()[key].map((row) =>
           row.id === id ? { ...row, payRef: value } : row,
         );
