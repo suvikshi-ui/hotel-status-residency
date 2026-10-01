@@ -135,6 +135,15 @@
   color: #1b2e28;
 }
 
+.page-bar {
+  background: #d5e6dc;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-color: rgba(27, 46, 40, 0.16);
+  box-shadow: none;
+  color: #1b2e28;
+}
+
 .paper-card {
   border-radius: 18px;
 }

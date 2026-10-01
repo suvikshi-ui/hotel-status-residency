@@ -135,7 +135,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-dvh text-[#1b2e28]">
       <div className="flex min-w-0 flex-col pb-20 md:pb-0">
-        <header className="liquid-bar sticky top-0 z-30 border-b text-[#1b2e28] print:hidden">
+        <header className="page-bar sticky top-0 z-30 border-b text-[#1b2e28] print:hidden">
           <div className="flex items-center gap-2 px-3 py-2 md:px-6">
             <Sheet open={menu} onOpenChange={setMenu}>
               <SheetTrigger asChild>
@@ -207,7 +207,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               </Button>
             ) : null}
           </div>
-          <div className="hidden border-t border-white/10 px-3 py-2 md:block md:px-6">
+          <div className="hidden border-t border-[#1b2e28]/15 px-3 py-2 md:block md:px-6">
             <NavLinks variant="top" onDark />
           </div>
         </header>
