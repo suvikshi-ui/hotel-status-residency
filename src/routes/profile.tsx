@@ -193,6 +193,38 @@ function BackupCard() {
   );
 }
 
+function EmptyBooksCard() {
+  const restore = useLedger((s) => s.restoreSeed);
+  const { gate } = useGate();
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Empty books</CardTitle>
+        <p className="text-sm text-muted">
+          Reset all books to empty and start from today. Local entries on this
+          desk will be cleared.
+        </p>
+      </CardHeader>
+      <CardContent>
+        <Button
+          variant="outline"
+          onClick={() =>
+            gate(() => restore(), {
+              title: "Are you sure?",
+              message:
+                "Reset all books to empty and start from today? Local entries will be cleared.",
+              confirmLabel: "Restore",
+              danger: true,
+            })
+          }
+        >
+          Reset empty books
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
 function ProfilePage() {
   const hotel = useLedger((s) => s.hotel);
   const opening = useLedger((s) => s.opening);
@@ -236,6 +268,7 @@ function ProfilePage() {
       {canAddUsers(role) ? <AddUserCard /> : null}
 
       {role === "admin" || role === "supervisor" ? <BackupCard /> : null}
+      {role === "admin" || role === "supervisor" ? <EmptyBooksCard /> : null}
 
       {user ? (
         <Card>
