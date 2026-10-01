@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { format, parseISO, isValid } from "date-fns";
 import { Download, Landmark, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -8,13 +9,11 @@ import { Input } from "@/components/ui/input";
 import { SaveCube, useAccountSave } from "@/components/save-cube";
 import { useGate } from "@/components/security-gate";
 import {
-  STATEMENT_HEADERS,
   bankRowsFromPdf,
+  downloadBankStatementPdf,
   mergeBankRows,
   parseStatementText,
   reconcileBank,
-  statementChartHtml,
-  statementChartRows,
   type BankRow,
 } from "@/lib/bank-recon";
 import { formatDayShort, money } from "@/lib/format";
@@ -39,7 +38,25 @@ function BankReconPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [password, setPassword] = useState("");
-  const month = date.slice(0, 7);
+  const [picked, setPicked] = useState<string | null>(null);
+  const months = useMemo(
+    () =>
+      [...new Set(bankRows.map((row) => row.month))]
+        .filter((key) => /^\d{4}-\d{2}$/.test(key))
+        .sort(),
+    [bankRows],
+  );
+  const liveMonth = date.slice(0, 7);
+  const month =
+    picked && months.includes(picked)
+      ? picked
+      : months.includes(liveMonth)
+        ? liveMonth
+        : (months[months.length - 1] ?? liveMonth);
+  const monthLabel = (() => {
+    const d = parseISO(`${month}-01`);
+    return isValid(d) ? format(d, "MMMM yyyy") : month;
+  })();
   const monthRows = useMemo(
     () => bankRows.filter((r) => r.month === month),
     [bankRows, month],
@@ -61,6 +78,8 @@ function BankReconPage() {
         setBankRows(mergeBankRows(kept, parsed));
         const first = parsed.find((row) => row.date)?.date;
         if (first) setDate(first);
+        const savedMonth = parsed.find((row) => row.month)?.month;
+        if (savedMonth) setPicked(savedMonth);
         toast.success(`${parsed.length} rows ready in the chart`);
       },
       {
@@ -91,27 +110,29 @@ function BankReconPage() {
     }
   }
 
-  function downloadStatement() {
+  async function downloadStatement() {
     if (!lines.length) {
       toast.error("Upload a statement first");
       return;
     }
-    const html = statementChartHtml(
-      [...STATEMENT_HEADERS, "Office date", "Name", "Reason"],
-      lines.map((line, i) => [
-        ...(statementChartRows(monthRows)[i] ?? ["", "", "", "", ""]),
-        line.office ? line.office.date : "",
-        line.office?.name ?? "",
-        line.office?.reason ?? "",
-      ]),
-    );
-    const blob = new Blob([html], { type: "application/vnd.ms-excel" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `bank-statement-${month}.xls`;
-    a.click();
-    URL.revokeObjectURL(url);
+    await downloadBankStatementPdf({
+      title: `Bank statement · ${monthLabel}`,
+      fileName: `bank-statement-${month}.pdf`,
+      lines: lines.map((line) => ({
+        date: line.bank.dateRaw || "—",
+        narration: line.bank.particular || "—",
+        ref: line.bank.ref || "—",
+        withdrawal: line.bank.debit
+          ? Math.round(line.bank.debit).toLocaleString("en-IN")
+          : "—",
+        deposit: line.bank.credit
+          ? Math.round(line.bank.credit).toLocaleString("en-IN")
+          : "—",
+        officeDate: line.office ? formatDayShort(line.office.date) : "—",
+        name: line.office?.name || "—",
+        reason: line.office?.reason || "—",
+      })),
+    });
   }
 
   return (
@@ -125,10 +146,9 @@ function BankReconPage() {
             Bank recon
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Journal from the bank statement. A P.K. QR reference from the
-            daily register fills office date, guest name and reason when it
-            matches Ch./Ref. no. Room is room rent, food is food bill, and an
-            expense keeps the reason you typed.
+            Journal from the bank statement. Save keeps that month as a cube.
+            Open the cube any time — office date, name and reason update when a
+            P.K. QR reference matches. Download is one landscape PDF page.
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
@@ -168,21 +188,47 @@ function BankReconPage() {
           <Button
             type="button"
             disabled={!monthRows.length || busy}
-            onClick={downloadStatement}
+            onClick={() => void downloadStatement()}
           >
             <Download className="size-4" />
             Download
           </Button>
-          <SaveCube busy={saving} onSave={() => void saveToServer()} />
+          <SaveCube
+            busy={saving}
+            onSave={() => {
+              if (monthRows.length) setPicked(month);
+              return saveToServer();
+            }}
+          />
         </div>
       </div>
+
+      {months.length ? (
+        <div className="flex flex-wrap gap-2">
+          {months.map((key) => {
+            const d = parseISO(`${key}-01`);
+            const label = isValid(d) ? format(d, "MMMM yyyy") : key;
+            return (
+              <Button
+                key={key}
+                type="button"
+                size="sm"
+                variant={key === month ? "default" : "outline"}
+                onClick={() => setPicked(key)}
+              >
+                {label}
+              </Button>
+            );
+          })}
+        </div>
+      ) : null}
 
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Landmark className="size-4" />
             {monthRows.length
-              ? `Journal entries · ${monthRows.length}`
+              ? `${monthLabel} · ${monthRows.length} rows`
               : "Journal entries"}
           </CardTitle>
         </CardHeader>

@@ -833,3 +833,106 @@ export async function statementTextFromPdf(
     )
     .join("\n");
 }
+
+export interface BankPdfLine {
+  date: string;
+  narration: string;
+  ref: string;
+  withdrawal: string;
+  deposit: string;
+  officeDate: string;
+  name: string;
+  reason: string;
+}
+
+export async function downloadBankStatementPdf(input: {
+  title: string;
+  fileName: string;
+  lines: BankPdfLine[];
+}) {
+  const { jsPDF } = await import("jspdf");
+  const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+  const pageW = 297;
+  const pageH = 210;
+  const margin = 5;
+  const innerW = pageW - margin * 2;
+  const titleH = 8;
+  const headH = 6;
+  const n = Math.max(input.lines.length, 1);
+  const usable = pageH - margin * 2 - titleH - headH;
+  const rowH = Math.min(5.2, usable / n);
+  const font = rowH >= 4.6 ? 7 : rowH >= 3.6 ? 6 : rowH >= 2.8 ? 5 : 4;
+  const cols: { label: string; w: number; right?: boolean }[] = [
+    { label: "Date", w: 22 },
+    { label: "Narration", w: 88 },
+    { label: "Ch./Ref. no.", w: 40 },
+    { label: "Withdrawal", w: 26, right: true },
+    { label: "Deposit", w: 26, right: true },
+    { label: "Office date", w: 24 },
+    { label: "Name", w: 32 },
+    { label: "Reason", w: 27 },
+  ];
+  const scale = innerW / cols.reduce((s, c) => s + c.w, 0);
+  for (const col of cols) col.w *= scale;
+
+  pdf.setFillColor(15, 61, 42);
+  pdf.rect(0, 0, pageW, titleH + margin, "F");
+  pdf.setTextColor(240, 192, 64);
+  pdf.setFont("times", "bold");
+  pdf.setFontSize(13);
+  pdf.text(input.title, margin, margin + 5.2);
+
+  let x = margin;
+  let y = margin + titleH;
+  pdf.setFillColor(246, 239, 220);
+  pdf.rect(margin, y, innerW, headH, "F");
+  pdf.setTextColor(17, 17, 17);
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(font);
+  for (const col of cols) {
+    const tx = col.right ? x + col.w - 1.2 : x + 1.2;
+    pdf.text(col.label, tx, y + headH - 1.8, { align: col.right ? "right" : "left" });
+    x += col.w;
+  }
+  y += headH;
+
+  pdf.setFont("helvetica", "normal");
+  const fit = (text: string, maxW: number) => {
+    const raw = text || "—";
+    if (pdf.getTextWidth(raw) <= maxW) return raw;
+    let t = raw;
+    while (t.length > 1 && pdf.getTextWidth(`${t}…`) > maxW) t = t.slice(0, -1);
+    return `${t}…`;
+  };
+
+  input.lines.forEach((line, i) => {
+    if (i % 2 === 0) {
+      pdf.setFillColor(248, 250, 248);
+      pdf.rect(margin, y, innerW, rowH, "F");
+    }
+    const cells = [
+      line.date,
+      line.narration,
+      line.ref,
+      line.withdrawal,
+      line.deposit,
+      line.officeDate,
+      line.name,
+      line.reason,
+    ];
+    x = margin;
+    cols.forEach((col, idx) => {
+      const tx = col.right ? x + col.w - 1.2 : x + 1.2;
+      pdf.text(fit(cells[idx] || "—", col.w - 2.4), tx, y + rowH - 1.2, {
+        align: col.right ? "right" : "left",
+      });
+      x += col.w;
+    });
+    y += rowH;
+  });
+
+  pdf.setDrawColor(17, 17, 17);
+  pdf.rect(margin, margin + titleH, innerW, headH + rowH * input.lines.length);
+
+  pdf.save(input.fileName);
+}
