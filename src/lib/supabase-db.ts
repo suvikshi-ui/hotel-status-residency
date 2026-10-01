@@ -364,12 +364,27 @@ function namedFromDb(row: Record<string, unknown>): NamedAmount {
 }
 
 function modeFromDb(row: Record<string, unknown>): ModeAmount {
+  const payRef = str(row.pay_ref) || str(row.payRef);
   return {
     id: str(row.id),
     date: dateStr(row.date),
     mode: modeOf(row.mode),
     amount: num(row.amount),
+    ...(payRef ? { payRef } : {}),
   };
+}
+
+function overlayPayRefs<T extends { id: string; payRef?: string | null }>(
+  rows: T[],
+  extra: T[] | undefined,
+): T[] {
+  if (!extra?.length) return rows;
+  const map = new Map(extra.map((row) => [row.id, row.payRef?.trim() || ""]));
+  return rows.map((row) => {
+    const saved = map.get(row.id);
+    if (!saved || row.payRef) return row;
+    return { ...row, payRef: saved };
+  });
 }
 
 export function booksFromHotel(hotel: unknown): Partial<LedgerSnapshot> | null {
@@ -433,12 +448,18 @@ function overlayBooks(snapshot: LedgerSnapshot, hotelRaw: unknown): LedgerSnapsh
   }
   if ((books.food?.length ?? 0) > 0 && snapshot.food.length === 0) {
     next.food = books.food ?? snapshot.food;
+  } else if (books.food?.length) {
+    next.food = overlayPayRefs(snapshot.food, books.food);
   }
   if ((books.wholesale?.length ?? 0) > 0 && snapshot.wholesale.length === 0) {
     next.wholesale = books.wholesale ?? snapshot.wholesale;
+  } else if (books.wholesale?.length) {
+    next.wholesale = overlayPayRefs(snapshot.wholesale, books.wholesale);
   }
   if ((books.expenses?.length ?? 0) > 0 && snapshot.expenses.length === 0) {
     next.expenses = books.expenses ?? snapshot.expenses;
+  } else if (books.expenses?.length) {
+    next.expenses = overlayPayRefs(snapshot.expenses, books.expenses);
   }
   if ((books.balReceived?.length ?? 0) > 0 && snapshot.balReceived.length === 0) {
     next.balReceived = books.balReceived ?? snapshot.balReceived;

@@ -69,6 +69,22 @@ export function mergeByKey<T>(
   return out;
 }
 
+export function mergeLineRefs<T extends { id: string; payRef?: string | null }>(
+  merged: T[],
+  local: T[] | undefined,
+  cloud: T[] | undefined,
+): T[] {
+  const localMap = new Map((local ?? []).map((row) => [row.id, row.payRef?.trim() || ""]));
+  const cloudMap = new Map((cloud ?? []).map((row) => [row.id, row.payRef?.trim() || ""]));
+  return merged.map((row) => {
+    const ref = localMap.has(row.id)
+      ? localMap.get(row.id) || ""
+      : cloudMap.get(row.id) || row.payRef?.trim() || "";
+    if ((row.payRef?.trim() || "") === ref) return row;
+    return { ...row, payRef: ref || null };
+  });
+}
+
 export function mergeRowsById<T extends { id: string }>(
   primary: T[] | undefined,
   filler: T[] | undefined,
@@ -186,54 +202,70 @@ export function mergeLiveSnapshot(
       local.guests,
       cloud.guests,
     ),
-    food: overlayLockedDayRows(
-      dropDeletedRows(
-        mergeByKey((r) => r.id, b.food, local.food, cloud.food),
-        deletedIds,
-        sealKey.food,
-      ),
-      cloud.food,
-      locked,
-      localRev,
-      cloudRev,
-    ),
-    wholesale: overlayLockedDayRows(
-      dropDeletedRows(
-        mergeByKey((r) => r.id, b.wholesale, local.wholesale, cloud.wholesale),
-        deletedIds,
-        sealKey.wholesale,
-      ),
-      cloud.wholesale,
-      locked,
-      localRev,
-      cloudRev,
-    ),
-    expenses: overlayLockedDayRows(
-      dropDeletedRows(
-        mergeByKey((r) => r.id, b.expenses, local.expenses, cloud.expenses),
-        deletedIds,
-        sealKey.expense,
-      ),
-      cloud.expenses,
-      locked,
-      localRev,
-      cloudRev,
-    ),
-    balReceived: overlayLockedDayRows(
-      dropDeletedRows(
-        mergeByKey(
-          (r) => r.id,
-          b.balReceived,
-          local.balReceived,
-          cloud.balReceived,
+    food: mergeLineRefs(
+      overlayLockedDayRows(
+        dropDeletedRows(
+          mergeByKey((r) => r.id, b.food, local.food, cloud.food),
+          deletedIds,
+          sealKey.food,
         ),
-        deletedIds,
-        sealKey.balance,
+        cloud.food,
+        locked,
+        localRev,
+        cloudRev,
       ),
+      local.food,
+      cloud.food,
+    ),
+    wholesale: mergeLineRefs(
+      overlayLockedDayRows(
+        dropDeletedRows(
+          mergeByKey((r) => r.id, b.wholesale, local.wholesale, cloud.wholesale),
+          deletedIds,
+          sealKey.wholesale,
+        ),
+        cloud.wholesale,
+        locked,
+        localRev,
+        cloudRev,
+      ),
+      local.wholesale,
+      cloud.wholesale,
+    ),
+    expenses: mergeLineRefs(
+      overlayLockedDayRows(
+        dropDeletedRows(
+          mergeByKey((r) => r.id, b.expenses, local.expenses, cloud.expenses),
+          deletedIds,
+          sealKey.expense,
+        ),
+        cloud.expenses,
+        locked,
+        localRev,
+        cloudRev,
+      ),
+      local.expenses,
+      cloud.expenses,
+    ),
+    balReceived: mergeLineRefs(
+      overlayLockedDayRows(
+        dropDeletedRows(
+          mergeByKey(
+            (r) => r.id,
+            b.balReceived,
+            local.balReceived,
+            cloud.balReceived,
+          ),
+          deletedIds,
+          sealKey.balance,
+        ),
+        cloud.balReceived,
+        locked,
+        localRev,
+        cloudRev,
+      ),
+      local.balReceived,
       cloud.balReceived,
-      locked,
-      localRev,
-      cloudRev,
     ),
     staff: mergeByKey((r) => r.id, b.staff, local.staff, cloud.staff).filter(
       (r) => !/^st-(0|1|2|3|4|5|6|7|8|9|10|11|12|13|14)$/.test(r.id),
