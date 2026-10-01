@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  bankRowsFromPdfItems,
   extractRef,
   parseStatementText,
   reconcileBank,
@@ -134,6 +135,44 @@ describe("bank recon", () => {
     assert.equal(grid.length, 1);
     assert.equal(grid[0]?.credit, 1800);
     assert.equal(grid[0]?.debit, 0);
+  });
+
+  it("reads an HDFC PDF column layout and drops closing balance", () => {
+    const rows = bankRowsFromPdfItems([
+      { page: 1, x: 40, y: 600, str: "Date" },
+      { page: 1, x: 144, y: 600, str: "Narration" },
+      { page: 1, x: 284, y: 600, str: "Chq./Ref.No." },
+      { page: 1, x: 405, y: 600, str: "Withdrawal Amt." },
+      { page: 1, x: 491, y: 600, str: "Deposit Amt." },
+      { page: 1, x: 564, y: 600, str: "Closing Balance" },
+      { page: 1, x: 34, y: 580, str: "01/09/26" },
+      { page: 1, x: 72, y: 580, str: "NEFT DR-IBKL0000183-VIJAYKUMAR" },
+      { page: 1, x: 281, y: 580, str: "HDFCH01230643481" },
+      { page: 1, x: 362, y: 580, str: "01/09/26" },
+      { page: 1, x: 438, y: 580, str: "35,000.00" },
+      { page: 1, x: 591, y: 580, str: "255,667.53" },
+      { page: 1, x: 68, y: 560, str: "RAMAKRISH" },
+      { page: 2, x: 72, y: 700, str: "NA YERMAL-NETBANK" },
+      { page: 2, x: 34, y: 680, str: "11/09/26" },
+      { page: 2, x: 72, y: 680, str: "UPI-RAVI-HOTEL" },
+      { page: 2, x: 289, y: 680, str: "0000129437828912" },
+      { page: 2, x: 520, y: 680, str: "1,794.00" },
+      { page: 2, x: 595, y: 680, str: "41,569.71" },
+      { page: 2, x: 68, y: 400, str: "STATEMENT SUMMARY :-" },
+    ]);
+    assert.equal(rows.length, 2);
+    assert.equal(rows[0]?.date, "2026-09-01");
+    assert.equal(rows[0]?.ref, "HDFCH01230643481");
+    assert.equal(rows[0]?.debit, 35000);
+    assert.equal(rows[0]?.credit, 0);
+    assert.match(rows[0]?.particular ?? "", /VIJAYKUMAR/);
+    assert.match(rows[0]?.particular ?? "", /RAMAKRISH/);
+    assert.match(rows[0]?.particular ?? "", /YERMAL/);
+    assert.equal(rows[0]?.cells.includes("255,667.53"), false);
+    assert.equal(rows[1]?.credit, 1794);
+    assert.equal(rows[1]?.debit, 0);
+    assert.equal(rows[1]?.ref, "0000129437828912");
+    assert.equal(rows.some((row) => /summary|closing/i.test(row.particular)), false);
   });
 
   it("pulls UPI/IMPS numbers out of narration", () => {

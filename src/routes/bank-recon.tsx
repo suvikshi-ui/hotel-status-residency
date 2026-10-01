@@ -9,12 +9,12 @@ import { SaveCube, useAccountSave } from "@/components/save-cube";
 import { useGate } from "@/components/security-gate";
 import {
   STATEMENT_HEADERS,
+  bankRowsFromPdf,
   mergeBankRows,
   parseStatementText,
   reconcileBank,
   statementChartHtml,
   statementChartRows,
-  statementTextFromPdf,
   type BankRow,
 } from "@/lib/bank-recon";
 import { formatDayShort, money } from "@/lib/format";
@@ -29,6 +29,7 @@ function BankReconPage() {
   const guests = useLedger((s) => s.guests);
   const bankRows = useLedger((s) => s.bankRows);
   const setBankRows = useLedger((s) => s.setBankRows);
+  const setDate = useLedger((s) => s.setDate);
   const { busy: saving, saveToServer } = useAccountSave();
   const { gate } = useGate();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -51,13 +52,16 @@ function BankReconPage() {
     }
     gate(
       () => {
-        const kept = bankRows.filter((r) => r.month !== month);
-        setBankRows(mergeBankRows(kept, parsed, month));
+        const months = new Set(parsed.map((row) => row.month).filter(Boolean));
+        const kept = bankRows.filter((row) => !months.has(row.month));
+        setBankRows(mergeBankRows(kept, parsed));
+        const first = parsed.find((row) => row.date)?.date;
+        if (first) setDate(first);
         toast.success(`${parsed.length} rows ready in the chart`);
       },
       {
         title: "Upload this bank statement?",
-        message: `${parsed.length} rows will replace ${month}.`,
+        message: `${parsed.length} rows. Date, narration, Chq/Ref, withdrawal and deposit only.`,
         confirmLabel: "Upload",
       },
     );
@@ -67,13 +71,11 @@ function BankReconPage() {
     setBusy(true);
     try {
       const name = file.name.toLowerCase();
-      let text = "";
       if (name.endsWith(".pdf") || file.type === "application/pdf") {
-        text = await statementTextFromPdf(await file.arrayBuffer(), password);
-      } else {
-        text = await file.text();
+        applyParsed(await bankRowsFromPdf(await file.arrayBuffer(), password));
+        return;
       }
-      applyParsed(parseStatementText(text, month));
+      applyParsed(parseStatementText(await file.text(), month));
     } catch (err) {
       const msg = err instanceof Error && err.message
         ? err.message
