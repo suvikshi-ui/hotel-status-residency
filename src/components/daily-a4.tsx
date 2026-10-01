@@ -247,7 +247,7 @@ export function DailyA4({
         style={{
           padding: "8px 10px",
           borderBottom: B,
-          background: "#123f38",
+          background: "#6b1832",
           color: "#f6f0e6",
           WebkitPrintColorAdjust: "exact",
         }}

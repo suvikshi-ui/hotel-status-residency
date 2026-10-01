@@ -9,12 +9,12 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-fg shadow-sm hover:opacity-90",
+          "border border-white/30 bg-[#7a2242] text-[#fffaf8] shadow-[inset_0_1px_0_rgba(255,255,255,0.32)] hover:bg-[#92294f]",
         secondary:
-          "bg-bg-warm text-fg hover:bg-border/60",
+          "border border-[#7a2242]/15 bg-[#f8e4e9] text-[#4a1224] hover:bg-[#f3d5dc]",
         outline:
-          "border border-border bg-card text-fg hover:bg-bg-warm",
-        ghost: "text-fg hover:bg-bg-warm",
+          "border border-[#7a2242]/40 bg-white/85 text-[#4a1224] hover:bg-[#f8e4e9]",
+        ghost: "hover:bg-[#f8e4e9]/70",
         danger: "bg-danger text-primary-fg hover:opacity-90",
         sidebar:
           "justify-start text-sidebar-fg hover:bg-sidebar-line w-full rounded-lg",

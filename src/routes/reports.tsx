@@ -359,7 +359,7 @@ function ReportsPage() {
               />
               <Legend />
               <Bar dataKey="Jan" fill="#c4b8a1" radius={[6, 6, 0, 0]} />
-              <Bar dataKey="Feb" fill="#123f38" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="Feb" fill="#7a2242" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>
@@ -387,7 +387,7 @@ function ReportsPage() {
               />
               <Legend />
               <Bar dataKey="Cash" stackId="a" fill="#2f6b4f" />
-              <Bar dataKey="QR" stackId="a" fill="#123f38" />
+              <Bar dataKey="QR" stackId="a" fill="#7a2242" />
               <Bar dataKey="PK" stackId="a" fill="#3d5a80" />
               <Bar dataKey="Online" stackId="a" fill="#6f675c" />
               <Bar dataKey="Due" stackId="a" fill="#8a5a22" />

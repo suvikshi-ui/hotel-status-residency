@@ -32,7 +32,7 @@ export function DateNav({ light = false }: { light?: boolean }) {
       <Button
         variant="ghost"
         size="icon"
-        className={cn("size-10 min-h-10", light && "!text-[#fff6f2] hover:!bg-white/12")}
+        className={cn("size-10 min-h-10", light && "!text-[#fffaf8] hover:!bg-white/12")}
         onClick={() => shift(-1)}
         aria-label="Previous day"
       >
@@ -46,7 +46,7 @@ export function DateNav({ light = false }: { light?: boolean }) {
       <Button
         variant="ghost"
         size="icon"
-        className={cn("size-10 min-h-10", light && "!text-[#fff6f2] hover:!bg-white/12")}
+        className={cn("size-10 min-h-10", light && "!text-[#fffaf8] hover:!bg-white/12")}
         onClick={() => shift(1)}
         aria-label="Next day"
       >
