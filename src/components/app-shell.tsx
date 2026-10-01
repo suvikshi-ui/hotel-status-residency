@@ -70,7 +70,7 @@ function NavLinks({
               onClick={onNavigate}
               className={cn(
                 "flex min-h-12 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg text-[11px] font-medium",
-                active ? "text-primary" : "text-muted",
+                active ? "text-[#e7f0ea]" : "text-[#c9c2b4]",
               )}
             >
               <Icon className="size-5" />
@@ -122,7 +122,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [menu, setMenu] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const onOverview = pathname === "/";
 
   useEffect(() => {
     setMenu(false);
@@ -134,23 +133,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className={cn("min-h-dvh", onOverview && "bg-[#1b2622] text-[#f3eee4]")}>
+    <div className="min-h-dvh bg-[#1b2622] text-[#f3eee4]">
       <div className="flex min-w-0 flex-col pb-20 md:pb-0">
-        <header
-          className={cn(
-            "sticky top-0 z-30 border-b backdrop-blur-md print:hidden",
-            onOverview
-              ? "border-white/10 bg-[#1b2622]/95 text-[#f3eee4]"
-              : "border-border bg-bg/95",
-          )}
-        >
+        <header className="sticky top-0 z-30 border-b border-white/10 bg-[#1b2622]/95 text-[#f3eee4] backdrop-blur-md print:hidden">
           <div className="flex items-center gap-2 px-3 py-2 md:px-6">
             <Sheet open={menu} onOpenChange={setMenu}>
               <SheetTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className={cn("md:hidden", onOverview && "!text-[#f3eee4] hover:!bg-white/10")}
+                  className="!text-[#f3eee4] hover:!bg-white/10 md:hidden"
                   aria-label="Open menu"
                 >
                   <Menu className="size-5" />
@@ -188,7 +180,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <div className="truncate font-display text-base font-semibold">
                   {hotel.name}
                 </div>
-                <div className={cn("hidden truncate text-[10px] uppercase tracking-[0.12em] md:block", onOverview ? "text-[#c9c2b4]" : "text-muted")}>
+                <div className="hidden truncate text-[10px] uppercase tracking-[0.12em] text-[#c9c2b4] md:block">
                   {cloud.phase === "saving"
                     ? "Sending to other desks…"
                     : cloud.phase === "missing-schema"
@@ -201,12 +193,12 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </div>
               </div>
             </div>
-            <DateNav light={onOverview} />
+            <DateNav light />
             {user ? (
               <Button
                 variant="ghost"
                 size="icon"
-                className={cn("shrink-0", onOverview && "!text-[#f3eee4] hover:!bg-white/10")}
+                className="shrink-0 !text-[#f3eee4] hover:!bg-white/10"
                 aria-label={leaving ? "Signing out" : "Sign out"}
                 onClick={onSignOut}
                 disabled={leaving}
@@ -215,8 +207,8 @@ export function AppShell({ children }: { children: ReactNode }) {
               </Button>
             ) : null}
           </div>
-          <div className={cn("hidden border-t px-3 py-2 md:block md:px-6", onOverview ? "border-white/10" : "border-border")}>
-            <NavLinks variant="top" onDark={onOverview} />
+          <div className="hidden border-t border-white/10 px-3 py-2 md:block md:px-6">
+            <NavLinks variant="top" onDark />
           </div>
         </header>
         <main className="w-full flex-1 px-3 py-5 print:px-0 print:py-0 md:px-8 md:py-8">
@@ -224,14 +216,14 @@ export function AppShell({ children }: { children: ReactNode }) {
         </main>
       </div>
 
-      <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-card/95 px-1 pb-[env(safe-area-inset-bottom)] pt-1 backdrop-blur-md print:hidden md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-white/10 bg-[#1b2622]/95 px-1 pb-[env(safe-area-inset-bottom)] pt-1 text-[#f3eee4] backdrop-blur-md print:hidden md:hidden">
         <NavLinks variant="bottom" />
         {role === "housekeeping" ? null : (
         <Sheet>
           <SheetTrigger asChild>
             <button
               type="button"
-              className="flex min-h-12 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-muted"
+              className="flex min-h-12 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-[#c9c2b4]"
             >
               <Menu className="size-5" />
               More
