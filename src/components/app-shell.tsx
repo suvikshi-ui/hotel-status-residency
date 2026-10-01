@@ -45,9 +45,11 @@ const NAV = [
 function NavLinks({
   onNavigate,
   variant,
+  onDark = false,
 }: {
   onNavigate?: () => void;
   variant: "side" | "bottom" | "top";
+  onDark?: boolean;
 }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { user } = useStaffSession();
@@ -94,8 +96,10 @@ function NavLinks({
               variant === "top" ? "px-3" : "gap-3 px-3",
               variant === "top"
                 ? active
-                  ? "bg-primary text-primary-fg"
-                  : "text-fg hover:bg-bg-warm"
+                  ? "bg-[#e7f0ea] text-[#123f38]"
+                  : onDark
+                    ? "text-[#f3eee4] hover:bg-white/10"
+                    : "text-fg hover:bg-bg-warm"
                 : active
                   ? "bg-sidebar-line text-sidebar-fg"
                   : "text-sidebar-muted hover:bg-sidebar-line/60 hover:text-sidebar-fg",
@@ -118,6 +122,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [menu, setMenu] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const onOverview = pathname === "/";
 
   useEffect(() => {
     setMenu(false);
@@ -129,16 +134,23 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-dvh">
+    <div className={cn("min-h-dvh", onOverview && "bg-[#1b2622] text-[#f3eee4]")}>
       <div className="flex min-w-0 flex-col pb-20 md:pb-0">
-        <header className="sticky top-0 z-30 border-b border-border bg-bg/95 backdrop-blur-md print:hidden">
+        <header
+          className={cn(
+            "sticky top-0 z-30 border-b backdrop-blur-md print:hidden",
+            onOverview
+              ? "border-white/10 bg-[#1b2622]/95 text-[#f3eee4]"
+              : "border-border bg-bg/95",
+          )}
+        >
           <div className="flex items-center gap-2 px-3 py-2 md:px-6">
             <Sheet open={menu} onOpenChange={setMenu}>
               <SheetTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="md:hidden"
+                  className={cn("md:hidden", onOverview && "!text-[#f3eee4] hover:!bg-white/10")}
                   aria-label="Open menu"
                 >
                   <Menu className="size-5" />
@@ -176,7 +188,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <div className="truncate font-display text-base font-semibold">
                   {hotel.name}
                 </div>
-                <div className="hidden truncate text-[10px] uppercase tracking-[0.12em] text-muted md:block">
+                <div className={cn("hidden truncate text-[10px] uppercase tracking-[0.12em] md:block", onOverview ? "text-[#c9c2b4]" : "text-muted")}>
                   {cloud.phase === "saving"
                     ? "Sending to other desks…"
                     : cloud.phase === "missing-schema"
@@ -189,12 +201,12 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </div>
               </div>
             </div>
-            <DateNav />
+            <DateNav light={onOverview} />
             {user ? (
               <Button
                 variant="ghost"
                 size="icon"
-                className="shrink-0"
+                className={cn("shrink-0", onOverview && "!text-[#f3eee4] hover:!bg-white/10")}
                 aria-label={leaving ? "Signing out" : "Sign out"}
                 onClick={onSignOut}
                 disabled={leaving}
@@ -203,8 +215,8 @@ export function AppShell({ children }: { children: ReactNode }) {
               </Button>
             ) : null}
           </div>
-          <div className="hidden border-t border-border px-3 py-2 md:block md:px-6">
-            <NavLinks variant="top" />
+          <div className={cn("hidden border-t px-3 py-2 md:block md:px-6", onOverview ? "border-white/10" : "border-border")}>
+            <NavLinks variant="top" onDark={onOverview} />
           </div>
         </header>
         <main className="w-full flex-1 px-3 py-5 print:px-0 print:py-0 md:px-8 md:py-8">

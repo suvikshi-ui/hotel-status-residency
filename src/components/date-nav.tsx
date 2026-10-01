@@ -3,8 +3,9 @@ import { addDays, format, parseISO } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { formatDay } from "@/lib/format";
 import { useLedger } from "@/lib/store";
+import { cn } from "@/lib/utils";
 
-export function DateNav() {
+export function DateNav({ light = false }: { light?: boolean }) {
   const date = useLedger((s) => s.selectedDate);
   const setDate = useLedger((s) => s.setDate);
   const openingDate = useLedger((s) => s.openingDate);
@@ -31,7 +32,7 @@ export function DateNav() {
       <Button
         variant="ghost"
         size="icon"
-        className="size-10 min-h-10"
+        className={cn("size-10 min-h-10", light && "!text-[#f3eee4] hover:!bg-white/10")}
         onClick={() => shift(-1)}
         aria-label="Previous day"
       >
@@ -45,7 +46,7 @@ export function DateNav() {
       <Button
         variant="ghost"
         size="icon"
-        className="size-10 min-h-10"
+        className={cn("size-10 min-h-10", light && "!text-[#f3eee4] hover:!bg-white/10")}
         onClick={() => shift(1)}
         aria-label="Next day"
       >

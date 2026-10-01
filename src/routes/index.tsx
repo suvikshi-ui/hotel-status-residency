@@ -70,7 +70,7 @@ function Overview() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-[#d7c7a4]">
             Night audit
           </p>
           <div className="mt-1 flex items-center gap-3">
@@ -79,7 +79,7 @@ function Overview() {
               {hotel.name}
             </h1>
           </div>
-          <p className="mt-1 max-w-xl text-sm text-muted">
+          <p className="mt-1 max-w-xl text-sm text-[#c9c2b4]">
             Daily occupancy, sales and night audit — start posting from today.
           </p>
         </div>
