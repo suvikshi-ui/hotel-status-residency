@@ -57,7 +57,7 @@ describe("bank recon", () => {
     const lines = reconcileBank(bank, guests);
     assert.equal(lines[0]?.office?.name, "SITA");
     assert.equal(lines[0]?.office?.date, "2026-09-18");
-    assert.equal(lines[0]?.office?.reason, "102");
+    assert.equal(lines[0]?.office?.reason, "room rent");
     assert.equal(lines[0]?.bank.ref, "IMPS998877");
   });
 
@@ -173,6 +173,62 @@ describe("bank recon", () => {
     assert.equal(rows[1]?.debit, 0);
     assert.equal(rows[1]?.ref, "0000129437828912");
     assert.equal(rows.some((row) => /summary|closing/i.test(row.particular)), false);
+  });
+
+  it("fills office date, guest name and reason when the daily ref matches", () => {
+    const bank = parseStatementText(
+      [
+        "Date,Narration,Ch./Ref. no.,Withdrawal,Deposit",
+        "26/09/2026,UPI NITYA,0000626947241710,0,2280",
+        "25/09/2026,SBIEPY,0002677926800114,66560,0",
+        "15/09/2026,FOOD,0000291479694407,0,5112",
+      ].join("\n"),
+      "2026-09",
+    );
+    const lines = reconcileBank(
+      bank,
+      [
+        {
+          id: "g1",
+          date: "2026-09-26",
+          slNo: 1,
+          name: "NITYA",
+          roomNo: "105",
+          mode: "QRPK",
+          amount: 2280,
+          payRefNo: "626947241710",
+        },
+      ],
+      {
+        food: [
+          {
+            id: "f1",
+            date: "2026-09-15",
+            mode: "QRPK",
+            amount: 5112,
+            payRef: "291479694407",
+          },
+        ],
+        expenses: [
+          {
+            id: "e1",
+            date: "2026-09-25",
+            mode: "QRPK",
+            amount: 66560,
+            particular: "electricity bill payment",
+            payRef: "2677926800114",
+          },
+        ],
+      },
+    );
+    assert.equal(lines[0]?.office?.date, "2026-09-26");
+    assert.equal(lines[0]?.office?.name, "NITYA");
+    assert.equal(lines[0]?.office?.reason, "room rent");
+    assert.equal(lines[1]?.office?.name, "");
+    assert.equal(lines[1]?.office?.reason, "electricity bill payment");
+    assert.equal(lines[1]?.office?.date, "2026-09-25");
+    assert.equal(lines[2]?.office?.reason, "food bill");
+    assert.equal(lines[2]?.office?.date, "2026-09-15");
   });
 
   it("pulls UPI/IMPS numbers out of narration", () => {

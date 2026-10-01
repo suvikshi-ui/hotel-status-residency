@@ -37,12 +37,13 @@ function ModeLineCard({
   title: string;
   rows: ModeAmount[];
   empty: string;
-  onAdd: (mode: PayMode, amount: number) => void;
+  onAdd: (mode: PayMode, amount: number, payRef?: string) => void;
   onRemove: (id: string) => void;
   addDisabled?: boolean;
 }) {
   const [mode, setMode] = useState<PayMode>("CASH");
   const [amount, setAmount] = useState("");
+  const [payRef, setPayRef] = useState("");
   const total = rows.reduce((s, r) => s + r.amount, 0);
 
   return (
@@ -62,9 +63,10 @@ function ModeLineCard({
               toast.error(`Enter a ${title} amount`);
               return;
             }
-            onAdd(mode, amt);
+            onAdd(mode, amt, mode === "QRPK" ? payRef.trim() : "");
             toast.success(`${title} posted`);
             setAmount("");
+            setPayRef("");
           }}
         >
           <div className="grid gap-1.5">
@@ -92,6 +94,17 @@ function ModeLineCard({
               placeholder="0"
             />
           </div>
+          {mode === "QRPK" ? (
+            <div className="grid gap-1.5 sm:col-span-3">
+              <Label>Payment reference number</Label>
+              <Input
+                value={payRef}
+                onChange={(e) => setPayRef(e.target.value)}
+                placeholder="Bank Chq / Ref no."
+                autoComplete="off"
+              />
+            </div>
+          ) : null}
           <div className="flex items-end">
             <Button type="submit" className="w-full" disabled={addDisabled}>
               Add
@@ -101,7 +114,12 @@ function ModeLineCard({
         <ul className="divide-y divide-border">
           {rows.map((r) => (
             <li key={r.id} className="flex items-center justify-between gap-2 py-2">
-              <ModeBadge mode={r.mode} />
+              <div className="min-w-0">
+                <ModeBadge mode={r.mode} />
+                {r.payRef ? (
+                  <div className="truncate text-xs text-muted">Ref {r.payRef}</div>
+                ) : null}
+              </div>
               <div className="flex items-center gap-1">
                 <span className="tabular text-sm font-medium">{money(r.amount)}</span>
                 {addDisabled ? null : (
@@ -137,13 +155,14 @@ function ExpenseLineCard({
 }: {
   rows: NamedAmount[];
   heads: string[];
-  onAdd: (particular: string, mode: PayMode, amount: number) => void;
+  onAdd: (particular: string, mode: PayMode, amount: number, payRef?: string) => void;
   onRemove: (id: string) => void;
   addDisabled?: boolean;
 }) {
   const [particular, setParticular] = useState("");
   const [mode, setMode] = useState<PayMode>("CASH");
   const [amount, setAmount] = useState("");
+  const [payRef, setPayRef] = useState("");
   const total = rows.reduce((s, r) => s + r.amount, 0);
 
   return (
@@ -167,10 +186,11 @@ function ExpenseLineCard({
               toast.error("Enter an expense amount");
               return;
             }
-            onAdd(particular.trim().toUpperCase(), mode, amt);
+            onAdd(particular.trim(), mode, amt, mode === "QRPK" ? payRef.trim() : "");
             toast.success("Expense posted");
             setParticular("");
             setAmount("");
+            setPayRef("");
           }}
         >
           <div className="grid gap-1.5">
@@ -214,6 +234,18 @@ function ExpenseLineCard({
               placeholder="0"
             />
           </div>
+          {mode === "QRPK" ? (
+            <div className="grid gap-1.5 sm:col-span-3">
+              <Label htmlFor="reg-exp-ref">Payment reference number</Label>
+              <Input
+                id="reg-exp-ref"
+                value={payRef}
+                onChange={(e) => setPayRef(e.target.value)}
+                placeholder="Bank Chq / Ref no."
+                autoComplete="off"
+              />
+            </div>
+          ) : null}
           <div className="flex items-end">
             <Button type="submit" className="w-full" disabled={addDisabled}>
               Add
@@ -226,6 +258,9 @@ function ExpenseLineCard({
               <div className="min-w-0">
                 <div className="truncate text-sm font-medium">{r.particular}</div>
                 <ModeBadge mode={r.mode} />
+                {r.payRef ? (
+                  <div className="truncate text-xs text-muted">Ref {r.payRef}</div>
+                ) : null}
               </div>
               <div className="flex items-center gap-1">
                 <span className="tabular text-sm font-medium">{money(r.amount)}</span>
@@ -328,6 +363,7 @@ export function RegisterLines() {
   const [source, setSource] = useState("");
   const [dueMode, setDueMode] = useState<PayMode>("CASH");
   const [dueAmt, setDueAmt] = useState("");
+  const [dueRef, setDueRef] = useState("");
   const [ota, setOta] = useState<(typeof OTA_CHANNELS)[number]>("Fab");
   const [otaAmt, setOtaAmt] = useState("");
   const dueAccount = lookupDueAccount(accounts, source);
@@ -350,7 +386,7 @@ export function RegisterLines() {
           rows={food}
           empty="No food posted today."
           addDisabled={locked}
-          onAdd={(mode, amount) => addFood({ mode, amount })}
+          onAdd={(mode, amount, payRef) => addFood({ mode, amount, payRef: payRef || null })}
           onRemove={(id) =>
             gate(() => removeFood(id, { bypass: true }), {
               title: "Delete this food entry?",
@@ -366,7 +402,7 @@ export function RegisterLines() {
           rows={ws}
           empty="No WS posted today."
           addDisabled={locked}
-          onAdd={(mode, amount) => addWs({ mode, amount })}
+          onAdd={(mode, amount, payRef) => addWs({ mode, amount, payRef: payRef || null })}
           onRemove={(id) =>
             gate(() => removeWs(id, { bypass: true }), {
               title: "Delete this WS entry?",
@@ -383,8 +419,8 @@ export function RegisterLines() {
         rows={expenses}
         heads={heads}
         addDisabled={locked}
-        onAdd={(particular, mode, amount) =>
-          addExpense({ particular, mode, amount })
+        onAdd={(particular, mode, amount, payRef) =>
+          addExpense({ particular, mode, amount, payRef: payRef || null })
         }
         onRemove={(id) =>
           gate(() => removeExpense(id, { bypass: true }), {
@@ -427,9 +463,11 @@ export function RegisterLines() {
                     mode: dueMode,
                     amount: n,
                     kind: "due",
+                    payRef: dueMode === "QRPK" ? dueRef.trim() || null : null,
                   });
                   toast.success(`Collected ${money(n)} from ${dueAccount?.key ?? t}`);
                   setDueAmt("");
+                  setDueRef("");
                 },
                 {
                   title: "Are you sure?",
@@ -512,6 +550,18 @@ export function RegisterLines() {
                 />
               </div>
             </div>
+            {dueMode === "QRPK" ? (
+              <div className="grid gap-1.5">
+                <Label htmlFor="bal-ref">Payment reference number</Label>
+                <Input
+                  id="bal-ref"
+                  value={dueRef}
+                  onChange={(e) => setDueRef(e.target.value)}
+                  placeholder="Bank Chq / Ref no."
+                  autoComplete="off"
+                />
+              </div>
+            ) : null}
             <Button type="submit">Collect from source</Button>
             <ReceiptList
               rows={dueRows}

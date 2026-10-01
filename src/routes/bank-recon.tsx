@@ -27,6 +27,10 @@ export const Route = createFileRoute("/bank-recon")({
 function BankReconPage() {
   const date = useLedger((s) => s.selectedDate);
   const guests = useLedger((s) => s.guests);
+  const food = useLedger((s) => s.food);
+  const wholesale = useLedger((s) => s.wholesale);
+  const expenses = useLedger((s) => s.expenses);
+  const receipts = useLedger((s) => s.balReceived);
   const bankRows = useLedger((s) => s.bankRows);
   const setBankRows = useLedger((s) => s.setBankRows);
   const setDate = useLedger((s) => s.setDate);
@@ -41,8 +45,8 @@ function BankReconPage() {
     [bankRows, month],
   );
   const lines = useMemo(
-    () => reconcileBank(monthRows, guests),
-    [monthRows, guests],
+    () => reconcileBank(monthRows, guests, { food, wholesale, expenses, receipts }),
+    [monthRows, guests, food, wholesale, expenses, receipts],
   );
 
   function applyParsed(parsed: BankRow[]) {
@@ -121,9 +125,10 @@ function BankReconPage() {
             Bank recon
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Journal from the bank statement. If Invoice payment reference
-            matches Ch./Ref. no., office date, name and reason fill
-            automatically.
+            Journal from the bank statement. A P.K. QR reference from the
+            daily register fills office date, guest name and reason when it
+            matches Ch./Ref. no. Room is room rent, food is food bill, and an
+            expense keeps the reason you typed.
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-2">

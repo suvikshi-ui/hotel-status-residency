@@ -27,6 +27,7 @@ export interface ModeAmount {
   date: string;
   mode: PayMode;
   amount: number;
+  payRef?: string | null;
 }
 
 export interface NamedAmount extends ModeAmount {

@@ -151,7 +151,8 @@ export function GuestForm({
       amount: amt,
       gst,
       gstInvoiceNo: gst ? gstInvoiceNo.trim() || null : null,
-      payRefNo: gst ? payRefNo.trim() || null : null,
+      payRefNo:
+        gst || mode === "QRPK" ? payRefNo.trim() || null : null,
     };
     const onDate = editing?.date ?? date;
     const hit = findDuplicateOnDate(guests, onDate, payload, editing?.id);
@@ -296,8 +297,9 @@ export function GuestForm({
               </label>
             </div>
           </div>
-          {gst ? (
-            <div className="grid grid-cols-2 gap-3">
+          {gst || mode === "QRPK" ? (
+            <div className={gst ? "grid grid-cols-2 gap-3" : "grid gap-3"}>
+              {gst ? (
               <div className="grid gap-1.5">
                 <Label htmlFor="g-inv">GST invoice number</Label>
                 <Input
@@ -308,13 +310,14 @@ export function GuestForm({
                   autoComplete="off"
                 />
               </div>
+              ) : null}
               <div className="grid gap-1.5">
                 <Label htmlFor="g-pref">Payment reference number</Label>
                 <Input
                   id="g-pref"
                   value={payRefNo}
                   onChange={(e) => setPayRefNo(e.target.value)}
-                  placeholder="Payment ref."
+                  placeholder="Bank Chq / Ref no."
                   autoComplete="off"
                 />
               </div>

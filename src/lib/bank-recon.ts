@@ -1,5 +1,5 @@
 import { uid } from "./format.ts";
-import type { GuestEntry } from "./types";
+import type { GuestEntry, NamedAmount, PayMode } from "./types";
 
 export interface BankRow {
   id: string;
@@ -141,20 +141,84 @@ export function mergeBankRows(current: BankRow[], incoming: BankRow[], month?: s
   return normalizeBankRows(keep);
 }
 
+type RefRow = {
+  id: string;
+  date: string;
+  amount: number;
+  mode?: PayMode;
+  payRef?: string | null;
+  particular?: string;
+};
+
 export function officeHitsFromGuests(guests: GuestEntry[]): OfficeHit[] {
+  return officeHitsFromBooks({ guests });
+}
+
+export function officeHitsFromBooks(input: {
+  guests: GuestEntry[];
+  food?: RefRow[];
+  wholesale?: RefRow[];
+  expenses?: NamedAmount[];
+  receipts?: NamedAmount[];
+}): OfficeHit[] {
   const out: OfficeHit[] = [];
-  for (const g of guests) {
-    const ref = asText(g.payRefNo);
-    if (!ref) continue;
-    const reason = asText(g.source) || asText(g.gstInvoiceNo) || asText(g.roomNo);
-    out.push({
+  const add = (hit: OfficeHit) => {
+    if (!asText(hit.ref)) return;
+    out.push(hit);
+  };
+  for (const g of input.guests) {
+    add({
       id: g.id,
       date: g.date,
       name: g.name,
       source: g.source ?? null,
-      reason,
+      reason: "room rent",
       amount: g.amount,
-      ref,
+      ref: asText(g.payRefNo),
+    });
+  }
+  for (const row of input.food ?? []) {
+    add({
+      id: row.id,
+      date: row.date,
+      name: "",
+      source: null,
+      reason: "food bill",
+      amount: row.amount,
+      ref: asText(row.payRef),
+    });
+  }
+  for (const row of input.wholesale ?? []) {
+    add({
+      id: row.id,
+      date: row.date,
+      name: "",
+      source: null,
+      reason: "WS",
+      amount: row.amount,
+      ref: asText(row.payRef),
+    });
+  }
+  for (const row of input.expenses ?? []) {
+    add({
+      id: row.id,
+      date: row.date,
+      name: "",
+      source: null,
+      reason: asText(row.particular),
+      amount: row.amount,
+      ref: asText(row.payRef),
+    });
+  }
+  for (const row of input.receipts ?? []) {
+    add({
+      id: row.id,
+      date: row.date,
+      name: asText(row.particular),
+      source: asText(row.particular) || null,
+      reason: "balance received",
+      amount: row.amount,
+      ref: asText(row.payRef),
     });
   }
   return out;
@@ -163,8 +227,14 @@ export function officeHitsFromGuests(guests: GuestEntry[]): OfficeHit[] {
 export function reconcileBank(
   bankRows: BankRow[],
   guests: GuestEntry[],
+  extra?: {
+    food?: RefRow[];
+    wholesale?: RefRow[];
+    expenses?: NamedAmount[];
+    receipts?: NamedAmount[];
+  },
 ): ReconLine[] {
-  const offices = officeHitsFromGuests(guests);
+  const offices = officeHitsFromBooks({ guests, ...extra });
   const used = new Set<string>();
   return bankRows.map((bank) => {
     const office = pickOffice(bank, offices, used);
