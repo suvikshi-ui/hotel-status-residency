@@ -92,23 +92,6 @@ function ReportsPage() {
     expByDay.set(e.date, (expByDay.get(e.date) ?? 0) + e.amount);
   }
 
-  const matchRows = [
-    {
-      label: "Flysky vs Food",
-      leftLabel: "Flysky expense",
-      left: buckets.flysky,
-      rightLabel: "Food sales",
-      right: febFood,
-    },
-    {
-      label: "WS expense vs WS sales",
-      leftLabel: "WS expense",
-      left: buckets.ws,
-      rightLabel: "WS sales",
-      right: febWs,
-    },
-  ];
-
   const compare = [
     { name: "Rooms", Jan: janSales, Feb: febSales },
     { name: "Expenses", Jan: janExp, Feb: expTotal },
@@ -211,54 +194,6 @@ function ReportsPage() {
           hint={`WS exp ${money(buckets.ws)}`}
         />
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Match — Flysky / Food / WS</CardTitle>
-          <p className="text-sm text-muted">
-            Flysky against food sales. WS expense against WS sales.
-          </p>
-        </CardHeader>
-        <CardContent className="overflow-x-auto p-0">
-          <table className="w-full min-w-[36rem] text-left text-sm">
-            <thead className="text-xs uppercase tracking-wide text-muted">
-              <tr className="border-y border-border">
-                <th className="px-5 py-2 font-medium">Line</th>
-                <th className="px-3 py-2 text-right font-medium">Expense</th>
-                <th className="px-3 py-2 text-right font-medium">Sales</th>
-                <th className="px-5 py-2 text-right font-medium">Difference</th>
-              </tr>
-            </thead>
-            <tbody>
-              {matchRows.map((r) => {
-                const diff = r.right - r.left;
-                return (
-                  <tr key={r.label} className="border-b border-border/70">
-                    <td className="px-5 py-2.5">
-                      <div className="font-medium">{r.label}</div>
-                      <div className="text-xs text-muted">
-                        {r.leftLabel} vs {r.rightLabel}
-                      </div>
-                    </td>
-                    <td className="px-3 py-2.5 text-right tabular">
-                      {money(r.left)}
-                    </td>
-                    <td className="px-3 py-2.5 text-right tabular">
-                      {money(r.right)}
-                    </td>
-                    <td
-                      className={`px-5 py-2.5 text-right tabular font-medium ${diff >= 0 ? "text-ok" : "text-due"}`}
-                    >
-                      {diff >= 0 ? "+" : ""}
-                      {money(diff)}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </CardContent>
-      </Card>
 
       <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-5">
         <Mix label="Cash" value={cash} total={febSales} />

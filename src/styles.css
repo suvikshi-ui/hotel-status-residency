@@ -154,7 +154,7 @@
 }
 
 .daily-a4-head {
-  background: #6b1832 !important;
+  background: #1b2622 !important;
   color: #f6f0e6 !important;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
@@ -208,6 +208,6 @@
   }
 
   .daily-a4-head {
-    background: #6b1832 !important;
+    background: #1b2622 !important;
   }
 }
