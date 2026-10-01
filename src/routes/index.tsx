@@ -70,7 +70,7 @@ function Overview() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-[#d7c7a4]">
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-[#3d5c50]">
             Night audit
           </p>
           <div className="mt-1 flex items-center gap-3">
@@ -79,7 +79,7 @@ function Overview() {
               {hotel.name}
             </h1>
           </div>
-          <p className="mt-1 max-w-xl text-sm text-[#c9c2b4]">
+          <p className="mt-1 max-w-xl text-sm text-[#3d5c50]">
             Daily occupancy, sales and night audit — start posting from today.
           </p>
         </div>
@@ -139,21 +139,21 @@ function Overview() {
             <AreaChart data={chart} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="salesFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#7a2242" stopOpacity={0.35} />
-                  <stop offset="100%" stopColor="#7a2242" stopOpacity={0.02} />
+                  <stop offset="0%" stopColor="#1f4a3c" stopOpacity={0.35} />
+                  <stop offset="100%" stopColor="#1f4a3c" stopOpacity={0.02} />
                 </linearGradient>
               </defs>
               <CartesianGrid stroke="#e3d7c6" vertical={false} />
               <XAxis
                 dataKey="date"
-                tick={{ fill: "#5c2a38", fontSize: 11 }}
+                tick={{ fill: "#3e5a4c", fontSize: 11 }}
                 tickLine={false}
                 axisLine={false}
                 interval={3}
               />
               <YAxis
                 tickFormatter={(v) => moneyCompact(Number(v))}
-                tick={{ fill: "#5c2a38", fontSize: 11 }}
+                tick={{ fill: "#3e5a4c", fontSize: 11 }}
                 tickLine={false}
                 axisLine={false}
                 width={52}
@@ -178,7 +178,7 @@ function Overview() {
               <Area
                 type="monotone"
                 dataKey="sales"
-                stroke="#7a2242"
+                stroke="#1f4a3c"
                 strokeWidth={2}
                 fill="url(#salesFill)"
                 name="Sales"

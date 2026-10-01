@@ -10,15 +10,15 @@
   --color-muted: #6e665c;
   --color-muted-fg: #6e665c;
   --color-border: #e3d7c6;
-  --color-primary: #7a2242;
-  --color-primary-fg: #fffaf8;
-  --color-accent: #8d4a5c;
-  --color-accent-fg: #fffaf8;
-  --color-ring: #7a2242;
-  --color-sidebar: #2a0c16;
-  --color-sidebar-fg: #fff6f2;
-  --color-sidebar-muted: #e7cfc6;
-  --color-sidebar-line: #5c1830;
+  --color-primary: #1f4a3c;
+  --color-primary-fg: #f4faf6;
+  --color-accent: #3d6b58;
+  --color-accent-fg: #f4faf6;
+  --color-ring: #1f4a3c;
+  --color-sidebar: #1b2622;
+  --color-sidebar-fg: #f4faf6;
+  --color-sidebar-muted: #c9ddd2;
+  --color-sidebar-line: #2a4038;
   --color-danger: #9b3d32;
   --color-warn: #8a5a22;
   --color-ok: #2f6b4f;
@@ -54,16 +54,16 @@
   }
 
   body {
-    background-color: #3a1020;
+    background-color: #d5e6dc;
     background-image:
-      radial-gradient(ellipse 90% 55% at 0% 0%, rgba(184, 74, 98, 0.45), transparent 52%),
-      radial-gradient(ellipse 70% 45% at 100% 6%, rgba(120, 32, 58, 0.55), transparent 50%),
-      radial-gradient(ellipse 80% 50% at 50% 100%, rgba(22, 4, 12, 0.72), transparent 58%);
+      radial-gradient(ellipse 90% 55% at 0% 0%, rgba(255, 255, 255, 0.62), transparent 52%),
+      radial-gradient(ellipse 70% 45% at 100% 6%, rgba(126, 174, 148, 0.38), transparent 50%),
+      radial-gradient(ellipse 80% 50% at 50% 100%, rgba(70, 112, 92, 0.16), transparent 58%);
     background-attachment: fixed;
-    color: #fffaf8;
-    --color-fg: #fffaf8;
-    --color-muted: #f6e2dc;
-    --color-primary: #ffe4eb;
+    color: #1b2e28;
+    --color-fg: #1b2e28;
+    --color-muted: #3d5c50;
+    --color-primary: #1f4a3c;
     font-family: var(--font-sans);
     font-weight: 500;
     text-rendering: geometricPrecision;
@@ -111,27 +111,28 @@
 .paper-card,
 .bg-card,
 .bg-bg-warm {
-  background: linear-gradient(180deg, rgba(255, 250, 248, 0.92), rgba(255, 240, 236, 0.84));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(232, 244, 236, 0.62));
   backdrop-filter: blur(16px) saturate(1.25);
   -webkit-backdrop-filter: blur(16px) saturate(1.25);
-  border: 1px solid rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.7);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.75),
-    0 14px 36px rgba(48, 8, 18, 0.18);
-  --color-fg: #1a0a10;
-  --color-muted: #5c2a38;
-  --color-primary: #6b1832;
-  color: #1a0a10;
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    0 14px 36px rgba(27, 46, 40, 0.1);
+  --color-fg: #14241e;
+  --color-muted: #3e5a4c;
+  --color-primary: #1a4538;
+  color: #14241e;
   -webkit-font-smoothing: auto;
   text-rendering: geometricPrecision;
 }
 
 .liquid-bar {
-  background: rgba(74, 16, 32, 0.42);
-  backdrop-filter: blur(24px) saturate(1.4);
-  -webkit-backdrop-filter: blur(24px) saturate(1.4);
-  border-color: rgba(255, 255, 255, 0.16);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.46);
+  backdrop-filter: blur(24px) saturate(1.3);
+  -webkit-backdrop-filter: blur(24px) saturate(1.3);
+  border-color: rgba(27, 46, 40, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  color: #1b2e28;
 }
 
 .paper-card {
