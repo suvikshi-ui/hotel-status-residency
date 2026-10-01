@@ -242,41 +242,58 @@ export function reconcileBank(
   });
 }
 
+function isZeroRef(value: string) {
+  const compact = asText(value).replace(/[^A-Za-z0-9]/g, "");
+  return !compact || /^0+$/.test(compact);
+}
+
+function narrationCandidates(text: string) {
+  const out: string[] = [];
+  const primary = extractRef(text);
+  if (primary && !isZeroRef(primary)) out.push(primary);
+  for (const match of asText(text).matchAll(/\d{8,22}/g)) {
+    if (!isZeroRef(match[0])) out.push(match[0]);
+  }
+  return [...new Set(out)];
+}
+
 function pickOffice(
   bank: BankRow,
   offices: OfficeHit[],
   used: Set<string>,
 ): OfficeHit | null {
-  const ref =
-    asText(bank.ref) ||
-    cellByHeader(bank, REF_HEAD) ||
-    extractRef(bank.particular);
-  if (!ref) return null;
-  const bankKey = normalizeRef(ref);
-  if (used.has(bankKey)) return null;
-  const hits = offices.filter(
-    (o) => !used.has(normalizeRef(o.ref)) && refsMatch(ref, o.ref),
-  );
-  if (!hits.length) return null;
-  const seen = new Set<string>();
-  const kept: OfficeHit[] = [];
-  for (const hit of hits) {
-    const key = hit.reason.trim().toLowerCase();
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    kept.push(hit);
+  const printed = asText(bank.ref) || cellByHeader(bank, REF_HEAD);
+  const candidates = isZeroRef(printed)
+    ? narrationCandidates(bank.particular)
+    : [printed].filter((ref) => !isZeroRef(ref));
+  for (const ref of candidates) {
+    const bankKey = normalizeRef(ref);
+    if (!bankKey || used.has(bankKey)) continue;
+    const hits = offices.filter(
+      (o) => !used.has(normalizeRef(o.ref)) && refsMatch(ref, o.ref),
+    );
+    if (!hits.length) continue;
+    const seen = new Set<string>();
+    const kept: OfficeHit[] = [];
+    for (const hit of hits) {
+      const key = hit.reason.trim().toLowerCase();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      kept.push(hit);
+    }
+    if (!kept.length) continue;
+    used.add(bankKey);
+    for (const hit of hits) used.add(normalizeRef(hit.ref));
+    const names = [...new Set(kept.map((hit) => hit.name.trim()).filter(Boolean))];
+    return {
+      ...kept[0],
+      id: kept.map((hit) => hit.id).join("+"),
+      name: names.join(", "),
+      reason: kept.map((hit) => hit.reason).join(", "),
+      amount: kept.reduce((sum, hit) => sum + hit.amount, 0),
+    };
   }
-  if (!kept.length) return null;
-  used.add(bankKey);
-  for (const hit of hits) used.add(normalizeRef(hit.ref));
-  const names = [...new Set(kept.map((hit) => hit.name.trim()).filter(Boolean))];
-  return {
-    ...kept[0],
-    id: kept.map((hit) => hit.id).join("+"),
-    name: names.join(", "),
-    reason: kept.map((hit) => hit.reason).join(", "),
-    amount: kept.reduce((sum, hit) => sum + hit.amount, 0),
-  };
+  return null;
 }
 
 export function refsMatch(a: string, b: string) {

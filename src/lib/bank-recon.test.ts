@@ -299,6 +299,32 @@ describe("bank recon", () => {
     );
   });
 
+  it("uses the narration number when the cheque reference is all zeros", () => {
+    const bank = parseStatementText(
+      [
+        "Date,Narration,Ch./Ref. no.,Withdrawal,Deposit",
+        "24/09/2026,UPI/CR/626947241710/NITYA/SBIN,000000000000,0,2280",
+        "24/09/2026,UPI/CR/000000000000/BLANK,000000000000,0,100",
+      ].join("\n"),
+      "2026-09",
+    );
+    const lines = reconcileBank(bank, [
+      {
+        id: "g1",
+        date: "2026-09-24",
+        slNo: 1,
+        name: "NITYA",
+        roomNo: "105",
+        mode: "QRPK",
+        amount: 2000,
+        payRefNo: "626947241710",
+      },
+    ]);
+    assert.equal(lines[0]?.office?.name, "NITYA");
+    assert.equal(lines[0]?.office?.reason, "room rent");
+    assert.equal(lines[1]?.office, null);
+  });
+
   it("pulls UPI/IMPS numbers out of narration", () => {
     assert.equal(extractRef("TO TRANSFER UPI/DR/412345678901/RAMESH/SBIN"), "412345678901");
   });
