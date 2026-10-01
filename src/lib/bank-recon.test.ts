@@ -325,6 +325,33 @@ describe("bank recon", () => {
     assert.equal(lines[1]?.office, null);
   });
 
+  it("matches the full narration when the cheque reference is all zeros", () => {
+    const narr = "UPI-NITYA-nitya@oksbi-PAYMENT FROM GUEST";
+    const bank = parseStatementText(
+      [
+        "Date,Narration,Ch./Ref. no.,Withdrawal,Deposit",
+        `24/09/2026,${narr},000000000000,0,1500`,
+      ].join("\n"),
+      "2026-09",
+    );
+    const lines = reconcileBank(
+      bank,
+      [],
+      {
+        food: [
+          {
+            id: "f1",
+            date: "2026-09-24",
+            mode: "QRPK",
+            amount: 1500,
+            payRef: narr,
+          },
+        ],
+      },
+    );
+    assert.equal(lines[0]?.office?.reason, "food bill");
+  });
+
   it("pulls UPI/IMPS numbers out of narration", () => {
     assert.equal(extractRef("TO TRANSFER UPI/DR/412345678901/RAMESH/SBIN"), "412345678901");
   });

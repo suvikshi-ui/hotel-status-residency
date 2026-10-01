@@ -247,14 +247,17 @@ function isZeroRef(value: string) {
   return !compact || /^0+$/.test(compact);
 }
 
-function narrationCandidates(text: string) {
-  const out: string[] = [];
-  const primary = extractRef(text);
-  if (primary && !isZeroRef(primary)) out.push(primary);
-  for (const match of asText(text).matchAll(/\d{8,22}/g)) {
-    if (!isZeroRef(match[0])) out.push(match[0]);
-  }
-  return [...new Set(out)];
+function narrationMatches(narration: string, officeRef: string) {
+  const narr = asText(narration);
+  const ref = asText(officeRef);
+  if (!narr || !ref || isZeroRef(ref)) return false;
+  const left = normalizeRef(narr);
+  const right = normalizeRef(ref);
+  if (left.length < 4 || right.length < 4) return false;
+  if (left === right) return true;
+  if (right.length >= 6 && left.includes(right)) return true;
+  if (left.length >= 6 && right.includes(left)) return true;
+  return refsMatch(narr, ref);
 }
 
 function pickOffice(
@@ -263,37 +266,65 @@ function pickOffice(
   used: Set<string>,
 ): OfficeHit | null {
   const printed = asText(bank.ref) || cellByHeader(bank, REF_HEAD);
-  const candidates = isZeroRef(printed)
-    ? narrationCandidates(bank.particular)
-    : [printed].filter((ref) => !isZeroRef(ref));
+  if (!isZeroRef(printed)) {
+    return officeFromRefs(
+      [printed].filter((ref) => !isZeroRef(ref)),
+      offices,
+      used,
+    );
+  }
+  const narration =
+    asText(bank.particular) || cellByHeader(bank, NARR_HEAD) || asText(bank.cells?.[1]);
+  const narrKey = normalizeRef(narration);
+  if (!narration || (narrKey && used.has(`narr:${narrKey}`))) return null;
+  const hits = offices.filter(
+    (o) => !used.has(normalizeRef(o.ref)) && narrationMatches(narration, o.ref),
+  );
+  const picked = keepOffice(hits);
+  if (!picked) return null;
+  if (narrKey) used.add(`narr:${narrKey}`);
+  for (const hit of hits) used.add(normalizeRef(hit.ref));
+  return picked;
+}
+
+function officeFromRefs(
+  candidates: string[],
+  offices: OfficeHit[],
+  used: Set<string>,
+): OfficeHit | null {
   for (const ref of candidates) {
     const bankKey = normalizeRef(ref);
     if (!bankKey || used.has(bankKey)) continue;
     const hits = offices.filter(
       (o) => !used.has(normalizeRef(o.ref)) && refsMatch(ref, o.ref),
     );
-    if (!hits.length) continue;
-    const seen = new Set<string>();
-    const kept: OfficeHit[] = [];
-    for (const hit of hits) {
-      const key = hit.reason.trim().toLowerCase();
-      if (!key || seen.has(key)) continue;
-      seen.add(key);
-      kept.push(hit);
-    }
-    if (!kept.length) continue;
+    const picked = keepOffice(hits);
+    if (!picked) continue;
     used.add(bankKey);
     for (const hit of hits) used.add(normalizeRef(hit.ref));
-    const names = [...new Set(kept.map((hit) => hit.name.trim()).filter(Boolean))];
-    return {
-      ...kept[0],
-      id: kept.map((hit) => hit.id).join("+"),
-      name: names.join(", "),
-      reason: kept.map((hit) => hit.reason).join(", "),
-      amount: kept.reduce((sum, hit) => sum + hit.amount, 0),
-    };
+    return picked;
   }
   return null;
+}
+
+function keepOffice(hits: OfficeHit[]): OfficeHit | null {
+  const seen = new Set<string>();
+  const kept: OfficeHit[] = [];
+  for (const hit of hits) {
+    const key = hit.reason.trim().toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    kept.push(hit);
+  }
+  if (!kept.length) return null;
+  const names = [...new Set(kept.map((hit) => hit.name.trim()).filter(Boolean))];
+  return {
+    ...kept[0],
+    id: kept.map((hit) => hit.id).join("+"),
+    name: names.join(", "),
+    reason: kept.map((hit) => hit.reason).join(", "),
+    amount: kept.reduce((sum, hit) => sum + hit.amount, 0),
+  };
 }
 
 export function refsMatch(a: string, b: string) {
