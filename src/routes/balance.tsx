@@ -367,7 +367,7 @@ function BalancePage() {
                 },
               );
             }}
-            onAdd={(mode, amount, note) => {
+            onAdd={(mode, amount, note, payRef) => {
               gate(
                 () => {
                   addBalReceived({
@@ -375,6 +375,7 @@ function BalancePage() {
                     mode,
                     amount,
                     kind: "other",
+                    payRef: payRef?.trim() || null,
                   });
                   toast.success(`Other ${money(amount)} saved`);
                 },
@@ -426,7 +427,7 @@ function OtherTab({
   rows: { id: string; date: string; particular: string; mode: PayMode; amount: number }[];
   onAddList: (source: string, amount: number) => void;
   onReceive: (source: string, mode: PayMode, amount: number, payRef?: string) => void;
-  onAdd: (mode: PayMode, amount: number, note: string) => void;
+  onAdd: (mode: PayMode, amount: number, note: string, payRef?: string) => void;
   onRemove: (id: string) => void;
 }) {
   const [listSource, setListSource] = useState("");
@@ -438,6 +439,7 @@ function OtherTab({
   const [mode, setMode] = useState<PayMode>("CASH");
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
+  const [otherRef, setOtherRef] = useState("");
 
   return (
     <>
@@ -681,9 +683,10 @@ function OtherTab({
                 toast.error("Enter an amount");
                 return;
               }
-              onAdd(mode, amt, note);
+              onAdd(mode, amt, note, mode === "QRPK" ? otherRef.trim() : "");
               setAmount("");
               setNote("");
+              setOtherRef("");
             }}
           >
             <div className="grid gap-1.5">
@@ -721,6 +724,18 @@ function OtherTab({
                 placeholder="Optional"
               />
             </div>
+            {mode === "QRPK" ? (
+              <div className="grid gap-1.5 sm:col-span-2">
+                <Label htmlFor="other-ref">P.K. QR reference number</Label>
+                <Input
+                  id="other-ref"
+                  value={otherRef}
+                  onChange={(e) => setOtherRef(e.target.value)}
+                  placeholder="Bank Chq / Ref no."
+                  autoComplete="off"
+                />
+              </div>
+            ) : null}
             <div className="flex items-end">
               <Button type="submit" className="w-full">
                 Save

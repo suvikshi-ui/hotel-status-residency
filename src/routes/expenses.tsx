@@ -4,6 +4,7 @@ import { Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ModeBadge } from "@/components/mode-badge";
+import { PkRefField } from "@/components/pk-ref";
 import { sumByDay, sumByHead, sumByMode } from "@/lib/expense-tally";
 import { formatDayShort, money } from "@/lib/format";
 import { useLedger } from "@/lib/store";
@@ -14,6 +15,7 @@ export const Route = createFileRoute("/expenses")({ component: ExpensesPage });
 function ExpensesPage() {
   const date = useLedger((s) => s.selectedDate);
   const all = useLedger((s) => s.expenses);
+  const setLineRef = useLedger((s) => s.setLineRef);
   const month = date.slice(0, 7);
   const monthRows = useMemo(
     () => all.filter((e) => e.date.startsWith(month)),
@@ -165,6 +167,7 @@ function ExpensesPage() {
                 <th className="px-5 py-2 font-medium">Date</th>
                 <th className="px-3 py-2 font-medium">Particular</th>
                 <th className="px-3 py-2 font-medium">Paid by</th>
+                <th className="px-3 py-2 font-medium">P.K. ref</th>
                 <th className="px-5 py-2 text-right font-medium">Amount</th>
               </tr>
             </thead>
@@ -178,13 +181,23 @@ function ExpensesPage() {
                   <td className="px-3 py-2.5">
                     <ModeBadge mode={e.mode} />
                   </td>
+                  <td className="px-3 py-2.5">
+                    {e.mode === "QRPK" ? (
+                      <PkRefField
+                        value={e.payRef}
+                        onSave={(ref) => setLineRef("expense", e.id, ref)}
+                      />
+                    ) : (
+                      "—"
+                    )}
+                  </td>
                   <td className="px-5 py-2.5 text-right tabular">{money(e.amount)}</td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
               <tr className="border-t border-border bg-bg-warm/50 font-semibold">
-                <td className="px-5 py-2.5" colSpan={3}>
+                <td className="px-5 py-2.5" colSpan={4}>
                   Total
                 </td>
                 <td className="px-5 py-2.5 text-right tabular">{money(monthTotal)}</td>

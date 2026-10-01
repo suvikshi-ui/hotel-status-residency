@@ -137,6 +137,11 @@ export interface LedgerState {
   removeExpense: (id: string, opts?: BypassGuard) => void;
   addBalReceived: (row: Omit<NamedAmount, "id" | "date"> & { date?: string }) => void;
   removeBalReceived: (id: string, opts?: BypassGuard) => void;
+  setLineRef: (
+    kind: "guest" | "food" | "wholesale" | "expense" | "receipt",
+    id: string,
+    ref: string,
+  ) => void;
   restoreSeed: () => void;
   setStaff: (staff: StaffRow[]) => void;
   setStaffRegister: (rows: StaffProfile[]) => void;
@@ -178,6 +183,7 @@ function seedState(): Omit<
   | "removeExpense"
   | "addBalReceived"
   | "removeBalReceived"
+  | "setLineRef"
   | "restoreSeed"
   | "setStaff"
   | "setStaffRegister"
@@ -625,6 +631,32 @@ export const useLedger = create<LedgerState>()(
           deletedIds: withSealed(get().deletedIds, [key]),
           ...rebuildFrom(next, row?.date ?? get().selectedDate),
         });
+      },
+      setLineRef: (kind, id, ref) => {
+        const value = ref.trim() || null;
+        if (kind === "guest") {
+          const guests = get().guests.map((g) =>
+            g.id === id ? { ...g, payRefNo: value } : g,
+          );
+          const row = guests.find((g) => g.id === id);
+          const next = { ...get(), guests };
+          save({ guests, ...rebuildFrom(next, row?.date ?? get().selectedDate) });
+          return;
+        }
+        const key =
+          kind === "food"
+            ? "food"
+            : kind === "wholesale"
+              ? "wholesale"
+              : kind === "expense"
+                ? "expenses"
+                : "balReceived";
+        const rows = get()[key].map((row) =>
+          row.id === id ? { ...row, payRef: value } : row,
+        );
+        const row = rows.find((item) => item.id === id);
+        const next = { ...get(), [key]: rows };
+        save({ [key]: rows, ...rebuildFrom(next, row?.date ?? get().selectedDate) });
       },
       restoreSeed: () => {
         const s = seedState();

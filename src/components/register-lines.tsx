@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ModeBadge } from "@/components/mode-badge";
+import { PkRefField } from "@/components/pk-ref";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -96,7 +97,7 @@ function ModeLineCard({
           </div>
           {mode === "QRPK" ? (
             <div className="grid gap-1.5 sm:col-span-3">
-              <Label>Payment reference number</Label>
+              <Label>P.K. QR reference number</Label>
               <Input
                 value={payRef}
                 onChange={(e) => setPayRef(e.target.value)}
@@ -116,8 +117,17 @@ function ModeLineCard({
             <li key={r.id} className="flex items-center justify-between gap-2 py-2">
               <div className="min-w-0">
                 <ModeBadge mode={r.mode} />
-                {r.payRef ? (
-                  <div className="truncate text-xs text-muted">Ref {r.payRef}</div>
+                {r.mode === "QRPK" ? (
+                  <PkRefField
+                    value={r.payRef}
+                    onSave={(ref) =>
+                      useLedger.getState().setLineRef(
+                        title === "Food" ? "food" : "wholesale",
+                        r.id,
+                        ref,
+                      )
+                    }
+                  />
                 ) : null}
               </div>
               <div className="flex items-center gap-1">
@@ -236,7 +246,7 @@ function ExpenseLineCard({
           </div>
           {mode === "QRPK" ? (
             <div className="grid gap-1.5 sm:col-span-3">
-              <Label htmlFor="reg-exp-ref">Payment reference number</Label>
+              <Label htmlFor="reg-exp-ref">P.K. QR reference number</Label>
               <Input
                 id="reg-exp-ref"
                 value={payRef}
@@ -258,8 +268,13 @@ function ExpenseLineCard({
               <div className="min-w-0">
                 <div className="truncate text-sm font-medium">{r.particular}</div>
                 <ModeBadge mode={r.mode} />
-                {r.payRef ? (
-                  <div className="truncate text-xs text-muted">Ref {r.payRef}</div>
+                {r.mode === "QRPK" ? (
+                  <PkRefField
+                    value={r.payRef}
+                    onSave={(ref) =>
+                      useLedger.getState().setLineRef("expense", r.id, ref)
+                    }
+                  />
                 ) : null}
               </div>
               <div className="flex items-center gap-1">
@@ -311,6 +326,14 @@ function ReceiptList({
             <div className="text-xs text-muted">
               {r.kind === "ota" ? "Online · to P.K. QR" : MODE_LABEL[r.mode]}
             </div>
+            {r.mode === "QRPK" ? (
+              <PkRefField
+                value={r.payRef}
+                onSave={(ref) =>
+                  useLedger.getState().setLineRef("receipt", r.id, ref)
+                }
+              />
+            ) : null}
           </div>
           <div className="flex items-center gap-1">
             <span className="tabular text-sm font-medium">{money(r.amount)}</span>
@@ -366,6 +389,7 @@ export function RegisterLines() {
   const [dueRef, setDueRef] = useState("");
   const [ota, setOta] = useState<(typeof OTA_CHANNELS)[number]>("Fab");
   const [otaAmt, setOtaAmt] = useState("");
+  const [otaRef, setOtaRef] = useState("");
   const dueAccount = lookupDueAccount(accounts, source);
   const dueLeft = dueAccount ? Math.max(0, dueAccount.remaining) : 0;
 
@@ -552,7 +576,7 @@ export function RegisterLines() {
             </div>
             {dueMode === "QRPK" ? (
               <div className="grid gap-1.5">
-                <Label htmlFor="bal-ref">Payment reference number</Label>
+                <Label htmlFor="bal-ref">P.K. QR reference number</Label>
                 <Input
                   id="bal-ref"
                   value={dueRef}
@@ -594,9 +618,11 @@ export function RegisterLines() {
                     mode: "QRPK",
                     amount: n,
                     kind: "ota",
+                    payRef: otaRef.trim() || null,
                   });
                   toast.success(`${ota} ${money(n)} → P.K. QR`);
                   setOtaAmt("");
+                  setOtaRef("");
                 },
                 {
                   title: "Are you sure?",
@@ -635,6 +661,16 @@ export function RegisterLines() {
                 value={otaAmt}
                 onChange={(e) => setOtaAmt(e.target.value)}
                 placeholder="0"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="ota-ref">P.K. QR reference number</Label>
+              <Input
+                id="ota-ref"
+                value={otaRef}
+                onChange={(e) => setOtaRef(e.target.value)}
+                placeholder="Bank Chq / Ref no."
+                autoComplete="off"
               />
             </div>
             <p className="text-xs text-muted">

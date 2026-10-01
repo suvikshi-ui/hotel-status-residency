@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { GuestForm } from "@/components/guest-form";
 import { RegisterLines } from "@/components/register-lines";
 import { ModeBadge } from "@/components/mode-badge";
+import { PkRefField } from "@/components/pk-ref";
 import { YesterdayRoll } from "@/components/yesterday-roll";
 import { ReportsLink } from "@/components/reports-link";
 import { useGate } from "@/components/security-gate";
@@ -38,6 +39,7 @@ function RegisterPage() {
   const take = buildDayTake(guests, food, ws);
   const removeGuest = useLedger((s) => s.removeGuest);
   const setStay = useLedger((s) => s.setStay);
+  const setLineRef = useLedger((s) => s.setLineRef);
   const lockedDates = useLedger((s) => s.lockedDates);
   const lockRegister = useLedger((s) => s.lockRegister);
   const unlockRegister = useLedger((s) => s.unlockRegister);
@@ -212,6 +214,7 @@ function RegisterPage() {
                 <th className="px-3 py-2 font-medium">Name</th>
                 <th className="px-3 py-2 font-medium">Room</th>
                 <th className="px-3 py-2 font-medium">Mode</th>
+                <th className="px-3 py-2 font-medium">P.K. ref</th>
                 <th className="px-3 py-2 text-right font-medium">Amount</th>
                 <th className="px-3 py-2 font-medium">Source</th>
                 <th className="px-3 py-2 font-medium">Invoice</th>
@@ -234,6 +237,16 @@ function RegisterPage() {
                   <td className="px-3 py-2.5 tabular">{g.roomNo}</td>
                   <td className="px-3 py-2.5">
                     <ModeBadge mode={g.mode} />
+                  </td>
+                  <td className="px-3 py-2.5">
+                    {g.mode === "QRPK" ? (
+                      <PkRefField
+                        value={g.payRefNo}
+                        onSave={(ref) => setLineRef("guest", g.id, ref)}
+                      />
+                    ) : (
+                      "—"
+                    )}
                   </td>
                   <td className="px-3 py-2.5 text-right tabular">
                     {money(g.amount)}

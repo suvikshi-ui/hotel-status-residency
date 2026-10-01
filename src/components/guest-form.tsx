@@ -312,7 +312,7 @@ export function GuestForm({
               </div>
               ) : null}
               <div className="grid gap-1.5">
-                <Label htmlFor="g-pref">Payment reference number</Label>
+                <Label htmlFor="g-pref">P.K. QR reference number</Label>
                 <Input
                   id="g-pref"
                   value={payRefNo}
