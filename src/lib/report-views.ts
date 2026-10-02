@@ -15,11 +15,11 @@ export const REPORT_TAB: { id: ReportView; label: string }[] = [
   { id: "daily", label: "Daily report" },
   { id: "detail", label: "Detailed daily" },
   { id: "month", label: "Monthly report" },
+  { id: "salary", label: "Salary report" },
+  { id: "advance", label: "Staff advance" },
   { id: "inventory", label: "Linen report" },
   { id: "ws", label: "WS report" },
   { id: "kitchen", label: "Kitchen report" },
-  { id: "salary", label: "Salary report" },
-  { id: "advance", label: "Staff advance" },
 ];
 
 export const HOUSEKEEPING_REPORTS: ReportView[] = ["inventory", "ws", "kitchen"];

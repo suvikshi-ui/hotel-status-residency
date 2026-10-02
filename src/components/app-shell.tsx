@@ -28,18 +28,18 @@ import { useCloudSync } from "@/lib/supabase-sync";
 import { ReminderPopup } from "@/components/reminder-popup";
 
 const NAV = [
-  { to: "/", label: "Overview", icon: LayoutDashboard },
-  { to: "/register", label: "Register", icon: BookOpen },
-  { to: "/invoice", label: "Invoice", icon: FileText },
-  { to: "/bank-recon", label: "Bank recon", icon: Landmark },
-  { to: "/balance", label: "Balance", icon: Scale },
-  { to: "/complaints", label: "Complaints", icon: MessageSquareWarning },
-  { to: "/reminders", label: "Reminder", icon: Bell },
-  { to: "/expenses", label: "Expenses", icon: Receipt },
-  { to: "/staff", label: "Staff", icon: Users },
-  { to: "/inventory", label: "Inventory", icon: Layers },
-  { to: "/reports", label: "Reports", icon: BarChart3 },
-  { to: "/profile", label: "Profile", icon: CircleUser },
+  { to: "/", label: "Overview", icon: LayoutDashboard, group: "Books" },
+  { to: "/register", label: "Register", icon: BookOpen, group: "Books" },
+  { to: "/invoice", label: "Invoice", icon: FileText, group: "Books" },
+  { to: "/expenses", label: "Expenses", icon: Receipt, group: "Books" },
+  { to: "/balance", label: "Balance", icon: Scale, group: "Books" },
+  { to: "/bank-recon", label: "Bank recon", icon: Landmark, group: "Books" },
+  { to: "/staff", label: "Staff", icon: Users, group: "Payroll" },
+  { to: "/inventory", label: "Inventory", icon: Layers, group: "Stores" },
+  { to: "/complaints", label: "Complaints", icon: MessageSquareWarning, group: "Desk" },
+  { to: "/reminders", label: "Reminder", icon: Bell, group: "Desk" },
+  { to: "/reports", label: "Reports", icon: BarChart3, group: "Close" },
+  { to: "/profile", label: "Profile", icon: CircleUser, group: "Close" },
 ] as const;
 
 function NavLinks({
@@ -56,8 +56,9 @@ function NavLinks({
   const role = user?.role ?? "admin";
   const items = NAV.filter((item) => canOpenPath(role, item.to));
   if (variant === "bottom") {
-    const allowed = new Set(bottomNavPaths(role));
-    const primary = items.filter((item) => allowed.has(item.to));
+    const primary = bottomNavPaths(role)
+      .map((path) => items.find((item) => item.to === path))
+      .filter((item): item is (typeof items)[number] => Boolean(item));
     return (
       <>
         {primary.map((item) => {
@@ -82,32 +83,50 @@ function NavLinks({
     );
   }
   return (
-    <nav className={cn("flex gap-1", variant === "top" ? "flex-wrap" : "flex-col px-3")}>
-      {items.map((item) => {
+    <nav className={cn("flex gap-1", variant === "top" ? "flex-wrap items-center" : "flex-col px-3")}>
+      {items.map((item, index) => {
         const active = pathname === item.to;
         const Icon = item.icon;
+        const groupBreak = index > 0 && items[index - 1].group !== item.group;
         return (
-          <Link
+          <span
             key={item.to}
-            to={item.to as "/"}
-            onClick={onNavigate}
-            className={cn(
-              "flex min-h-10 items-center gap-2 rounded-lg text-sm font-medium transition-colors",
-              variant === "top" ? "px-3" : "gap-3 px-3",
-              variant === "top"
-                ? active
-                  ? "bg-[#1f4a3c] text-[#f4faf6] shadow-[inset_0_1px_0_rgba(255,255,255,0.28)]"
-                  : onDark
-                    ? "text-[#1b2e28] hover:bg-[#1f4a3c]/8"
-                    : "text-fg hover:bg-bg-warm"
-                : active
-                  ? "bg-sidebar-line text-sidebar-fg"
-                  : "text-sidebar-muted hover:bg-sidebar-line/60 hover:text-sidebar-fg",
-            )}
+            className={variant === "side" ? "flex flex-col" : "contents"}
           >
-            <Icon className="size-4 shrink-0" />
-            {item.label}
-          </Link>
+            {variant === "side" && (index === 0 || groupBreak) ? (
+              <p
+                className={cn(
+                  "px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-sidebar-muted",
+                  index === 0 ? "pb-1 pt-1" : "pb-1 pt-4",
+                )}
+              >
+                {item.group}
+              </p>
+            ) : null}
+            {variant === "top" && groupBreak ? (
+              <span className="mx-1 hidden h-6 w-px self-center bg-[#1b2e28]/20 sm:block" aria-hidden />
+            ) : null}
+            <Link
+              to={item.to as "/"}
+              onClick={onNavigate}
+              className={cn(
+                "flex min-h-10 items-center gap-2 rounded-lg text-sm font-medium transition-colors",
+                variant === "top" ? "px-3" : "gap-3 px-3",
+                variant === "top"
+                  ? active
+                    ? "bg-[#1f4a3c] text-[#f4faf6] shadow-[inset_0_1px_0_rgba(255,255,255,0.28)]"
+                    : onDark
+                      ? "text-[#1b2e28] hover:bg-[#1f4a3c]/8"
+                      : "text-fg hover:bg-bg-warm"
+                  : active
+                    ? "bg-sidebar-line text-sidebar-fg"
+                    : "text-sidebar-muted hover:bg-sidebar-line/60 hover:text-sidebar-fg",
+              )}
+            >
+              <Icon className="size-4 shrink-0" />
+              {item.label}
+            </Link>
+          </span>
         );
       })}
     </nav>

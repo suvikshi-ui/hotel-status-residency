@@ -62,11 +62,14 @@ function ReportsPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">
-            Books
+            Accounts
           </p>
           <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight">
             Reports
           </h1>
+          <p className="mt-1 text-sm text-muted">
+            Day book, month, payroll, then stores.
+          </p>
         </div>
         <TabsList className="flex h-auto min-h-11 w-full flex-wrap justify-start sm:w-auto">
           {tabs.map((tab) => (
