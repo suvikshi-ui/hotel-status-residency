@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { FileDown, Printer } from "lucide-react";
 import { toast } from "sonner";
@@ -382,18 +382,11 @@ function AcService({
 }) {
   const today = new Date().toISOString().slice(0, 10);
   const [dates, setDates] = useState<Record<string, string>>({});
-  const serviceDates = useMemo(
-    () => [...new Set(rows.map((row) => row.createdAt.slice(0, 10)))].sort((a, b) => b.localeCompare(a)),
-    [rows],
-  );
-  const [picked, setPicked] = useState("");
-  const shown = serviceDates.includes(picked) ? picked : (serviceDates[0] ?? "");
-  const dayRows = rows
-    .filter((row) => row.createdAt.slice(0, 10) === shown)
-    .sort((a, b) => a.roomNo.localeCompare(b.roomNo, undefined, { numeric: true }));
+  const roomCount = byFloor.reduce((n, floor) => n + floor.rooms.length, 0);
 
   return (
     <div className="flex flex-col gap-5">
+      <AcChart byFloor={byFloor} rows={rows} roomCount={roomCount} />
       <p className="text-sm text-muted">
         Room number, the date, and which service. That date keeps this service.
       </p>
@@ -455,56 +448,112 @@ function AcService({
           </CardContent>
         </Card>
       ))}
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">AC service list</CardTitle>
-          <p className="text-sm text-muted">Open a date to see every room serviced that day.</p>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          {serviceDates.length === 0 ? (
-            <p className="text-sm text-muted">No AC service yet.</p>
-          ) : (
-            <>
-              <div className="flex flex-wrap gap-2">
-                {serviceDates.map((date) => (
-                  <Button
-                    key={date}
-                    type="button"
-                    size="sm"
-                    variant={date === shown ? "default" : "outline"}
-                    onClick={() => setPicked(date)}
-                  >
-                    {formatDayShort(date)}
-                  </Button>
-                ))}
-              </div>
-              <table className="w-full text-left text-sm">
-                <thead className="text-xs uppercase tracking-wide text-muted">
-                  <tr className="border-y border-border">
-                    <th className="py-2 font-medium">Room</th>
-                    <th className="px-3 py-2 font-medium">Date</th>
-                    <th className="px-3 py-2 font-medium">Service</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {dayRows.map((row) => {
-                    const kind = acServiceKind(row.note);
-                    return (
-                      <tr key={row.id} className="border-b border-border/70">
-                        <td className="py-2.5 font-medium tabular">{row.roomNo}</td>
-                        <td className="px-3 py-2.5 tabular text-muted">{formatDayShort(shown)}</td>
-                        <td className="px-3 py-2.5">{kind ? acServiceLabel(kind) : "—"}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </>
-          )}
-        </CardContent>
-      </Card>
     </div>
+  );
+}
+
+const AC_TONE: Record<AcServiceKind, string> = {
+  "jet-pump": "bg-[#d7ebe3] text-[#1b332a]",
+  breakdown: "bg-[#f6e7c8] text-[#5c4314]",
+  gas: "bg-[#d9e6f5] text-[#1d3d66]",
+  motherboard: "bg-[#eadff2] text-[#4a2d5c]",
+};
+
+function AcChart({
+  byFloor,
+  rows,
+  roomCount,
+}: {
+  byFloor: { floor: RoomDef["floor"]; rooms: RoomDef[] }[];
+  rows: RoomComplaint[];
+  roomCount: number;
+}) {
+  function marks(roomNo: string, kind: AcServiceKind) {
+    return rows
+      .filter((row) => row.roomNo === roomNo && acServiceKind(row.note) === kind)
+      .map((row) => row.createdAt.slice(0, 10))
+      .sort((a, b) => b.localeCompare(a));
+  }
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">AC service chart</CardTitle>
+        <p className="text-sm text-muted">
+          Every room, and the date each service was done. Blank means not done.
+        </p>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {AC_SERVICES.map((kind) => {
+            const done = new Set(
+              rows.filter((row) => acServiceKind(row.note) === kind.id).map((row) => row.roomNo),
+            ).size;
+            return (
+              <div key={kind.id} className={`rounded-lg px-3 py-2 ${AC_TONE[kind.id]}`}>
+                <div className="text-[11px] font-medium uppercase tracking-wide">{kind.label}</div>
+                <div className="mt-1 font-display text-xl font-semibold tabular">
+                  {done}
+                  <span className="ml-1 text-xs font-medium">/ {roomCount} rooms</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[46rem] border-separate border-spacing-0 text-left text-sm">
+            <thead>
+              <tr className="text-[11px] uppercase tracking-wide">
+                <th className="sticky left-0 bg-card px-3 py-2 font-medium">Room</th>
+                {AC_SERVICES.map((kind) => (
+                  <th key={kind.id} className={`px-3 py-2 font-medium ${AC_TONE[kind.id]}`}>
+                    {kind.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {byFloor.map(({ floor, rooms: floorRooms }) => (
+                <Fragment key={floor}>
+                  <tr>
+                    <td
+                      colSpan={5}
+                      className="bg-bg-warm/70 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted"
+                    >
+                      {floor} floor
+                    </td>
+                  </tr>
+                  {floorRooms.map((room) => (
+                    <tr key={room.no} className="border-b border-border/70">
+                      <td className="sticky left-0 bg-card px-3 py-2 font-display text-base font-semibold tabular">
+                        {room.no}
+                      </td>
+                      {AC_SERVICES.map((kind) => {
+                        const when = marks(room.no, kind.id);
+                        return (
+                          <td key={kind.id} className="border-b border-border/60 px-3 py-2 align-top">
+                            {when.length ? (
+                              <div className={`inline-flex flex-col rounded-md px-2 py-1 text-xs font-medium ${AC_TONE[kind.id]}`}>
+                                {when.map((date) => (
+                                  <span key={date} className="tabular">
+                                    {formatDayShort(date)}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-muted">—</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
