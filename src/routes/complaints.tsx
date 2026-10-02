@@ -21,9 +21,15 @@ import {
   complaintPlaceLabel,
   complaintsForRoom,
   emptyComplaint,
+  isAcService,
   roomCubeLayout,
   type ComplaintLevel,
   type RoomComplaint,
+  AC_SERVICES,
+  acServiceKind,
+  acServiceLabel,
+  acServiceNote,
+  type AcServiceKind,
 } from "@/lib/complaints";
 import {
   COMPLAINT_LIST_KIND,
@@ -81,9 +87,14 @@ function ComplaintsPage() {
   const [note, setNote] = useState("");
   const [level, setLevel] = useState<ComplaintLevel>("yellow");
 
-  const openCount = complaints.filter((c) => c.level !== "green").length;
-  const redCount = complaints.filter((c) => c.level === "red").length;
-  const solvedCount = complaints.filter((c) => c.level === "green").length;
+  const deskComplaints = useMemo(
+    () => complaints.filter((row) => !isAcService(row)),
+    [complaints],
+  );
+  const acRows = useMemo(() => complaints.filter(isAcService), [complaints]);
+  const openCount = deskComplaints.filter((c) => c.level !== "green").length;
+  const redCount = deskComplaints.filter((c) => c.level === "red").length;
+  const solvedCount = deskComplaints.filter((c) => c.level === "green").length;
   const showList = role === "admin" || role === "housekeeping" || role === "owner";
 
   const byFloor = useMemo(
@@ -151,6 +162,36 @@ function ComplaintsPage() {
     });
   }
 
+  function logAc(roomNo: string, date: string, kind: AcServiceKind) {
+    if (!date) {
+      toast.error("Pick the service date");
+      return;
+    }
+    const apply = () => {
+      const next = complaints.filter(
+        (row) =>
+          !(
+            isAcService(row) &&
+            row.roomNo === roomNo &&
+            row.createdAt.slice(0, 10) === date
+          ),
+      );
+      const row = emptyComplaint(roomNo, "green", acServiceNote(kind), who);
+      row.createdAt = date;
+      setComplaints([...next, row]);
+      toast.success(`${roomNo} · ${formatDayShort(date)} · ${acServiceLabel(kind)}`);
+    };
+    if (role === "housekeeping") {
+      apply();
+      return;
+    }
+    gate(apply, {
+      title: "Save this AC service?",
+      message: `Room ${roomNo} on ${formatDayShort(date)}: ${acServiceLabel(kind)}.`,
+      confirmLabel: "Save",
+    });
+  }
+
   function remove() {
     if (role === "housekeeping") return;
     const existing = open?.existing;
@@ -199,9 +240,15 @@ function ComplaintsPage() {
         <Stat label="Open" value={openCount} />
         <Stat label="Emergency" value={redCount} tone="danger" />
         <Stat label="Solved" value={solvedCount} />
-        <Stat label="Logged" value={complaints.length} />
+        <Stat label="Logged" value={deskComplaints.length} />
       </div>
 
+      <Tabs defaultValue="complaints">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="complaints">Complaints</TabsTrigger>
+          <TabsTrigger value="ac">AC service</TabsTrigger>
+        </TabsList>
+        <TabsContent value="complaints" className="flex flex-col gap-5">
       {showList ? (
         <Tabs defaultValue="cubes">
           <TabsList className="grid w-full grid-cols-2 print:hidden" aria-label="Complaint views">
@@ -215,7 +262,7 @@ function ComplaintsPage() {
           <TabsContent value="cubes" className="flex flex-col gap-5">
             <ComplaintCubes
               byFloor={byFloor}
-              complaints={complaints}
+              complaints={deskComplaints}
               sealedIds={sealedIds}
               onNew={write ? startNew : () => undefined}
               onEdit={startEdit}
@@ -223,18 +270,28 @@ function ComplaintsPage() {
             />
           </TabsContent>
           <TabsContent value="list">
-            <ComplaintList rooms={rooms} complaints={complaints} />
+            <ComplaintList rooms={rooms} complaints={deskComplaints} />
           </TabsContent>
         </Tabs>
       ) : (
         <ComplaintCubes
           byFloor={byFloor}
-          complaints={complaints}
+          complaints={deskComplaints}
           sealedIds={sealedIds}
           onNew={startNew}
           onEdit={startEdit}
         />
       )}
+        </TabsContent>
+        <TabsContent value="ac">
+          <AcService
+            byFloor={byFloor}
+            rows={acRows}
+            write={write}
+            onLog={logAc}
+          />
+        </TabsContent>
+      </Tabs>
 
       <Dialog
         open={Boolean(open)}
@@ -308,6 +365,145 @@ function ComplaintsPage() {
           </div>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function AcService({
+  byFloor,
+  rows,
+  write,
+  onLog,
+}: {
+  byFloor: { floor: RoomDef["floor"]; rooms: RoomDef[] }[];
+  rows: RoomComplaint[];
+  write: boolean;
+  onLog: (roomNo: string, date: string, kind: AcServiceKind) => void;
+}) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [dates, setDates] = useState<Record<string, string>>({});
+  const serviceDates = useMemo(
+    () => [...new Set(rows.map((row) => row.createdAt.slice(0, 10)))].sort((a, b) => b.localeCompare(a)),
+    [rows],
+  );
+  const [picked, setPicked] = useState("");
+  const shown = serviceDates.includes(picked) ? picked : (serviceDates[0] ?? "");
+  const dayRows = rows
+    .filter((row) => row.createdAt.slice(0, 10) === shown)
+    .sort((a, b) => a.roomNo.localeCompare(b.roomNo, undefined, { numeric: true }));
+
+  return (
+    <div className="flex flex-col gap-5">
+      <p className="text-sm text-muted">
+        Room number, the date, and which service. That date keeps this service.
+      </p>
+      {byFloor.map(({ floor, rooms: floorRooms }) => (
+        <Card key={floor}>
+          <CardHeader>
+            <CardTitle className="text-base">{floor} floor</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            {floorRooms.map((room) => {
+              const date = dates[room.no] || today;
+              const current = rows.find(
+                (row) => row.roomNo === room.no && row.createdAt.slice(0, 10) === date,
+              );
+              const currentKind = current ? acServiceKind(current.note) : null;
+              return (
+                <div
+                  key={room.no}
+                  className="flex flex-col gap-2 border-b border-border/70 pb-3 last:border-0 last:pb-0"
+                >
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="w-10 font-display text-lg font-semibold tabular">{room.no}</span>
+                    <Input
+                      type="date"
+                      aria-label={`Service date for room ${room.no}`}
+                      value={date}
+                      disabled={!write}
+                      className="w-40"
+                      onChange={(e) =>
+                        setDates((prev) => ({ ...prev, [room.no]: e.target.value }))
+                      }
+                    />
+                    {currentKind ? (
+                      <span className="text-xs text-muted">
+                        {formatDayShort(date)} · {acServiceLabel(currentKind)}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted">No service on this date</span>
+                    )}
+                  </div>
+                  {write ? (
+                    <div className="flex flex-wrap gap-2">
+                      {AC_SERVICES.map((kind) => (
+                        <Button
+                          key={kind.id}
+                          type="button"
+                          size="sm"
+                          variant={currentKind === kind.id ? "default" : "outline"}
+                          onClick={() => onLog(room.no, date, kind.id)}
+                        >
+                          {kind.label}
+                        </Button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      ))}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">AC service list</CardTitle>
+          <p className="text-sm text-muted">Open a date to see every room serviced that day.</p>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          {serviceDates.length === 0 ? (
+            <p className="text-sm text-muted">No AC service yet.</p>
+          ) : (
+            <>
+              <div className="flex flex-wrap gap-2">
+                {serviceDates.map((date) => (
+                  <Button
+                    key={date}
+                    type="button"
+                    size="sm"
+                    variant={date === shown ? "default" : "outline"}
+                    onClick={() => setPicked(date)}
+                  >
+                    {formatDayShort(date)}
+                  </Button>
+                ))}
+              </div>
+              <table className="w-full text-left text-sm">
+                <thead className="text-xs uppercase tracking-wide text-muted">
+                  <tr className="border-y border-border">
+                    <th className="py-2 font-medium">Room</th>
+                    <th className="px-3 py-2 font-medium">Date</th>
+                    <th className="px-3 py-2 font-medium">Service</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dayRows.map((row) => {
+                    const kind = acServiceKind(row.note);
+                    return (
+                      <tr key={row.id} className="border-b border-border/70">
+                        <td className="py-2.5 font-medium tabular">{row.roomNo}</td>
+                        <td className="px-3 py-2.5 tabular text-muted">{formatDayShort(shown)}</td>
+                        <td className="px-3 py-2.5">{kind ? acServiceLabel(kind) : "—"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

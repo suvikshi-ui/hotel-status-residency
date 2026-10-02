@@ -1,4 +1,4 @@
-import { COMPLAINT_LEVELS, type ComplaintLevel, type RoomComplaint } from "./complaints";
+import { COMPLAINT_LEVELS, isAcService, type ComplaintLevel, type RoomComplaint } from "./complaints";
 import { escapeHtml, printDocument } from "./print-sheet";
 import type { RoomDef } from "./types";
 
@@ -15,9 +15,10 @@ export function complaintStatus(level: ComplaintLevel) {
 }
 
 export function filterComplaints(rows: RoomComplaint[], kind: ComplaintListKind) {
-  if (kind === "open") return rows.filter((c) => c.level !== "green");
-  if (kind === "solved") return rows.filter((c) => c.level === "green");
-  return rows;
+  const desk = rows.filter((c) => !isAcService(c));
+  if (kind === "open") return desk.filter((c) => c.level !== "green");
+  if (kind === "solved") return desk.filter((c) => c.level === "green");
+  return desk;
 }
 
 export function sortComplaints(rows: RoomComplaint[], rooms: RoomDef[]) {

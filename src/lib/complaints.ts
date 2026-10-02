@@ -70,7 +70,33 @@ export function normalizeComplaints(rows: RoomComplaint[] | undefined): RoomComp
 }
 
 export function complaintsForRoom(rows: RoomComplaint[], roomNo: string) {
-  return rows.filter((r) => r.roomNo === roomNo);
+  return rows.filter((r) => r.roomNo === roomNo && !isAcService(r));
+}
+
+export const AC_SERVICES = [
+  { id: "jet-pump", label: "Jet pump service" },
+  { id: "breakdown", label: "Breakdown service" },
+  { id: "gas", label: "Gas top up" },
+  { id: "motherboard", label: "Motherboard service" },
+] as const;
+
+export type AcServiceKind = (typeof AC_SERVICES)[number]["id"];
+
+export function acServiceNote(kind: AcServiceKind) {
+  return `[[ac:${kind}]]`;
+}
+
+export function acServiceKind(note: string): AcServiceKind | null {
+  const match = note.match(/\[\[ac:(jet-pump|breakdown|gas|motherboard)\]\]/);
+  return match ? (match[1] as AcServiceKind) : null;
+}
+
+export function isAcService(row: { note: string }) {
+  return acServiceKind(row.note) != null;
+}
+
+export function acServiceLabel(kind: AcServiceKind) {
+  return AC_SERVICES.find((row) => row.id === kind)?.label ?? kind;
 }
 
 export const COMPLAINT_DESKS = ["Reception", "Other"] as const;
