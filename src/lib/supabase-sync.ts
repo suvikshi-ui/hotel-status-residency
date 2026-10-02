@@ -471,9 +471,16 @@ export async function saveAccountNow(): Promise<
   }
   const local = withHouseFiles(userId, snapshotFromStore());
   setPhase("saving");
+  let toPush = local;
+  const pulled = await pullLedger(userId);
+  if (pulled.ok && pulled.kind === "data") {
+    const merged = mergeLiveSnapshot(lastPulled, snapshotFromStore(), pulled.snapshot);
+    if (hashOf(merged) !== hashOf(snapshotFromStore())) applyMerged(merged, local);
+    toPush = withHouseFiles(userId, snapshotFromStore());
+  }
   const result = await pushLedger(
     userId,
-    local,
+    toPush,
     undefined,
     useLedger.getState().appRole,
     undefined,

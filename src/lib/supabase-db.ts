@@ -396,6 +396,22 @@ function modeFromDb(row: Record<string, unknown>): ModeAmount {
   };
 }
 
+function overlayGuestBooks(rows: GuestEntry[], extra: GuestEntry[] | undefined): GuestEntry[] {
+  if (!extra?.length) return rows;
+  const map = new Map(extra.map((row) => [row.id, row]));
+  return rows.map((row) => {
+    const saved = map.get(row.id);
+    if (!saved) return row;
+    return {
+      ...row,
+      payRefNo: row.payRefNo || saved.payRefNo || null,
+      gst: Boolean(row.gst || saved.gst),
+      gstInvoiceNo: row.gstInvoiceNo || saved.gstInvoiceNo || null,
+      source: row.source || saved.source || null,
+    };
+  });
+}
+
 function overlayPayRefs<T extends { id: string; payRef?: string | null }>(
   rows: T[],
   extra: T[] | undefined,
@@ -470,6 +486,8 @@ function overlayBooks(snapshot: LedgerSnapshot, hotelRaw: unknown): LedgerSnapsh
   const next = { ...snapshot };
   if ((books.guests?.length ?? 0) > 0 && snapshot.guests.length === 0) {
     next.guests = books.guests ?? snapshot.guests;
+  } else if (books.guests?.length) {
+    next.guests = overlayGuestBooks(snapshot.guests, books.guests);
   }
   if ((books.food?.length ?? 0) > 0 && snapshot.food.length === 0) {
     next.food = books.food ?? snapshot.food;

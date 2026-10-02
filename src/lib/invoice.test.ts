@@ -42,6 +42,15 @@ describe("invoice gst flag", () => {
     assert.equal(next[1]?.gst, false);
   });
 
+  it("keeps a payment reference that only the other desk still has", () => {
+    const next = mergeGuestGst(
+      [g("a")],
+      [g("a")],
+      [g("a", { payRefNo: "REF123456" })],
+    );
+    assert.equal(next[0]?.payRefNo, "REF123456");
+  });
+
   it("groups check-in to check-out as one GST invoice", () => {
     const bills = buildGstStayBills([
       g("n1", { date: "2026-09-01", gst: true, checkIn: "2026-09-01", stay: "continue", amount: 2000 }),

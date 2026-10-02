@@ -368,6 +368,19 @@ describe("bank recon", () => {
     assert.equal(mergeBankBooks([], cloud).length, cloud.length);
   });
 
+  it("keeps every line when both desks have the same month", () => {
+    const cloud = parseStatementText(
+      "Date,Narration,Ch./Ref. no.,Withdrawal,Deposit\n01/09/2026,UPI RENT,REF111122223333,0,2000\n02/09/2026,UPI FOOD,REF444455556666,0,500",
+      "2026-09",
+    );
+    const local = parseStatementText(
+      "Date,Narration,Ch./Ref. no.,Withdrawal,Deposit\n01/09/2026,UPI RENT,REF111122223333,0,2000",
+      "2026-09",
+    );
+    const merged = mergeBankBooks(local, cloud);
+    assert.equal(merged.filter((row) => row.month === "2026-09").length, 2);
+  });
+
   it("pulls UPI/IMPS numbers out of narration", () => {
     assert.equal(extractRef("TO TRANSFER UPI/DR/412345678901/RAMESH/SBIN"), "412345678901");
   });

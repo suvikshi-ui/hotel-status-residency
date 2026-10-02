@@ -74,6 +74,7 @@ function snapshotNow(): LedgerSnapshot {
     reminders: s.reminders,
     contacts: s.contacts,
     corporates: s.corporates,
+    guestCards: s.guestCards,
     bankRows: s.bankRows,
     savedAt: s.savedAt,
   };

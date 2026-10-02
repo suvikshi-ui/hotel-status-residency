@@ -91,8 +91,14 @@ export function mergeGuestGst(
   const localMap = new Map((local ?? []).map((g) => [g.id, bitsOf(g)]));
   const cloudMap = new Map((cloud ?? []).map((g) => [g.id, bitsOf(g)]));
   return merged.map((g) => {
-    const bits = localMap.get(g.id) ?? cloudMap.get(g.id) ?? bitsOf(g);
-    return { ...g, ...bits };
+    const localBits = localMap.get(g.id);
+    const cloudBits = cloudMap.get(g.id);
+    return {
+      ...g,
+      gst: Boolean(g.gst || localBits?.gst || cloudBits?.gst),
+      gstInvoiceNo: g.gstInvoiceNo || localBits?.gstInvoiceNo || cloudBits?.gstInvoiceNo || null,
+      payRefNo: g.payRefNo || localBits?.payRefNo || cloudBits?.payRefNo || null,
+    };
   });
 }
 
