@@ -162,6 +162,28 @@ function ComplaintsPage() {
     });
   }
 
+  function removeAc(row: RoomComplaint) {
+    if (role !== "admin") return;
+    if (isSealed(sealedIds, sealKey.complaint(row.id))) {
+      toast.message("Saved entry — this service will not change");
+      return;
+    }
+    const kind = acServiceKind(row.note);
+    gate(
+      () => {
+        removeComplaint(row.id);
+        toast.success(`${row.roomNo} · ${kind ? acServiceLabel(kind) : "service"} deleted`);
+      },
+      {
+        title: "Delete this AC service?",
+        message: `Room ${row.roomNo} on ${formatDayShort(row.createdAt)}.`,
+        confirmLabel: "Delete",
+        danger: true,
+        requireCode: true,
+      },
+    );
+  }
+
   function logAc(roomNo: string, date: string, kind: AcServiceKind) {
     if (!date) {
       toast.error("Pick the service date");
@@ -287,8 +309,9 @@ function ComplaintsPage() {
           <AcService
             byFloor={byFloor}
             rows={acRows}
-            write={write}
+            entry={role !== "owner" && role !== "housekeeping" && write}
             onLog={logAc}
+            onDelete={role === "admin" ? removeAc : undefined}
           />
         </TabsContent>
       </Tabs>
@@ -372,13 +395,15 @@ function ComplaintsPage() {
 function AcService({
   byFloor,
   rows,
-  write,
+  entry,
   onLog,
+  onDelete,
 }: {
   byFloor: { floor: RoomDef["floor"]; rooms: RoomDef[] }[];
   rows: RoomComplaint[];
-  write: boolean;
+  entry: boolean;
   onLog: (roomNo: string, date: string, kind: AcServiceKind) => void;
+  onDelete?: (row: RoomComplaint) => void;
 }) {
   const today = new Date().toISOString().slice(0, 10);
   const [dates, setDates] = useState<Record<string, string>>({});
@@ -386,7 +411,9 @@ function AcService({
 
   return (
     <div className="flex flex-col gap-5">
-      <AcChart byFloor={byFloor} rows={rows} roomCount={roomCount} />
+      <AcChart byFloor={byFloor} rows={rows} roomCount={roomCount} onDelete={onDelete} />
+      {entry ? (
+      <>
       <p className="text-sm text-muted">
         Room number, the date, and which service. That date keeps this service.
       </p>
@@ -413,7 +440,7 @@ function AcService({
                       type="date"
                       aria-label={`Service date for room ${room.no}`}
                       value={date}
-                      disabled={!write}
+                      disabled={!entry}
                       className="w-40"
                       onChange={(e) =>
                         setDates((prev) => ({ ...prev, [room.no]: e.target.value }))
@@ -427,7 +454,7 @@ function AcService({
                       <span className="text-xs text-muted">No service on this date</span>
                     )}
                   </div>
-                  {write ? (
+                  {entry ? (
                     <div className="flex flex-wrap gap-2">
                       {AC_SERVICES.map((kind) => (
                         <Button
@@ -448,6 +475,8 @@ function AcService({
           </CardContent>
         </Card>
       ))}
+      </>
+      ) : null}
     </div>
   );
 }
@@ -463,16 +492,17 @@ function AcChart({
   byFloor,
   rows,
   roomCount,
+  onDelete,
 }: {
   byFloor: { floor: RoomDef["floor"]; rooms: RoomDef[] }[];
   rows: RoomComplaint[];
   roomCount: number;
+  onDelete?: (row: RoomComplaint) => void;
 }) {
   function marks(roomNo: string, kind: AcServiceKind) {
     return rows
       .filter((row) => row.roomNo === roomNo && acServiceKind(row.note) === kind)
-      .map((row) => row.createdAt.slice(0, 10))
-      .sort((a, b) => b.localeCompare(a));
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
   return (
     <Card>
@@ -532,10 +562,19 @@ function AcChart({
                         return (
                           <td key={kind.id} className="border-b border-border/60 px-3 py-2 align-top">
                             {when.length ? (
-                              <div className={`inline-flex flex-col rounded-md px-2 py-1 text-xs font-medium ${AC_TONE[kind.id]}`}>
-                                {when.map((date) => (
-                                  <span key={date} className="tabular">
-                                    {formatDayShort(date)}
+                              <div className={`inline-flex flex-col gap-1 rounded-md px-2 py-1 text-xs font-medium ${AC_TONE[kind.id]}`}>
+                                {when.map((row) => (
+                                  <span key={row.id} className="flex items-center gap-2">
+                                    <span className="tabular">{formatDayShort(row.createdAt)}</span>
+                                    {onDelete ? (
+                                      <button
+                                        type="button"
+                                        className="underline"
+                                        onClick={() => onDelete(row)}
+                                      >
+                                        Delete
+                                      </button>
+                                    ) : null}
                                   </span>
                                 ))}
                               </div>
