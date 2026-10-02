@@ -15,6 +15,7 @@ import { Route as BankReconRouteImport } from './routes/bank-recon'
 import { Route as ComplaintsRouteImport } from './routes/complaints'
 import { Route as DaySheetRouteImport } from './routes/day-sheet'
 import { Route as ExpensesRouteImport } from './routes/expenses'
+import { Route as GuestsRouteImport } from './routes/guests'
 import { Route as InventoryRouteImport } from './routes/inventory'
 import { Route as InvoiceRouteImport } from './routes/invoice'
 import { Route as LoginRouteImport } from './routes/login'
@@ -53,6 +54,11 @@ const DaySheetRoute = DaySheetRouteImport.update({
 const ExpensesRoute = ExpensesRouteImport.update({
   id: '/expenses',
   path: '/expenses',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GuestsRoute = GuestsRouteImport.update({
+  id: '/guests',
+  path: '/guests',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InventoryRoute = InventoryRouteImport.update({
@@ -108,6 +114,7 @@ export interface FileRoutesByFullPath {
   '/complaints': typeof ComplaintsRoute
   '/day-sheet': typeof DaySheetRoute
   '/expenses': typeof ExpensesRoute
+  '/guests': typeof GuestsRoute
   '/inventory': typeof InventoryRoute
   '/invoice': typeof InvoiceRoute
   '/login': typeof LoginRoute
@@ -125,6 +132,7 @@ export interface FileRoutesByTo {
   '/complaints': typeof ComplaintsRoute
   '/day-sheet': typeof DaySheetRoute
   '/expenses': typeof ExpensesRoute
+  '/guests': typeof GuestsRoute
   '/inventory': typeof InventoryRoute
   '/invoice': typeof InvoiceRoute
   '/login': typeof LoginRoute
@@ -143,6 +151,7 @@ export interface FileRoutesById {
   '/complaints': typeof ComplaintsRoute
   '/day-sheet': typeof DaySheetRoute
   '/expenses': typeof ExpensesRoute
+  '/guests': typeof GuestsRoute
   '/inventory': typeof InventoryRoute
   '/invoice': typeof InvoiceRoute
   '/login': typeof LoginRoute
@@ -162,6 +171,7 @@ export interface FileRouteTypes {
     | '/complaints'
     | '/day-sheet'
     | '/expenses'
+    | '/guests'
     | '/inventory'
     | '/invoice'
     | '/login'
@@ -179,6 +189,7 @@ export interface FileRouteTypes {
     | '/complaints'
     | '/day-sheet'
     | '/expenses'
+    | '/guests'
     | '/inventory'
     | '/invoice'
     | '/login'
@@ -196,6 +207,7 @@ export interface FileRouteTypes {
     | '/complaints'
     | '/day-sheet'
     | '/expenses'
+    | '/guests'
     | '/inventory'
     | '/invoice'
     | '/login'
@@ -214,6 +226,7 @@ export interface RootRouteChildren {
   ComplaintsRoute: typeof ComplaintsRoute
   DaySheetRoute: typeof DaySheetRoute
   ExpensesRoute: typeof ExpensesRoute
+  GuestsRoute: typeof GuestsRoute
   InventoryRoute: typeof InventoryRoute
   InvoiceRoute: typeof InvoiceRoute
   LoginRoute: typeof LoginRoute
@@ -267,6 +280,13 @@ declare module '@tanstack/react-router' {
       path: '/expenses'
       fullPath: '/expenses'
       preLoaderRoute: typeof ExpensesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/guests': {
+      id: '/guests'
+      path: '/guests'
+      fullPath: '/guests'
+      preLoaderRoute: typeof GuestsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/inventory': {
@@ -342,6 +362,7 @@ const rootRouteChildren: RootRouteChildren = {
   ComplaintsRoute: ComplaintsRoute,
   DaySheetRoute: DaySheetRoute,
   ExpensesRoute: ExpensesRoute,
+  GuestsRoute: GuestsRoute,
   InventoryRoute: InventoryRoute,
   InvoiceRoute: InvoiceRoute,
   LoginRoute: LoginRoute,

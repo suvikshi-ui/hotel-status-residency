@@ -5,6 +5,7 @@ import {
   parseLockedDates,
 } from "./register-lock.ts";
 import { mergeBankBooks } from "./bank-recon.ts";
+import { normalizeGuestCards } from "./guest-cards.ts";
 import { mergeGuestGst } from "./invoice.ts";
 import { mergeSealed, parseSealedIds, dropDeletedRows, sealKey } from "./sheet-seal.ts";
 import { mergeInventoryFiles } from "./inventory.ts";
@@ -314,6 +315,14 @@ export function mergeLiveSnapshot(
       b.reminders ?? [],
       local.reminders ?? [],
       cloud.reminders ?? [],
+    ),
+    guestCards: normalizeGuestCards(
+      mergeByKey(
+        (r) => r.id,
+        b.guestCards ?? [],
+        local.guestCards ?? [],
+        cloud.guestCards ?? [],
+      ),
     ),
     bankRows: mergeBankBooks(local.bankRows ?? [], cloud.bankRows ?? []),
     savedAt: Math.max(local.savedAt ?? 0, cloud.savedAt ?? 0),

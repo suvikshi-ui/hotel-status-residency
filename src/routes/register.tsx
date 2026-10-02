@@ -6,6 +6,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { GuestForm } from "@/components/guest-form";
 import { RegisterLines } from "@/components/register-lines";
 import { ModeBadge } from "@/components/mode-badge";
@@ -14,10 +21,11 @@ import { YesterdayRoll } from "@/components/yesterday-roll";
 import { ReportsLink } from "@/components/reports-link";
 import { useGate } from "@/components/security-gate";
 import { buildDayTake } from "@/lib/day-report";
-import { formatDay, formatDayShort, money } from "@/lib/format";
+import { formatDay, formatDayShort, money, uid } from "@/lib/format";
 import { stayDates } from "@/lib/stay";
 import { useLedger } from "@/lib/store";
 import { isDayLocked } from "@/lib/register-lock";
+import type { GuestEntry } from "@/lib/types";
 import { requestCloudPullNow } from "@/lib/supabase-sync";
 import { SaveCube, useAccountSave } from "@/components/save-cube";
 import { AccountWriteFix } from "@/components/account-write-fix";
@@ -44,10 +52,13 @@ function RegisterPage() {
   const lockRegister = useLedger((s) => s.lockRegister);
   const unlockRegister = useLedger((s) => s.unlockRegister);
   const { busy: saving, saveToServer } = useAccountSave();
+  const guestCards = useLedger((s) => s.guestCards);
+  const saveGuestCard = useLedger((s) => s.saveGuestCard);
   const { gate } = useGate();
   const locked = isDayLocked(lockedDates, date);
   const [q, setQ] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [detailFor, setDetailFor] = useState<GuestEntry | null>(null);
 
   useEffect(() => {
     setEditingId(null);
@@ -221,6 +232,7 @@ function RegisterPage() {
                 <th className="px-3 py-2 font-medium">Check-in</th>
                 <th className="px-3 py-2 font-medium">Check-out</th>
                 <th className="px-3 py-2 font-medium">Stay</th>
+                <th className="px-3 py-2 font-medium">Guest</th>
                 <th className="px-3 py-2" />
               </tr>
             </thead>
@@ -293,6 +305,15 @@ function RegisterPage() {
                       </Button>
                     )}
                   </td>
+                  <td className="px-3 py-2.5">
+                    <input
+                      type="checkbox"
+                      className="size-5 accent-[#1f4a3c]"
+                      checked={guestCards.some((card) => card.postingId === g.id)}
+                      aria-label={`Guest detail for ${g.name}`}
+                      onChange={() => setDetailFor(g)}
+                    />
+                  </td>
                   <td className="px-3 py-2.5 text-right">
                     {locked ? null : (
                     <div className="flex justify-end gap-1 print:hidden">
@@ -354,7 +375,115 @@ function RegisterPage() {
       </Card>
 
       <RegisterLines />
+      <GuestDetailDialog
+        posting={detailFor}
+        existing={guestCards.find((card) => card.postingId === detailFor?.id) ?? null}
+        onClose={() => setDetailFor(null)}
+        onSave={(card) => {
+          saveGuestCard(card);
+          setDetailFor(null);
+          toast.success(`${card.fullName} added to Guest list`);
+          void saveToServer();
+        }}
+      />
     </div>
+  );
+}
+
+function GuestDetailDialog({
+  posting,
+  existing,
+  onClose,
+  onSave,
+}: {
+  posting: GuestEntry | null;
+  existing: {
+    id: string;
+    fullName: string;
+    phone: string;
+    company: string;
+    cameFrom: string;
+    bookedBy: string;
+  } | null;
+  onClose: () => void;
+  onSave: (card: {
+    id: string;
+    postingId: string;
+    date: string;
+    roomNo: string;
+    fullName: string;
+    phone: string;
+    company: string;
+    cameFrom: string;
+    bookedBy: string;
+  }) => void;
+}) {
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [company, setCompany] = useState("");
+  const [cameFrom, setCameFrom] = useState("");
+  const [bookedBy, setBookedBy] = useState("");
+
+  useEffect(() => {
+    if (!posting) return;
+    setFullName(existing?.fullName || posting.name);
+    setPhone(existing?.phone ?? "");
+    setCompany(existing?.company ?? "");
+    setCameFrom(existing?.cameFrom ?? "");
+    setBookedBy(existing?.bookedBy ?? "");
+  }, [posting, existing]);
+
+  return (
+    <Dialog open={Boolean(posting)} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Guest detail</DialogTitle>
+        </DialogHeader>
+        <form
+          className="flex flex-col gap-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!posting || !fullName.trim()) return;
+            onSave({
+              id: existing?.id || uid("guestcard"),
+              postingId: posting.id,
+              date: posting.date,
+              roomNo: posting.roomNo,
+              fullName: fullName.trim(),
+              phone: phone.trim(),
+              company: company.trim(),
+              cameFrom: cameFrom.trim(),
+              bookedBy: bookedBy.trim(),
+            });
+          }}
+        >
+          <p className="text-sm text-muted">
+            Room {posting?.roomNo} · {posting ? formatDayShort(posting.date) : ""}
+          </p>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="guest-full-name">Full name</Label>
+            <Input id="guest-full-name" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="guest-phone">Phone number</Label>
+            <Input id="guest-phone" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="guest-company">Company name</Label>
+            <Input id="guest-company" value={company} onChange={(e) => setCompany(e.target.value)} />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="guest-from">Where from</Label>
+            <Input id="guest-from" value={cameFrom} onChange={(e) => setCameFrom(e.target.value)} />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="guest-booked">Who booked</Label>
+            <Input id="guest-booked" value={bookedBy} onChange={(e) => setBookedBy(e.target.value)} />
+          </div>
+          <Button type="submit">Save to Guest list</Button>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 

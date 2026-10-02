@@ -6,6 +6,7 @@ import {
   BookOpen,
   CircleUser,
   LayoutDashboard,
+  Contact,
   FileText,
   Landmark,
   Layers,
@@ -30,6 +31,7 @@ import { ReminderPopup } from "@/components/reminder-popup";
 const NAV = [
   { to: "/", label: "Overview", icon: LayoutDashboard, group: "Books" },
   { to: "/register", label: "Register", icon: BookOpen, group: "Books" },
+  { to: "/guests", label: "Guest", icon: Contact, group: "Books" },
   { to: "/invoice", label: "Invoice", icon: FileText, group: "Books" },
   { to: "/expenses", label: "Expenses", icon: Receipt, group: "Books" },
   { to: "/balance", label: "Balance", icon: Scale, group: "Books" },

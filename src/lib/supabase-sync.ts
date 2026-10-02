@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { mergeLiveSnapshot, mergeRowsById, inventoryDeletedIds } from "./live-merge";
+import { mergeLiveSnapshot, mergeRowsById, inventoryDeletedIds, mergeByKey } from "./live-merge";
 import { clearLocalLedgerCache } from "./ledger-cache";
 import { pullLockState } from "./pull-locks";
 import {
@@ -115,6 +115,7 @@ function snapshotFromStore(): LedgerSnapshot {
     inventoryFiles: s.inventoryFiles,
     complaints: s.complaints,
     reminders: s.reminders,
+    guestCards: s.guestCards,
     bankRows: s.bankRows,
     savedAt: s.savedAt,
   };
@@ -209,6 +210,7 @@ function applyMerged(merged: LedgerSnapshot, previous: LedgerSnapshot) {
     inventoryFiles: merged.inventoryFiles,
     complaints: merged.complaints,
     reminders: merged.reminders,
+    guestCards: merged.guestCards,
     bankRows: merged.bankRows,
     savedAt: merged.savedAt,
   });
@@ -702,6 +704,12 @@ function withLocalSavedFiles(cloud: LedgerSnapshot): LedgerSnapshot {
       (id) => id,
     ),
     bankRows: mergeBankBooks(local.bankRows ?? [], cloud.bankRows ?? []),
+    guestCards: mergeByKey(
+      (row) => row.id,
+      [],
+      local.guestCards ?? [],
+      cloud.guestCards ?? [],
+    ),
   };
 }
 
