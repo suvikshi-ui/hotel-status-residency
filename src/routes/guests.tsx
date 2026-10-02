@@ -1,29 +1,19 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Printer } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatDayShort } from "@/lib/format";
-import { escapeHtml, printDocument } from "@/lib/print-sheet";
+import { downloadGuestCheckinPdf } from "@/lib/guest-form-pdf";
+import { publicUrl } from "@/lib/public-url";
 import { useLedger } from "@/lib/store";
 
 export const Route = createFileRoute("/guests")({ component: GuestsPage });
 
-const FORM_ROWS = [
-  "Full name",
-  "Phone number",
-  "Company name",
-  "Where from",
-  "Who booked",
-  "Room number",
-  "Date",
-  "Signature",
-];
-
 function GuestsPage() {
-  const hotel = useLedger((s) => s.hotel);
   const cards = useLedger((s) => s.guestCards);
   const [q, setQ] = useState("");
   const shown = useMemo(() => {
@@ -37,17 +27,13 @@ function GuestsPage() {
     );
   }, [cards, q]);
 
-  function printForm() {
-    const lines = FORM_ROWS.map(
-      (label) =>
-        `<tr><th style="width:34%">${escapeHtml(label)}</th><td style="height:42px"></td></tr>`,
-    ).join("");
-    printDocument({
-      title: "Guest registration",
-      heading: hotel.name || "Hotel Status Residency",
-      sub: "Guest registration form",
-      table: `<table>${lines}</table>`,
-    });
+  async function printForm() {
+    try {
+      await downloadGuestCheckinPdf();
+      toast.success("PDF downloaded");
+    } catch {
+      toast.error("PDF could not be made");
+    }
   }
 
   return (
@@ -56,7 +42,7 @@ function GuestsPage() {
         <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">Books</p>
         <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight">Guest</h1>
       </div>
-      <Tabs defaultValue="list">
+      <Tabs defaultValue="form">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="list">Guest list</TabsTrigger>
           <TabsTrigger value="form">Registration form</TabsTrigger>
@@ -108,25 +94,95 @@ function GuestsPage() {
         </TabsContent>
         <TabsContent value="form" className="flex flex-col gap-4">
           <div className="flex justify-end">
-            <Button type="button" onClick={printForm}>
+            <Button type="button" onClick={() => void printForm()}>
               <Printer className="size-4" />
-              Print
+              Download PDF
             </Button>
           </div>
-          <Card className="mx-auto w-full max-w-xl p-6">
-            <p className="font-display text-2xl font-semibold">{hotel.name || "Hotel Status Residency"}</p>
-            <p className="mt-1 text-sm text-muted">Guest registration form</p>
-            <div className="mt-5 flex flex-col gap-4">
-              {FORM_ROWS.map((label) => (
-                <div key={label} className="border-b border-border pb-3">
-                  <div className="text-xs font-medium uppercase tracking-wide text-muted">{label}</div>
-                  <div className="mt-3 h-6" />
+          <div className="mx-auto w-full max-w-2xl overflow-hidden rounded-xl border border-border bg-white text-[#141816] shadow-sm">
+            <div className="flex items-center gap-3 bg-[#1b332a] px-4 py-3 text-white">
+              <img
+                src={publicUrl("logo.png?v=2")}
+                alt=""
+                className="size-14 shrink-0 rounded-md bg-white object-contain p-1"
+              />
+              <div>
+                <p className="text-base font-semibold leading-tight sm:text-lg">
+                  Hotel Status Residency — Guest Check-in
+                </p>
+                <p className="mt-1 text-[11px] text-white/80">
+                  PAP-595/596, TTC MIDC Mahape, Navi Mumbai 400701 · FabHotel Status Residency
+                </p>
+                <p className="text-[11px] text-white/80">Please fill in under 2 minutes</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-4 px-5 pt-5 text-[11px] font-semibold tracking-wide text-[#5c6662]">
+              {["DATE", "ROOM", "STAFF"].map((label) => (
+                <div key={label}>
+                  {label}
+                  <div className="mt-4 border-b border-[#5c6662]" />
                 </div>
               ))}
             </div>
-          </Card>
+            <div className="flex flex-col gap-5 px-5 py-6 text-sm">
+              <Field title="1. Full name" />
+              <Field title="2. Phone / WhatsApp" hint="Add country code if not an Indian number" />
+              <Field title="3. Company (if any)" />
+              <Field title="4. City or project you came from" />
+              <div>
+                <p className="font-semibold">5. Who booked? (tick one)</p>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-[13px]">
+                  <Tick label="OTA / booking app" />
+                  <Tick label="Company" />
+                  <Tick label="Self / friend / relative" />
+                </div>
+                <div className="mt-2 flex flex-wrap items-end gap-3 text-[13px]">
+                  <Tick label="Travel agent" />
+                  <span>Name</span>
+                  <span className="mb-1 h-px w-24 bg-[#5c6662]" />
+                  <span>Phone</span>
+                  <span className="mb-1 h-px w-24 bg-[#5c6662]" />
+                </div>
+              </div>
+              <Field title="6. Check-out date" hint="DD / MM / YYYY" />
+              <div className="grid grid-cols-[1fr_auto] items-end gap-6 rounded-md bg-[#f4f7f5] px-3 py-6 text-xs text-[#5c6662]">
+                <div>
+                  Guest signature
+                  <div className="mt-4 border-b border-[#5c6662]" />
+                </div>
+                <div className="w-28">
+                  Date
+                  <div className="mt-4 border-b border-[#5c6662]" />
+                </div>
+              </div>
+            </div>
+            <p className="px-5 pb-4 text-center text-[11px] text-[#5c6662]">
+              For hotel records and guest service only. We do not sell your details.
+              <br />
+              Hotel Status Residency · Mahape — keep at reception desk
+            </p>
+          </div>
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function Tick({ label }: { label: string }) {
+  return (
+    <span className="inline-flex items-center gap-2">
+      <span className="inline-block size-3.5 border border-[#2a302e]" />
+      {label}
+    </span>
+  );
+}
+
+function Field({ title, hint }: { title: string; hint?: string }) {
+  return (
+    <div>
+      <p className="font-semibold">{title}</p>
+      {hint ? <p className="text-[11px] text-[#6a736f]">{hint}</p> : null}
+      <div className="mt-4 border-b border-[#5c6662]" />
     </div>
   );
 }
