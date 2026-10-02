@@ -26,7 +26,7 @@ import { uid } from "./format";
 import { applyGuestPatch, applyStay, applyYesterdayRoll } from "./stay";
 import { rebuildDayBooks } from "./ledger";
 import { fillAllSeedDates } from "./seed-fill";
-import { earlierDate, mergeRowsByDate } from "./cloud-save";
+import { mergeRowsByDate } from "./cloud-save";
 import { parseAppRole, type AppRole } from "./roles";
 import { isDayLocked, withLocked, withoutLocked, pickLockedDates, parseLockedDates, parseLockRev, hotelFromCloud, bumpLockRev } from "./register-lock";
 import {
@@ -81,7 +81,13 @@ function afterOpeningChange() {
 }
 
 const seed = seedJson as SeedData;
-const BASE_OPENING_DATE = seed.days[0]?.date ?? "2026-09-01";
+export const BOOK_OPENING_DATE = "2026-09-19";
+export const BOOK_OPENING_CASH = 25000;
+const BASE_OPENING_DATE = BOOK_OPENING_DATE;
+
+function pinOpening(opening: OpeningBalances): OpeningBalances {
+  return { ...opening, cash: BOOK_OPENING_CASH };
+}
 
 export const LAST_SEEDED = "2026-09-09";
 export const DEFAULT_DATE = todayIso();
@@ -221,7 +227,7 @@ function seedState(): Omit<
 > {
   return {
     hotel: seed.hotel,
-    opening: seed.opening,
+    opening: pinOpening(seed.opening),
     rooms: seed.rooms as RoomDef[],
     guests: seed.guests as GuestEntry[],
     food: seed.food as ModeAmount[],
@@ -412,10 +418,7 @@ function mergeSnapshot(
     ? (persisted.balReceived ?? [])
     : mergeRowsByDate(persisted.balReceived, current.balReceived);
   let selectedDate = todayIso();
-  const openingDate = opts?.replace
-    ? persisted.openingDate || current.openingDate
-    : earlierDate(persisted.openingDate, current.openingDate) ||
-      current.openingDate;
+  const openingDate = BOOK_OPENING_DATE;
   return {
     ...current,
     ...persisted,
@@ -439,6 +442,7 @@ function mergeSnapshot(
     expenses,
     balReceived,
     selectedDate,
+    opening: pinOpening({ ...current.opening, ...(persisted.opening ?? {}) }),
     openingDate,
     appRole,
     lockedDates,
@@ -472,8 +476,8 @@ function rebuildFrom(
   fromDate: string,
 ): Pick<LedgerState, "days" | "dirty"> {
   const days = rebuildDayBooks({
-    openingDate: state.openingDate || BASE_OPENING_DATE,
-    opening: state.opening,
+    openingDate: BOOK_OPENING_DATE,
+    opening: pinOpening(state.opening),
     guests: state.guests,
     food: state.food,
     wholesale: state.wholesale,
@@ -507,13 +511,16 @@ export const useLedger = create<LedgerState>()(
         const next = { ...get(), selectedDate: date };
         save({ selectedDate: date, ...rebuildFrom(next, date) });
       },
-      setOpening: (date, opening) => {
-        const next = { ...get(), opening, openingDate: date, selectedDate: date };
+      setOpening: (_date, opening) => {
+        const next = {
+          ...get(),
+          opening: pinOpening(opening),
+          openingDate: BOOK_OPENING_DATE,
+        };
         save({
-          opening,
-          openingDate: date,
-          selectedDate: date,
-          ...rebuildFrom(next, date),
+          opening: next.opening,
+          openingDate: BOOK_OPENING_DATE,
+          ...rebuildFrom(next, BOOK_OPENING_DATE),
         });
         afterOpeningChange();
       },
@@ -1043,7 +1050,7 @@ export function adoptLegacyLedger(userId: string | null): boolean {
     wholesale,
     expenses,
     balReceived,
-    openingDate: earlierDate(String(v6.openingDate ?? ""), String(donor.openingDate ?? "")) || "2026-09-01",
+    openingDate: BOOK_OPENING_DATE,
   };
   localStorage.setItem(v6key, JSON.stringify({ state: next, version: 0 }));
   return true;
@@ -1083,8 +1090,8 @@ export function pickDayBooks(state: LedgerState, date: string): DayBooks | undef
   const hit = state.days.find((d) => d.date === date);
   if (hit) return hit;
   return rebuildDayBooks({
-    openingDate: state.openingDate || BASE_OPENING_DATE,
-    opening: state.opening,
+    openingDate: BOOK_OPENING_DATE,
+    opening: pinOpening(state.opening),
     guests: state.guests,
     food: state.food,
     wholesale: state.wholesale,

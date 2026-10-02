@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AddUserCard } from "@/components/add-user-form";
 import { useGate } from "@/components/security-gate";
-import { formatDay, money } from "@/lib/format";
+import { money } from "@/lib/format";
 import { drawForMonth } from "@/lib/month-draw";
 import { todayIso } from "@/lib/reminders";
 import { canAddUsers } from "@/lib/roles";
@@ -359,9 +359,9 @@ function MonthEndCard() {
       <CardHeader>
         <CardTitle>Month-end withdraw</CardTitle>
         <p className="text-sm text-muted">
-          September opening upar jaisa hai waisa hi rahega. Month end ke baad cash, Santosh QR
-          aur P.K. ka total yahan hai. Jo withdraw karoge, uske baad bacha hua agle month ki
-          starting balance hai.
+          September opening upar wala form nahi hai. 19 September 2026 ko cash ₹25,000
+          register mein default hai. Month end ke baad cash, Santosh QR aur P.K. se
+          withdraw karo. Bacha hua agle month ki starting balance banega.
         </p>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
@@ -427,22 +427,12 @@ function MonthEndCard() {
 
 function ProfilePage() {
   const hotel = useLedger((s) => s.hotel);
-  const opening = useLedger((s) => s.opening);
-  const openingDate = useLedger((s) => s.openingDate);
   const stored = useLedger((s) => s.securityCode);
   const role = useLedger((s) => s.appRole);
-  const setOpening = useLedger((s) => s.setOpening);
   const setSecurityCode = useLedger((s) => s.setSecurityCode);
   const { gate, hasCode } = useGate();
   const { user } = useStaffSession();
   const cloud = useCloudSync();
-
-  const [date, setDate] = useState(openingDate);
-  const [cash, setCash] = useState(String(opening.cash));
-  const [santosh, setSantosh] = useState(String(opening.santosh));
-  const [pk, setPk] = useState(String(opening.pk));
-  const [online, setOnline] = useState(String(opening.online));
-  const [outstanding, setOutstanding] = useState(String(opening.outstanding));
 
   const [currentPin, setCurrentPin] = useState("");
   const [nextPin, setNextPin] = useState("");
@@ -505,85 +495,6 @@ function ProfilePage() {
 
       {role === "admin" ? (
       <>
-      <Card>
-        <CardHeader>
-          <CardTitle>Opening balance</CardTitle>
-          <p className="text-sm text-muted">
-            Now from {formatDay(openingDate)}. This September opening stays as it is.
-            Month-end withdraw is the next card and does not change these figures.
-          </p>
-        </CardHeader>
-        <CardContent>
-          <form
-            className="grid gap-3 sm:grid-cols-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (!date) {
-                toast.error("Pick a date");
-                return;
-              }
-              const n = (v: string) => Number(v);
-              const next = {
-                cash: n(cash),
-                santosh: n(santosh),
-                pk: n(pk),
-                online: n(online),
-                outstanding: n(outstanding),
-              };
-              if (Object.values(next).some((v) => !Number.isFinite(v))) {
-                toast.error("Enter valid amounts");
-                return;
-              }
-              const save = () => {
-                setOpening(date, next);
-                toast.success(`Opening set from ${formatDay(date)}`);
-              };
-              gate(save, {
-                title: "Are you sure?",
-                message: `Set opening balances from ${formatDay(date)}? Books will rebuild from this date.`,
-                confirmLabel: "Save",
-              });
-            }}
-          >
-            <div className="grid gap-1.5 sm:col-span-2">
-              <Label htmlFor="ob-date">From date</Label>
-              <Input
-                id="ob-date"
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-              />
-            </div>
-            {(
-              [
-                ["Cash", cash, setCash],
-                ["Santosh QR", santosh, setSantosh],
-                ["P.K. QR", pk, setPk],
-                ["Online", online, setOnline],
-                ["Outstanding / Balance", outstanding, setOutstanding],
-              ] as const
-            ).map(([label, value, set]) => (
-              <div key={label} className="grid gap-1.5">
-                <Label>{label}</Label>
-                <Input
-                  type="number"
-                  value={value}
-                  onChange={(e) => set(e.target.value)}
-                />
-              </div>
-            ))}
-            <div className="sm:col-span-2">
-              <Button type="submit">Save opening</Button>
-            </div>
-          </form>
-          <p className="mt-4 text-xs text-muted">
-            Current: cash {money(opening.cash)} · Santosh {money(opening.santosh)}{" "}
-            · P.K. {money(opening.pk)} · Online {money(opening.online)} ·
-            Balance {money(opening.outstanding)}
-          </p>
-        </CardContent>
-      </Card>
-
       <MonthEndCard />
 
       <Card>
