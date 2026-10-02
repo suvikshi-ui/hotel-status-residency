@@ -63,6 +63,7 @@ import {
 import { guestCardsFromHotel, normalizeGuestCards, type GuestCard } from "./guest-cards";
 import { contactsFromHotel, normalizeContacts, type HotelContact } from "./contacts";
 import { corporatesFromHotel, normalizeCorporates, type CorporateCompany } from "./corporates";
+import { monthDrawsFromHotel, normalizeMonthDraws, type MonthDraw } from "./month-draw";
 
 function afterSave() {
   void import("./supabase-sync").then((m) => m.requestCloudSave());
@@ -111,6 +112,7 @@ export interface LedgerState {
   reminders: HotelReminder[];
   contacts: HotelContact[];
   corporates: CorporateCompany[];
+  monthDraws: MonthDraw[];
   guestCards: GuestCard[];
   bankRows: BankRow[];
   selectedDate: string;
@@ -163,6 +165,7 @@ export interface LedgerState {
   setReminders: (reminders: HotelReminder[]) => void;
   setContacts: (contacts: HotelContact[]) => void;
   setCorporates: (rows: CorporateCompany[]) => void;
+  setMonthDraws: (rows: MonthDraw[]) => void;
   saveGuestCard: (card: GuestCard) => void;
   setBankRows: (bankRows: BankRow[]) => void;
   applySnapshot: (p: Partial<LedgerState>) => void;
@@ -208,6 +211,7 @@ function seedState(): Omit<
   | "setReminders"
   | "setContacts"
   | "setCorporates"
+  | "setMonthDraws"
   | "saveGuestCard"
   | "setBankRows"
   | "applySnapshot"
@@ -239,6 +243,7 @@ function seedState(): Omit<
     reminders: [],
     contacts: [],
     corporates: [],
+    monthDraws: [],
     guestCards: [],
     bankRows: [],
     selectedDate: DEFAULT_DATE,
@@ -333,6 +338,12 @@ function mergeSnapshot(
         const fromHotel = corporatesFromHotel(persisted.hotel);
         return fromHotel.length ? fromHotel : normalizeCorporates(current.corporates);
       })();
+  const monthDraws = Array.isArray(persisted.monthDraws)
+    ? normalizeMonthDraws(persisted.monthDraws)
+    : (() => {
+        const fromHotel = monthDrawsFromHotel(persisted.hotel);
+        return fromHotel.length ? fromHotel : normalizeMonthDraws(current.monthDraws);
+      })();
   const guestCards = Array.isArray(persisted.guestCards)
     ? normalizeGuestCards(persisted.guestCards)
     : (() => {
@@ -419,6 +430,7 @@ function mergeSnapshot(
     reminders,
     contacts,
     corporates,
+    monthDraws,
     guestCards,
     bankRows,
     guests,
@@ -468,6 +480,7 @@ function rebuildFrom(
     expenses: state.expenses,
     balReceived: state.balReceived,
     throughDates: [fromDate, state.selectedDate, state.openingDate],
+    draws: state.monthDraws,
   });
   const dirty: Record<string, true> = { ...state.dirty };
   for (const d of days) {
@@ -805,6 +818,11 @@ export const useLedger = create<LedgerState>()(
         save({ contacts: normalizeContacts(contacts) }),
       setCorporates: (rows) =>
         save({ corporates: normalizeCorporates(rows) }),
+      setMonthDraws: (rows) => {
+        const monthDraws = normalizeMonthDraws(rows);
+        const next = { ...get(), monthDraws };
+        save({ monthDraws, ...rebuildFrom(next, next.openingDate || BASE_OPENING_DATE) });
+      },
       saveGuestCard: (card) => {
         const next = normalizeGuestCards([
           card,
@@ -867,6 +885,9 @@ export const useLedger = create<LedgerState>()(
           corporates: Array.isArray(p.corporates)
             ? normalizeCorporates(p.corporates)
             : cur.corporates,
+          monthDraws: Array.isArray(p.monthDraws)
+            ? normalizeMonthDraws(p.monthDraws)
+            : cur.monthDraws,
           guestCards: Array.isArray(p.guestCards)
             ? normalizeGuestCards(p.guestCards)
             : cur.guestCards,
@@ -928,6 +949,7 @@ export const useLedger = create<LedgerState>()(
         reminders: s.reminders,
         contacts: s.contacts,
         corporates: s.corporates,
+        monthDraws: s.monthDraws,
         guestCards: s.guestCards,
         bankRows: s.bankRows,
         appRole: s.appRole,
@@ -1069,6 +1091,7 @@ export function pickDayBooks(state: LedgerState, date: string): DayBooks | undef
     expenses: state.expenses,
     balReceived: state.balReceived,
     throughDates: [date, state.selectedDate],
+    draws: state.monthDraws,
   }).find((d) => d.date === date);
 }
 

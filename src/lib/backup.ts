@@ -30,6 +30,7 @@ export type BackupTables = {
   contacts?: unknown[];
   corporates?: unknown[];
   guestCards?: unknown[];
+  monthDraws?: unknown[];
   bankRows?: unknown[];
   sealedIds?: unknown;
   deletedIds?: unknown;

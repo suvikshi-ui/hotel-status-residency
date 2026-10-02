@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Download, Loader2, Upload } from "lucide-react";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import { AddUserCard } from "@/components/add-user-form";
 import { useGate } from "@/components/security-gate";
 import { formatDay, money } from "@/lib/format";
+import { drawForMonth } from "@/lib/month-draw";
+import { todayIso } from "@/lib/reminders";
 import { canAddUsers } from "@/lib/roles";
 import { codeOk, hashCode } from "@/lib/pin";
 import { useLedger } from "@/lib/store";
@@ -45,6 +47,7 @@ function snapshotNow(): LedgerSnapshot {
       s.guestCards ?? [],
       s.contacts ?? [],
       s.corporates ?? [],
+      s.monthDraws ?? [],
     ),
     opening: s.opening,
     rooms: s.rooms,
@@ -74,6 +77,7 @@ function snapshotNow(): LedgerSnapshot {
     reminders: s.reminders,
     contacts: s.contacts,
     corporates: s.corporates,
+    monthDraws: s.monthDraws,
     guestCards: s.guestCards,
     bankRows: s.bankRows,
     savedAt: s.savedAt,
@@ -231,6 +235,196 @@ function EmptyBooksCard() {
   );
 }
 
+function closedMonths(openingDate: string) {
+  const start = (openingDate || "2026-09-01").slice(0, 7);
+  const today = todayIso().slice(0, 7);
+  const out: string[] = [];
+  let year = Number(start.slice(0, 4));
+  let month = Number(start.slice(5, 7));
+  const endYear = Number(today.slice(0, 4));
+  const endMonth = Number(today.slice(5, 7));
+  while (year < endYear || (year === endYear && month < endMonth)) {
+    out.push(`${year}-${String(month).padStart(2, "0")}`);
+    month += 1;
+    if (month > 12) {
+      month = 1;
+      year += 1;
+    }
+  }
+  return out;
+}
+
+function monthTitle(month: string) {
+  const [year, m] = month.split("-");
+  const names = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+  return `${names[Number(m) - 1] ?? month} ${year}`;
+}
+
+function nextMonth(month: string) {
+  const year = Number(month.slice(0, 4));
+  const m = Number(month.slice(5, 7));
+  if (m === 12) return `${year + 1}-01`;
+  return `${year}-${String(m + 1).padStart(2, "0")}`;
+}
+
+function MonthEndCard() {
+  const days = useLedger((s) => s.days);
+  const draws = useLedger((s) => s.monthDraws);
+  const openingDate = useLedger((s) => s.openingDate);
+  const setMonthDraws = useLedger((s) => s.setMonthDraws);
+  const { gate } = useGate();
+  const { busy, saveToServer } = useAccountSave();
+  const months = useMemo(() => closedMonths(openingDate), [openingDate]);
+  const [month, setMonth] = useState(months.at(-1) ?? "");
+  const saved = drawForMonth(draws, month);
+  const [cash, setCash] = useState(saved.cash ? String(saved.cash) : "");
+  const [santosh, setSantosh] = useState(saved.santosh ? String(saved.santosh) : "");
+  const [pk, setPk] = useState(saved.pk ? String(saved.pk) : "");
+  const started = useRef(false);
+
+  useEffect(() => {
+    if (started.current || !months.length) return;
+    started.current = true;
+    const next = months.at(-1) ?? "";
+    const row = drawForMonth(draws, next);
+    setMonth(next);
+    setCash(row.cash ? String(row.cash) : "");
+    setSantosh(row.santosh ? String(row.santosh) : "");
+    setPk(row.pk ? String(row.pk) : "");
+  }, [months, draws]);
+
+  function pick(next: string) {
+    const row = drawForMonth(draws, next);
+    setMonth(next);
+    setCash(row.cash ? String(row.cash) : "");
+    setSantosh(row.santosh ? String(row.santosh) : "");
+    setPk(row.pk ? String(row.pk) : "");
+  }
+
+  const close = days.filter((day) => day.date.startsWith(month)).at(-1);
+  const totals = {
+    cash: close?.cashBook.cb ?? 0,
+    santosh: close?.santosh.cb ?? 0,
+    pk: close?.pk.cb ?? 0,
+  };
+  const take = {
+    cash: Math.min(Math.max(0, Math.round(Number(cash) || 0)), Math.max(0, totals.cash)),
+    santosh: Math.min(
+      Math.max(0, Math.round(Number(santosh) || 0)),
+      Math.max(0, totals.santosh),
+    ),
+    pk: Math.min(Math.max(0, Math.round(Number(pk) || 0)), Math.max(0, totals.pk)),
+  };
+  const left = {
+    cash: totals.cash - take.cash,
+    santosh: totals.santosh - take.santosh,
+    pk: totals.pk - take.pk,
+  };
+
+  function saveDraw() {
+    if (!month || !close) {
+      toast.error("Is month ka closing abhi book mein nahi hai");
+      return;
+    }
+    gate(
+      () => {
+        const rest = draws.filter((row) => row.month !== month);
+        setMonthDraws([...rest, { month, ...take }]);
+        toast.success(`${monthTitle(nextMonth(month))} opening set`);
+        void saveToServer();
+      },
+      {
+        title: "Withdraw and set next month?",
+        message: `${monthTitle(month)} close se cash ${money(take.cash)}, Santosh ${money(take.santosh)}, P.K. ${money(take.pk)} nikaloge. ${monthTitle(nextMonth(month))} cash ${money(left.cash)} se start hoga.`,
+        confirmLabel: "Withdraw",
+      },
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Month-end withdraw</CardTitle>
+        <p className="text-sm text-muted">
+          September opening upar jaisa hai waisa hi rahega. Month end ke baad cash, Santosh QR
+          aur P.K. ka total yahan hai. Jo withdraw karoge, uske baad bacha hua agle month ki
+          starting balance hai.
+        </p>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        {months.length === 0 ? (
+          <p className="text-sm text-muted">Month end ke baad yahan withdraw ka option aayega.</p>
+        ) : (
+          <>
+            <div className="grid gap-1.5">
+              <Label htmlFor="draw-month">Month</Label>
+              <select
+                id="draw-month"
+                className="h-10 rounded-md border border-border bg-background px-3 text-sm"
+                value={month}
+                onChange={(e) => pick(e.target.value)}
+              >
+                {months.map((value) => (
+                  <option key={value} value={value}>
+                    {monthTitle(value)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {close ? (
+              <div className="grid gap-3 sm:grid-cols-3">
+                {(
+                  [
+                    ["Cash", totals.cash, cash, setCash],
+                    ["Santosh QR", totals.santosh, santosh, setSantosh],
+                    ["P.K. QR", totals.pk, pk, setPk],
+                  ] as const
+                ).map(([label, total, value, set]) => (
+                  <div key={label} className="grid gap-1.5">
+                    <Label>
+                      {label} · {money(total)}
+                    </Label>
+                    <Input
+                      inputMode="numeric"
+                      placeholder="Withdraw"
+                      value={value}
+                      onChange={(e) => set(e.target.value.replace(/[^\d]/g, ""))}
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted">Is month ka closing abhi book mein nahi hai.</p>
+            )}
+            <p className="text-sm">
+              {monthTitle(nextMonth(month || months[0] || "2026-10"))} opening: cash{" "}
+              {money(left.cash)} · Santosh {money(left.santosh)} · P.K. {money(left.pk)}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" disabled={busy || !close} onClick={saveDraw}>
+                {busy ? "Saving…" : "Withdraw"}
+              </Button>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function ProfilePage() {
   const hotel = useLedger((s) => s.hotel);
   const opening = useLedger((s) => s.opening);
@@ -315,8 +509,8 @@ function ProfilePage() {
         <CardHeader>
           <CardTitle>Opening balance</CardTitle>
           <p className="text-sm text-muted">
-            Now from {formatDay(openingDate)}. Saved on the hotel account, not
-            this computer. Books from this date start with these figures.
+            Now from {formatDay(openingDate)}. This September opening stays as it is.
+            Month-end withdraw is the next card and does not change these figures.
           </p>
         </CardHeader>
         <CardContent>
@@ -389,6 +583,8 @@ function ProfilePage() {
           </p>
         </CardContent>
       </Card>
+
+      <MonthEndCard />
 
       <Card>
         <CardHeader>
