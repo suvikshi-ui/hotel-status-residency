@@ -137,42 +137,55 @@ export function payRefsForSource(
   return out;
 }
 
+function stayBill(
+  chunk: GuestEntry[],
+  receipts: NamedAmount[],
+  gstOnly: boolean,
+): GstStayBill {
+  const first = chunk[0]!;
+  const last = chunk[chunk.length - 1]!;
+  const checkIn = first.checkIn || first.date;
+  const checkOut = last.checkOut || checkoutFromLastNight(last.date);
+  const billed = gstOnly ? chunk.filter((g) => g.gst) : chunk;
+  const fromGuest = billed.map((g) => g.payRefNo?.trim() || "").find(Boolean) || "";
+  const fromRecv = payRefsForSource(receipts, sourceKey(first));
+  return {
+    id: first.id,
+    ids: chunk.map((g) => g.id),
+    name: first.name,
+    roomNo: first.roomNo,
+    source: (first.source ?? "").trim(),
+    mode: first.mode,
+    checkIn,
+    checkOut,
+    nights: nightsFromDates(checkIn, checkOut) || billed.length,
+    amount: billed.reduce((s, g) => s + g.amount, 0),
+    gstInvoiceNo: billed.map((g) => g.gstInvoiceNo?.trim() || "").find(Boolean) || "",
+    payRefNo: fromGuest || fromRecv.join(" · "),
+  };
+}
+
+export function buildRegisterStays(
+  guests: GuestEntry[],
+  receipts: NamedAmount[] = [],
+): GstStayBill[] {
+  return consecutiveStayNights(guests)
+    .map((chunk) => stayBill(chunk, receipts, false))
+    .sort(
+      (a, b) =>
+        a.checkIn.localeCompare(b.checkIn) ||
+        a.name.localeCompare(b.name) ||
+        a.roomNo.localeCompare(b.roomNo),
+    );
+}
+
 export function buildGstStayBills(
   guests: GuestEntry[],
   receipts: NamedAmount[] = [],
 ): GstStayBill[] {
   return consecutiveStayNights(guests)
     .filter((chunk) => chunk.some((g) => g.gst))
-    .map((chunk) => {
-      const first = chunk[0]!;
-      const last = chunk[chunk.length - 1]!;
-      const checkIn = first.checkIn || first.date;
-      const checkOut =
-        last.checkOut ||
-        checkoutFromLastNight(last.date);
-      const billed = chunk.filter((g) => g.gst);
-      const fromGuest =
-        billed.map((g) => g.payRefNo?.trim() || "").find(Boolean) || "";
-      const fromRecv = payRefsForSource(receipts, sourceKey(first));
-      const payRefNo =
-        fromGuest ||
-        fromRecv.join(" · ");
-      return {
-        id: first.id,
-        ids: chunk.map((g) => g.id),
-        name: first.name,
-        roomNo: first.roomNo,
-        source: (first.source ?? "").trim(),
-        mode: first.mode,
-        checkIn,
-        checkOut,
-        nights: nightsFromDates(checkIn, checkOut) || billed.length,
-        amount: billed.reduce((s, g) => s + g.amount, 0),
-        gstInvoiceNo:
-          billed.map((g) => g.gstInvoiceNo?.trim() || "").find(Boolean) || "",
-        payRefNo,
-      };
-    })
+    .map((chunk) => stayBill(chunk, receipts, true))
     .sort(
       (a, b) =>
         a.checkIn.localeCompare(b.checkIn) ||
