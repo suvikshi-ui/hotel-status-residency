@@ -1,14 +1,18 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Printer } from "lucide-react";
+import { Plus, Printer, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatDayShort } from "@/lib/format";
+import { useGate } from "@/components/security-gate";
+import { SaveCube, useAccountSave } from "@/components/save-cube";
+import { formatDayShort, uid } from "@/lib/format";
 import { downloadGuestCheckinPdf } from "@/lib/guest-form-pdf";
 import { publicUrl } from "@/lib/public-url";
+import { canWrite } from "@/lib/roles";
 import { useLedger } from "@/lib/store";
 
 export const Route = createFileRoute("/guests")({ component: GuestsPage });
@@ -43,9 +47,10 @@ function GuestsPage() {
         <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight">Guest</h1>
       </div>
       <Tabs defaultValue="form">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="list">Guest list</TabsTrigger>
-          <TabsTrigger value="form">Registration form</TabsTrigger>
+          <TabsTrigger value="form">Form</TabsTrigger>
+          <TabsTrigger value="corporate">Corporate</TabsTrigger>
         </TabsList>
         <TabsContent value="list" className="flex flex-col gap-4">
           <Input
@@ -163,7 +168,196 @@ function GuestsPage() {
             </p>
           </div>
         </TabsContent>
+        <TabsContent value="corporate">
+          <CorporateTab />
+        </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function CorporateTab() {
+  const rows = useLedger((s) => s.corporates);
+  const setCorporates = useLedger((s) => s.setCorporates);
+  const write = canWrite(useLedger((s) => s.appRole));
+  const { busy: saving, saveToServer } = useAccountSave();
+  const { gate } = useGate();
+  const [name, setName] = useState("");
+  const [gst, setGst] = useState("");
+  const [amount, setAmount] = useState("");
+  const [address, setAddress] = useState("");
+  const [person, setPerson] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [note, setNote] = useState("");
+
+  function add() {
+    const company = name.trim();
+    if (!company) {
+      toast.error("Write the company name");
+      return;
+    }
+    const bookingAmount = Math.round(Number(amount.replace(/,/g, "")) || 0);
+    gate(
+      () => {
+        setCorporates([
+          ...rows,
+          {
+            id: uid("co"),
+            name: company,
+            gst: gst.trim(),
+            bookingAmount,
+            address: address.trim(),
+            person: person.trim(),
+            phone: phone.trim(),
+            email: email.trim(),
+            note: note.trim(),
+          },
+        ]);
+        setName("");
+        setGst("");
+        setAmount("");
+        setAddress("");
+        setPerson("");
+        setPhone("");
+        setEmail("");
+        setNote("");
+        toast.success("Company added");
+      },
+      {
+        title: "Add this company?",
+        message: company,
+        confirmLabel: "Add",
+      },
+    );
+  }
+
+  function remove(id: string) {
+    const row = rows.find((item) => item.id === id);
+    if (!row) return;
+    gate(
+      () => {
+        setCorporates(rows.filter((item) => item.id !== id));
+        toast.success("Company deleted");
+      },
+      {
+        title: "Delete this company?",
+        message: row.name,
+        confirmLabel: "Delete",
+        danger: true,
+        requireCode: true,
+      },
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <p className="text-sm text-muted">
+          Companies the hotel has a tie-up with. Name, GST, agreed booking amount and address.
+        </p>
+        {write ? <SaveCube busy={saving} onSave={() => void saveToServer()} /> : null}
+      </div>
+      {write ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Add company</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-2">
+            <FieldBox label="Company name" value={name} onChange={setName} />
+            <FieldBox label="GST number" value={gst} onChange={setGst} />
+            <FieldBox label="Booking amount" value={amount} onChange={setAmount} numeric />
+            <FieldBox label="Contact person" value={person} onChange={setPerson} />
+            <FieldBox label="Phone" value={phone} onChange={setPhone} />
+            <FieldBox label="Email" value={email} onChange={setEmail} />
+            <div className="sm:col-span-2">
+              <FieldBox label="Address" value={address} onChange={setAddress} />
+            </div>
+            <div className="sm:col-span-2">
+              <FieldBox label="Tie-up note" value={note} onChange={setNote} />
+            </div>
+            <div>
+              <Button type="button" onClick={add}>
+                <Plus className="size-4" />
+                Add
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Tie-up list · {rows.length}</CardTitle>
+        </CardHeader>
+        <CardContent className="overflow-x-auto p-0">
+          {rows.length === 0 ? (
+            <p className="px-5 py-8 text-center text-sm text-muted">No company yet.</p>
+          ) : (
+            <table className="w-full min-w-[52rem] text-left text-sm">
+              <thead className="text-[11px] uppercase tracking-wide text-muted">
+                <tr className="border-y border-border">
+                  <th className="px-5 py-2 font-medium">Company</th>
+                  <th className="px-3 py-2 font-medium">GST</th>
+                  <th className="px-3 py-2 font-medium">Booking</th>
+                  <th className="px-3 py-2 font-medium">Person</th>
+                  <th className="px-3 py-2 font-medium">Phone</th>
+                  <th className="px-3 py-2 font-medium">Address</th>
+                  <th className="px-3 py-2 font-medium">Note</th>
+                  {write ? <th className="py-2" /> : null}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.id} className="border-b border-border/70">
+                    <td className="px-5 py-2.5 font-medium">{row.name}</td>
+                    <td className="px-3 py-2.5 tabular">{row.gst || "—"}</td>
+                    <td className="px-3 py-2.5 tabular">
+                      {row.bookingAmount ? `₹${row.bookingAmount.toLocaleString("en-IN")}` : "—"}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      {row.person || "—"}
+                      {row.email ? <div className="text-xs text-muted">{row.email}</div> : null}
+                    </td>
+                    <td className="px-3 py-2.5 tabular">{row.phone || "—"}</td>
+                    <td className="px-3 py-2.5">{row.address || "—"}</td>
+                    <td className="px-3 py-2.5">{row.note || "—"}</td>
+                    {write ? (
+                      <td className="py-2.5 pr-3 text-right">
+                        <Button type="button" size="sm" variant="ghost" onClick={() => remove(row.id)}>
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </td>
+                    ) : null}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function FieldBox({
+  label,
+  value,
+  onChange,
+  numeric,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  numeric?: boolean;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label>{label}</Label>
+      <Input
+        value={value}
+        inputMode={numeric ? "numeric" : undefined}
+        onChange={(e) => onChange(numeric ? e.target.value.replace(/[^\d]/g, "") : e.target.value)}
+      />
     </div>
   );
 }

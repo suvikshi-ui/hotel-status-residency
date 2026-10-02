@@ -7,6 +7,7 @@ import {
 import { mergeBankBooks } from "./bank-recon.ts";
 import { normalizeGuestCards } from "./guest-cards.ts";
 import { normalizeContacts } from "./contacts.ts";
+import { normalizeCorporates } from "./corporates.ts";
 import { mergeGuestGst } from "./invoice.ts";
 import { mergeSealed, parseSealedIds, dropDeletedRows, sealKey } from "./sheet-seal.ts";
 import { mergeInventoryFiles } from "./inventory.ts";
@@ -123,6 +124,7 @@ function emptyRows(s: LedgerSnapshot): LedgerSnapshot {
     complaints: [],
     reminders: [],
     contacts: [],
+    corporates: [],
     bankRows: [],
     ota: [],
     janSales: [],
@@ -324,6 +326,14 @@ export function mergeLiveSnapshot(
         b.contacts ?? [],
         local.contacts ?? [],
         cloud.contacts ?? [],
+      ),
+    ),
+    corporates: normalizeCorporates(
+      mergeByKey(
+        (r) => r.id,
+        b.corporates ?? [],
+        local.corporates ?? [],
+        cloud.corporates ?? [],
       ),
     ),
     guestCards: normalizeGuestCards(

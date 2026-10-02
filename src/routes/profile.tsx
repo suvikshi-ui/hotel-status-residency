@@ -44,6 +44,7 @@ function snapshotNow(): LedgerSnapshot {
       s.bankRows ?? [],
       s.guestCards ?? [],
       s.contacts ?? [],
+      s.corporates ?? [],
     ),
     opening: s.opening,
     rooms: s.rooms,
@@ -72,6 +73,7 @@ function snapshotNow(): LedgerSnapshot {
     complaints: s.complaints,
     reminders: s.reminders,
     contacts: s.contacts,
+    corporates: s.corporates,
     bankRows: s.bankRows,
     savedAt: s.savedAt,
   };

@@ -62,6 +62,7 @@ import {
 } from "./bank-recon";
 import { guestCardsFromHotel, normalizeGuestCards, type GuestCard } from "./guest-cards";
 import { contactsFromHotel, normalizeContacts, type HotelContact } from "./contacts";
+import { corporatesFromHotel, normalizeCorporates, type CorporateCompany } from "./corporates";
 
 function afterSave() {
   void import("./supabase-sync").then((m) => m.requestCloudSave());
@@ -109,6 +110,7 @@ export interface LedgerState {
   complaints: RoomComplaint[];
   reminders: HotelReminder[];
   contacts: HotelContact[];
+  corporates: CorporateCompany[];
   guestCards: GuestCard[];
   bankRows: BankRow[];
   selectedDate: string;
@@ -160,6 +162,7 @@ export interface LedgerState {
   removeComplaint: (id: string, opts?: BypassGuard) => void;
   setReminders: (reminders: HotelReminder[]) => void;
   setContacts: (contacts: HotelContact[]) => void;
+  setCorporates: (rows: CorporateCompany[]) => void;
   saveGuestCard: (card: GuestCard) => void;
   setBankRows: (bankRows: BankRow[]) => void;
   applySnapshot: (p: Partial<LedgerState>) => void;
@@ -204,6 +207,7 @@ function seedState(): Omit<
   | "removeComplaint"
   | "setReminders"
   | "setContacts"
+  | "setCorporates"
   | "saveGuestCard"
   | "setBankRows"
   | "applySnapshot"
@@ -234,6 +238,7 @@ function seedState(): Omit<
     complaints: demoComplaints(),
     reminders: [],
     contacts: [],
+    corporates: [],
     guestCards: [],
     bankRows: [],
     selectedDate: DEFAULT_DATE,
@@ -322,6 +327,12 @@ function mergeSnapshot(
         const fromHotel = contactsFromHotel(persisted.hotel);
         return fromHotel.length ? fromHotel : normalizeContacts(current.contacts);
       })();
+  const corporates = Array.isArray(persisted.corporates)
+    ? normalizeCorporates(persisted.corporates)
+    : (() => {
+        const fromHotel = corporatesFromHotel(persisted.hotel);
+        return fromHotel.length ? fromHotel : normalizeCorporates(current.corporates);
+      })();
   const guestCards = Array.isArray(persisted.guestCards)
     ? normalizeGuestCards(persisted.guestCards)
     : (() => {
@@ -407,6 +418,7 @@ function mergeSnapshot(
     complaints,
     reminders,
     contacts,
+    corporates,
     guestCards,
     bankRows,
     guests,
@@ -791,6 +803,8 @@ export const useLedger = create<LedgerState>()(
         save({ reminders: normalizeReminders(reminders) }),
       setContacts: (contacts) =>
         save({ contacts: normalizeContacts(contacts) }),
+      setCorporates: (rows) =>
+        save({ corporates: normalizeCorporates(rows) }),
       saveGuestCard: (card) => {
         const next = normalizeGuestCards([
           card,
@@ -850,6 +864,9 @@ export const useLedger = create<LedgerState>()(
           contacts: Array.isArray(p.contacts)
             ? normalizeContacts(p.contacts)
             : cur.contacts,
+          corporates: Array.isArray(p.corporates)
+            ? normalizeCorporates(p.corporates)
+            : cur.corporates,
           guestCards: Array.isArray(p.guestCards)
             ? normalizeGuestCards(p.guestCards)
             : cur.guestCards,
@@ -910,6 +927,7 @@ export const useLedger = create<LedgerState>()(
         complaints: s.complaints,
         reminders: s.reminders,
         contacts: s.contacts,
+        corporates: s.corporates,
         guestCards: s.guestCards,
         bankRows: s.bankRows,
         appRole: s.appRole,
