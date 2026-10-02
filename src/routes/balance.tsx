@@ -202,10 +202,10 @@ function BalancePage() {
 
       <Tabs defaultValue="balance">
         <TabsList aria-label="Balance sections">
-          <TabsTrigger value="balance" className="w-full">
+          <TabsTrigger value="balance">
             Balance
           </TabsTrigger>
-          <TabsTrigger value="other" className="w-full">
+          <TabsTrigger value="other">
             Other
           </TabsTrigger>
         </TabsList>

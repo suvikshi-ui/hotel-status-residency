@@ -274,10 +274,10 @@ function ComplaintsPage() {
       {showList ? (
         <Tabs defaultValue="cubes">
           <TabsList className="print:hidden" aria-label="Complaint views">
-            <TabsTrigger value="cubes" className="w-full">
+            <TabsTrigger value="cubes">
               Cubes
             </TabsTrigger>
-            <TabsTrigger value="list" className="w-full">
+            <TabsTrigger value="list">
               List
             </TabsTrigger>
           </TabsList>

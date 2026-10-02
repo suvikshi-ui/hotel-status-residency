@@ -391,14 +391,14 @@ function StaffPage() {
 
       <Tabs value={sheet} onValueChange={(v) => setSheet(v as Sheet)}>
         <TabsList className="print:hidden" aria-label="Staff registers">
-          <TabsTrigger value="register" className="w-full">
+          <TabsTrigger value="register">
             Staff register
           </TabsTrigger>
-          <TabsTrigger value="salary" className="w-full">
-            Salary register
+          <TabsTrigger value="salary">
+            Salary{salaryFiles.length ? ` · ${salaryFiles.length}` : ""}
           </TabsTrigger>
-          <TabsTrigger value="advance" className="w-full">
-            Advance register
+          <TabsTrigger value="advance">
+            Advance{advanceFiles.length ? ` · ${advanceFiles.length}` : ""}
           </TabsTrigger>
         </TabsList>
 
@@ -785,7 +785,7 @@ function MonthFiles({
 }) {
   const todayYear = current.slice(0, 4);
   const [year, setYear] = useState(todayYear);
-  const [month, setMonth] = useState("");
+  const [month, setMonth] = useState(current.slice(0, 7));
   const open = files.find((file) => file.id === openId) ?? null;
   const years = useMemo(() => {
     const found = new Set(files.map((file) => file.period.slice(0, 4)).filter((value) => value.length === 4));

@@ -52,6 +52,7 @@ function periodLabel(kind: InventoryBook, period: string) {
 }
 
 function InventoryPage() {
+  const files = useLedger((s) => s.inventoryFiles);
   return (
     <div className="flex flex-col gap-5">
       <div>
@@ -69,8 +70,11 @@ function InventoryPage() {
       <Tabs defaultValue="linen">
         <TabsList aria-label="Inventory books">
           {BOOKS.map((book) => (
-            <TabsTrigger key={book.id} value={book.id} className="w-full">
+            <TabsTrigger key={book.id} value={book.id}>
               {book.label}
+              {files.some((file) => file.kind === book.id)
+                ? ` · ${files.filter((file) => file.kind === book.id).length}`
+                : ""}
             </TabsTrigger>
           ))}
         </TabsList>
@@ -112,7 +116,7 @@ function WsFileNav({
   const todayYear = period.slice(0, 4);
   const todayMonth = period.slice(0, 7);
   const [year, setYear] = useState(todayYear);
-  const [month, setMonth] = useState("");
+  const [month, setMonth] = useState(todayMonth);
   const years = useMemo(() => {
     const found = new Set(
       files.map((file) => file.period.slice(0, 4)).filter((value) => value.length === 4),
