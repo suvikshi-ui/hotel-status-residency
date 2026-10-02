@@ -35,6 +35,7 @@ import { DUE_PAY_MODES, formatDayShort, MODE_LABEL, money, stayStamp } from "@/l
 import { useLedger, useDayBooks } from "@/lib/store";
 import { useGate } from "@/components/security-gate";
 import { SaveCube, useAccountSave } from "@/components/save-cube";
+import { canWrite } from "@/lib/roles";
 import { isSealed, sealKey } from "@/lib/sheet-seal";
 import type { PayMode } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -55,6 +56,7 @@ function BalancePage() {
   const removeBalReceived = useLedger((s) => s.removeBalReceived);
   const sealedIds = useLedger((s) => s.sealedIds);
   const { busy: saving, saveToServer } = useAccountSave();
+  const write = canWrite(useLedger((s) => s.appRole));
   const { gate } = useGate();
   const [q, setQ] = useState("");
   const [onlyOpen, setOnlyOpen] = useState(true);
@@ -168,7 +170,7 @@ function BalancePage() {
           Collect dues, then press Save to send the books to the server.
         </p>
       </div>
-      <SaveCube busy={saving} onSave={() => void saveToServer()} />
+      {write ? <SaveCube busy={saving} onSave={() => void saveToServer()} /> : null}
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -288,6 +290,7 @@ function BalancePage() {
                 toast.message("Opening guest print…");
                 printSourceGuests(searchHit, hotel.name, hotel.place);
               }}
+              write={write}
             />
           ) : null}
 
@@ -309,6 +312,7 @@ function BalancePage() {
                   toast.message("Opening guest print…");
                   printSourceGuests(account, hotel.name, hotel.place);
                 }}
+                write={write}
               />
             ))}
             {listed.length === 0 && !searchHit ? (
@@ -400,6 +404,7 @@ function BalancePage() {
                 },
               );
             }}
+            write={write}
           />
         </TabsContent>
       </Tabs>
@@ -418,6 +423,7 @@ function OtherTab({
   onReceive,
   onAdd,
   onRemove,
+  write = true,
 }: {
   booksCb: number;
   today: number;
@@ -429,6 +435,7 @@ function OtherTab({
   onReceive: (source: string, mode: PayMode, amount: number, payRef?: string) => void;
   onAdd: (mode: PayMode, amount: number, note: string, payRef?: string) => void;
   onRemove: (id: string) => void;
+  write?: boolean;
 }) {
   const [listSource, setListSource] = useState("");
   const [listAmount, setListAmount] = useState("");
@@ -464,6 +471,7 @@ function OtherTab({
         </Card>
       </div>
 
+      {write ? (
       <Card>
         <CardContent className="flex flex-col gap-4 p-5">
           <div>
@@ -529,6 +537,7 @@ function OtherTab({
           </form>
         </CardContent>
       </Card>
+      ) : null}
 
       {listRows.length > 0 ? (
         <Card>
@@ -553,6 +562,7 @@ function OtherTab({
                       {money(r.amount)}
                     </td>
                     <td className="px-3 py-2.5 text-right">
+                      {write ? (
                       <Button
                         variant="ghost"
                         size="icon"
@@ -562,6 +572,7 @@ function OtherTab({
                       >
                         <Trash2 className="size-4" />
                       </Button>
+                      ) : null}
                     </td>
                   </tr>
                 ))}
@@ -571,6 +582,7 @@ function OtherTab({
         </Card>
       ) : null}
 
+      {write ? (
       <Card>
         <CardContent className="flex flex-col gap-4 p-5">
           <div>
@@ -662,7 +674,9 @@ function OtherTab({
           </form>
         </CardContent>
       </Card>
+      ) : null}
 
+      {write ? (
       <Card>
         <CardContent className="flex flex-col gap-4 p-5">
           <div>
@@ -744,6 +758,7 @@ function OtherTab({
           </form>
         </CardContent>
       </Card>
+      ) : null}
 
       <Card>
         <CardContent className="overflow-x-auto p-0">
@@ -771,6 +786,7 @@ function OtherTab({
                     {money(r.amount)}
                   </td>
                   <td className="px-3 py-2.5 text-right">
+                    {write ? (
                     <Button
                       variant="ghost"
                       size="icon"
@@ -780,6 +796,7 @@ function OtherTab({
                     >
                       <Trash2 className="size-4" />
                     </Button>
+                    ) : null}
                   </td>
                 </tr>
               ))}
@@ -805,6 +822,7 @@ function SourceCard({
   onCollect,
   onRemoveReceipt,
   onPrintGuests,
+  write = true,
 }: {
   account: DueAccount;
   open: boolean;
@@ -814,6 +832,7 @@ function SourceCard({
   onCollect: (mode: PayMode, amount: number, payRef?: string) => void;
   onRemoveReceipt: (id: string) => void;
   onPrintGuests: () => void;
+  write?: boolean;
 }) {
   const [mode, setMode] = useState<PayMode>("CASH");
   const [amount, setAmount] = useState("");
@@ -970,6 +989,7 @@ function SourceCard({
                     <span className="tabular text-sm font-medium text-ok">
                       {money(r.amount)}
                     </span>
+                    {write ? (
                     <Button
                       variant="ghost"
                       size="icon"
@@ -979,13 +999,14 @@ function SourceCard({
                     >
                       <Trash2 className="size-4" />
                     </Button>
+                    ) : null}
                   </div>
                 </li>
               ))}
             </ul>
           ) : null}
 
-          {!account.settled ? (
+          {write && !account.settled ? (
             <form
               className="mt-4 grid gap-3 sm:grid-cols-[9rem_1fr_1fr_auto]"
               onSubmit={(e) => {
@@ -1044,11 +1065,11 @@ function SourceCard({
                 </Button>
               </div>
             </form>
-          ) : (
+          ) : account.settled ? (
             <p className="mt-4 text-sm text-ok">
               This source is settled. Every stay is ticked Paid.
             </p>
-          )}
+          ) : null}
         </CardContent>
       ) : null}
     </Card>

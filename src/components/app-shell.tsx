@@ -56,7 +56,9 @@ function NavLinks({
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { user } = useStaffSession();
   const role = user?.role ?? "admin";
-  const items = NAV.filter((item) => canOpenPath(role, item.to));
+  const items = NAV.filter((item) => canOpenPath(role, item.to)).map((item) =>
+    role === "owner" ? { ...item, group: "Owner" } : item,
+  );
   if (variant === "bottom") {
     const primary = bottomNavPaths(role)
       .map((path) => items.find((item) => item.to === path))

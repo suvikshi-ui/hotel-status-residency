@@ -18,6 +18,7 @@ import {
 } from "@/lib/bank-recon";
 import { formatDayShort, money } from "@/lib/format";
 import { useLedger } from "@/lib/store";
+import { canWrite } from "@/lib/roles";
 
 export const Route = createFileRoute("/bank-recon")({
   component: BankReconPage,
@@ -34,6 +35,7 @@ function BankReconPage() {
   const setBankRows = useLedger((s) => s.setBankRows);
   const setDate = useLedger((s) => s.setDate);
   const { busy: saving, saveToServer } = useAccountSave();
+  const write = canWrite(useLedger((s) => s.appRole));
   const { gate } = useGate();
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -152,6 +154,7 @@ function BankReconPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
+          {write ? (
           <label className="grid gap-1.5">
             <span className="text-xs font-medium text-muted">
               Statement password
@@ -166,6 +169,7 @@ function BankReconPage() {
               aria-label="Statement password"
             />
           </label>
+          ) : null}
           <input
             ref={fileRef}
             type="file"
@@ -176,6 +180,7 @@ function BankReconPage() {
               if (file) void onFile(file);
             }}
           />
+          {write ? (
           <Button
             type="button"
             variant="outline"
@@ -185,6 +190,7 @@ function BankReconPage() {
             <Upload className="size-4" />
             {busy ? "Reading…" : "Upload statement"}
           </Button>
+          ) : null}
           <Button
             type="button"
             disabled={!monthRows.length || busy}
@@ -193,6 +199,7 @@ function BankReconPage() {
             <Download className="size-4" />
             Download
           </Button>
+          {write ? (
           <SaveCube
             busy={saving}
             onSave={() => {
@@ -200,6 +207,7 @@ function BankReconPage() {
               return saveToServer();
             }}
           />
+          ) : null}
         </div>
       </div>
 

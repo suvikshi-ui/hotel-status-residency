@@ -26,6 +26,7 @@ import {
   type ReminderRepeat,
 } from "@/lib/reminders";
 import { useLedger } from "@/lib/store";
+import { canWrite } from "@/lib/roles";
 
 export const Route = createFileRoute("/reminders")({
   component: RemindersPage,
@@ -35,6 +36,7 @@ function RemindersPage() {
   const reminders = useLedger((s) => s.reminders);
   const setReminders = useLedger((s) => s.setReminders);
   const { busy: saving, saveToServer } = useAccountSave();
+  const write = canWrite(useLedger((s) => s.appRole));
   const { gate } = useGate();
   const [note, setNote] = useState("");
   const [date, setDate] = useState(todayIso());
@@ -102,9 +104,10 @@ function RemindersPage() {
             Monthly, quarterly, half year, yearly, or one manual date.
           </p>
         </div>
-        <SaveCube busy={saving} onSave={() => void saveToServer()} />
+        {write ? <SaveCube busy={saving} onSave={() => void saveToServer()} /> : null}
       </div>
 
+      {write ? (
       <Card>
         <CardHeader>
           <CardTitle>New reminder</CardTitle>
@@ -167,6 +170,7 @@ function RemindersPage() {
           </form>
         </CardContent>
       </Card>
+      ) : null}
 
       <Card>
         <CardContent className="overflow-x-auto p-0">
@@ -197,6 +201,7 @@ function RemindersPage() {
                     </td>
                     <td className="px-3 py-2.5">{REPEAT_LABEL[r.repeat]}</td>
                     <td className="px-3 py-2.5 text-right">
+                      {write ? (
                       <Button
                         variant="ghost"
                         size="icon"
@@ -206,6 +211,7 @@ function RemindersPage() {
                       >
                         <Trash2 className="size-4" />
                       </Button>
+                      ) : null}
                     </td>
                   </tr>
                 );

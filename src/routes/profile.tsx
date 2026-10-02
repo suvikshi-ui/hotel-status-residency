@@ -262,6 +262,7 @@ function ProfilePage() {
           <HotelLogo mark className="h-12 w-auto shrink-0" />
           <p className="text-sm text-muted">
             {hotel.name} · {hotel.place}
+            {role === "owner" ? " · View only" : ""}
           </p>
         </div>
       </div>

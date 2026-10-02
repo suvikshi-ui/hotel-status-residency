@@ -37,6 +37,7 @@ import {
 } from "@/lib/complaint-report";
 import { formatDayShort } from "@/lib/format";
 import { useLedger } from "@/lib/store";
+import { canWrite } from "@/lib/roles";
 import { useStaffSession } from "@/lib/supabase-auth";
 import type { RoomDef } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -69,6 +70,7 @@ function ComplaintsPage() {
   const sealedIds = useLedger((s) => s.sealedIds);
   const { busy: saving, saveToServer } = useAccountSave();
   const role = useLedger((s) => s.appRole);
+  const write = canWrite(role);
   const { user } = useStaffSession();
   const who = (user?.name || user?.username || "").trim();
   const { gate } = useGate();
@@ -82,7 +84,7 @@ function ComplaintsPage() {
   const openCount = complaints.filter((c) => c.level !== "green").length;
   const redCount = complaints.filter((c) => c.level === "red").length;
   const solvedCount = complaints.filter((c) => c.level === "green").length;
-  const showList = role === "admin" || role === "housekeeping";
+  const showList = role === "admin" || role === "housekeeping" || role === "owner";
 
   const byFloor = useMemo(
     () =>
@@ -190,7 +192,7 @@ function ComplaintsPage() {
             : "Log a cube, then press Save to send the books to the server."}
         </p>
       </div>
-      <SaveCube busy={saving} onSave={() => void saveToServer()} />
+      {write ? <SaveCube busy={saving} onSave={() => void saveToServer()} /> : null}
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -215,8 +217,9 @@ function ComplaintsPage() {
               byFloor={byFloor}
               complaints={complaints}
               sealedIds={sealedIds}
-              onNew={startNew}
+              onNew={write ? startNew : () => undefined}
               onEdit={startEdit}
+              write={write}
             />
           </TabsContent>
           <TabsContent value="list">
@@ -255,6 +258,7 @@ function ComplaintsPage() {
               <Input
                 id="complaint-note"
                 value={note}
+                disabled={!write}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="AC, tap, lock…"
               />
@@ -266,7 +270,7 @@ function ComplaintsPage() {
                   <button
                     key={opt.id}
                     type="button"
-                    onClick={() => setLevel(opt.id)}
+                    onClick={() => write && setLevel(opt.id)}
                     className={cn(
                       "rounded-lg border px-2 py-2 text-left",
                       level === opt.id
@@ -287,7 +291,7 @@ function ComplaintsPage() {
               </div>
             </div>
             <div className="flex justify-end gap-2">
-              {open?.existing && role !== "housekeeping" ? (
+              {open?.existing && write && role !== "housekeeping" ? (
                 <Button type="button" variant="danger" onClick={remove}>
                   Delete
                 </Button>
@@ -295,9 +299,11 @@ function ComplaintsPage() {
               <Button type="button" variant="outline" onClick={() => setOpen(null)}>
                 Cancel
               </Button>
+              {write ? (
               <Button type="button" onClick={save}>
                 {open?.existing ? "Save" : "Register"}
               </Button>
+              ) : null}
             </div>
           </div>
         </DialogContent>
@@ -312,12 +318,14 @@ function ComplaintCubes({
   sealedIds,
   onNew,
   onEdit,
+  write = true,
 }: {
   byFloor: { floor: RoomDef["floor"]; rooms: RoomDef[] }[];
   complaints: RoomComplaint[];
   sealedIds: SealedIds;
   onNew: (roomNo: string) => void;
   onEdit: (roomNo: string, existing: RoomComplaint) => void;
+  write?: boolean;
 }) {
   return (
     <>
@@ -341,6 +349,7 @@ function ComplaintCubes({
                 sealedIds={sealedIds}
                 onNew={onNew}
                 onEdit={onEdit}
+                write={write}
               />
             ))}
           </CardContent>
@@ -360,6 +369,7 @@ function ComplaintCubes({
               sealedIds={sealedIds}
               onNew={onNew}
               onEdit={onEdit}
+              write={write}
             />
           ))}
         </CardContent>
@@ -375,6 +385,7 @@ function CubeLine({
   sealedIds,
   onNew,
   onEdit,
+  write = true,
 }: {
   place: string;
   wide?: boolean;
@@ -382,6 +393,7 @@ function CubeLine({
   sealedIds: SealedIds;
   onNew: (roomNo: string) => void;
   onEdit: (roomNo: string, existing: RoomComplaint) => void;
+  write?: boolean;
 }) {
   const items = complaintsForRoom(complaints, place);
   const { trail, slots } = roomCubeLayout(items);
@@ -433,7 +445,7 @@ function CubeLine({
               frozen={isSealed(sealedIds, sealKey.complaint(item.id))}
               onClick={() => onEdit(place, item)}
             />
-          ) : (
+          ) : write ? (
             <button
               key={`${place}-empty-${i}`}
               type="button"
@@ -443,7 +455,7 @@ function CubeLine({
             >
               +
             </button>
-          ),
+          ) : null,
         )}
       </div>
     </div>

@@ -7,7 +7,7 @@ describe("public.users role", () => {
     assert.equal(roleFromUsersTable("housekeeping"), "housekeeping");
     assert.equal(roleFromUsersTable("admin"), "admin");
     assert.equal(roleFromUsersTable("supervisor"), "supervisor");
-    assert.equal(roleFromUsersTable("staff"), "staff");
+    assert.equal(roleFromUsersTable("owner"), "owner");
     assert.equal(roleFromUsersTable(undefined), "admin");
   });
 });

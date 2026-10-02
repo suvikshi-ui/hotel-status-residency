@@ -1002,6 +1002,7 @@ export async function pushLedger(
   role?: string,
   prune?: LedgerPrune,
 ): Promise<{ ok: true } | { ok: false; missingSchema: boolean; message: string }> {
+  if (role === "owner") return { ok: true };
   const ownerId = await resolveSharedHotelUserId(userId);
   const priorMeta = await getSupabase()
     .from("ledger_meta")

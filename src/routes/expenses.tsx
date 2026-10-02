@@ -9,6 +9,7 @@ import { EXPENSE_DESKS, expenseDesk, sumByDay, sumByHead, sumByMode } from "@/li
 import { formatDayShort, money } from "@/lib/format";
 import { isDayLocked } from "@/lib/register-lock";
 import { useLedger } from "@/lib/store";
+import { canWrite } from "@/lib/roles";
 import { ReportsLink } from "@/components/reports-link";
 
 export const Route = createFileRoute("/expenses")({ component: ExpensesPage });
@@ -18,6 +19,7 @@ function ExpensesPage() {
   const all = useLedger((s) => s.expenses);
   const setLineRef = useLedger((s) => s.setLineRef);
   const lockedDates = useLedger((s) => s.lockedDates);
+  const write = canWrite(useLedger((s) => s.appRole));
   const month = date.slice(0, 7);
   const monthRows = useMemo(
     () => all.filter((e) => e.date.startsWith(month)),
@@ -231,7 +233,7 @@ function ExpensesPage() {
                   <td className="px-3 py-2.5">
                     {e.mode === "QRPK" ? (
                       <GuardedPkRef
-                        locked={isDayLocked(lockedDates, e.date)}
+                        locked={isDayLocked(lockedDates, e.date) || !write}
                         value={e.payRef}
                         onSave={(ref, bypass) =>
                           setLineRef(

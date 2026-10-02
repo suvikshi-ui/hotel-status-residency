@@ -12,7 +12,7 @@ import {
 describe("housekeeping role", () => {
   it("defaults unknown values to admin", () => {
     assert.equal(parseAppRole("boss"), "admin");
-    assert.equal(parseAppRole("housekeeping"), "housekeeping");
+    assert.equal(parseAppRole("owner"), "owner");
   });
 
   it("opens complaints and inventory for Kali / housekeeping", () => {

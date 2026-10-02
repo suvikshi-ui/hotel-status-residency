@@ -12,6 +12,7 @@ import { formatDay, money, salaryPayMonth, salaryPayMonthKey, salaryPayMonthName
 import { escapeHtml, printDocument } from "@/lib/print-sheet";
 import { staffPay } from "@/lib/staff-pay";
 import { useLedger } from "@/lib/store";
+import { canWrite } from "@/lib/roles";
 import { HotelLogo } from "@/components/hotel-logo";
 import { SaveCube, useAccountSave } from "@/components/save-cube";
 import { useGate } from "@/components/security-gate";
@@ -40,6 +41,7 @@ function StaffPage() {
   const deletePayrollFile = useLedger((s) => s.deletePayrollFile);
   const setAdvances = useLedger((s) => s.setAdvances);
   const { busy: saving, saveToServer } = useAccountSave();
+  const write = canWrite(useLedger((s) => s.appRole));
   const { gate } = useGate();
   const [sheet, setSheet] = useState<Sheet>("register");
   const [regDraft, setRegDraft] = useState<StaffProfile[]>(staffRegister);
@@ -336,7 +338,7 @@ function StaffPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {(sheet === "register" ||
+          {write && (sheet === "register" ||
           (sheet === "salary" && !salaryLocked) ||
           (sheet === "advance" && !advanceLocked)) ? (
           <SaveCube
@@ -443,6 +445,7 @@ function StaffPage() {
                             <Input
                               aria-label={`${row.name || "staff"} ${label}`}
                               value={row[field]}
+                              disabled={!write}
                               inputMode={field === "mobile" || field === "mobile2" ? "tel" : "text"}
                               placeholder={field === "post" ? "Write the post" : ""}
                               onChange={(e) => patchProfile(row.id, field, e.target.value)}
@@ -460,12 +463,14 @@ function StaffPage() {
                   )}
                 </tbody>
               </table>
+              {write ? (
               <div className="border-t border-border p-3 print:hidden">
                 <Button type="button" variant="outline" onClick={addProfile}>
                   <Plus className="size-4" />
                   Add
                 </Button>
               </div>
+              ) : null}
             </CardContent>
           </Card>
         </TabsContent>
@@ -477,7 +482,7 @@ function StaffPage() {
             saved={Boolean(salarySaved)}
             files={salaryFiles}
             onOpen={setSalaryOpen}
-            onDelete={(file) => removePayroll(file, `${monthLabel(file.period)} salary`)}
+            onDelete={write ? (file) => removePayroll(file, `${monthLabel(file.period)} salary`) : undefined}
           />
           <div className="flex justify-end print:hidden">
             <Button type="button" variant="outline" onClick={printSalary}>
@@ -486,7 +491,7 @@ function StaffPage() {
             </Button>
           </div>
           <fieldset
-            disabled={salaryLocked}
+            disabled={salaryLocked || !write}
             className="flex min-w-0 flex-col gap-5 border-0 p-0"
           >
 
@@ -611,7 +616,7 @@ function StaffPage() {
                   type="button"
                   variant="outline"
                   onClick={addStaff}
-                  disabled={salaryLocked}
+                  disabled={salaryLocked || !write}
                 >
                   <Plus className="size-4" />
                   Add
@@ -629,7 +634,7 @@ function StaffPage() {
             saved={Boolean(advanceSaved)}
             files={advanceFiles}
             onOpen={setAdvanceOpen}
-            onDelete={(file) => removePayroll(file, `${monthLabel(file.period)} advance`)}
+            onDelete={write ? (file) => removePayroll(file, `${monthLabel(file.period)} advance`) : undefined}
           />
           <div className="flex justify-end print:hidden">
             <Button type="button" variant="outline" onClick={printAdvance}>
@@ -638,7 +643,7 @@ function StaffPage() {
             </Button>
           </div>
           <fieldset
-            disabled={advanceLocked}
+            disabled={advanceLocked || !write}
             className="flex min-w-0 flex-col gap-5 border-0 p-0"
           >
           <div className="flex flex-wrap items-end justify-end gap-2 print:hidden">
@@ -776,7 +781,7 @@ function MonthFiles({
   saved: boolean;
   files: PayrollFile[];
   onOpen: (id: string) => void;
-  onDelete: (file: PayrollFile) => void;
+  onDelete?: (file: PayrollFile) => void;
 }) {
   const todayYear = current.slice(0, 4);
   const [year, setYear] = useState(todayYear);
@@ -841,14 +846,14 @@ function MonthFiles({
           })}
         </div>
       </div>
-      {open ? (
+      {open && onDelete ? (
         <div className="flex justify-end">
           <Button type="button" variant="danger" onClick={() => onDelete(open)}>
             <Trash2 className="size-4" />
             Delete file
           </Button>
         </div>
-      ) : (
+      ) : open ? null : (
         <p className="text-sm text-muted">{monthLabel(current)} is not saved yet.</p>
       )}
     </div>
