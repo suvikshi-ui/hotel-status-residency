@@ -266,14 +266,14 @@ function ComplaintsPage() {
       </div>
 
       <Tabs defaultValue="complaints">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList>
           <TabsTrigger value="complaints">Complaints</TabsTrigger>
           <TabsTrigger value="ac">AC service</TabsTrigger>
         </TabsList>
         <TabsContent value="complaints" className="flex flex-col gap-5">
       {showList ? (
         <Tabs defaultValue="cubes">
-          <TabsList className="grid w-full grid-cols-2 print:hidden" aria-label="Complaint views">
+          <TabsList className="print:hidden" aria-label="Complaint views">
             <TabsTrigger value="cubes" className="w-full">
               Cubes
             </TabsTrigger>

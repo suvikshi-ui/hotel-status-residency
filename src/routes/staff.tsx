@@ -390,7 +390,7 @@ function StaffPage() {
       </div>
 
       <Tabs value={sheet} onValueChange={(v) => setSheet(v as Sheet)}>
-        <TabsList className="grid w-full grid-cols-3 print:hidden" aria-label="Staff registers">
+        <TabsList className="print:hidden" aria-label="Staff registers">
           <TabsTrigger value="register" className="w-full">
             Staff register
           </TabsTrigger>

@@ -201,7 +201,7 @@ function BalancePage() {
       </div>
 
       <Tabs defaultValue="balance">
-        <TabsList className="grid w-full grid-cols-2" aria-label="Balance sections">
+        <TabsList aria-label="Balance sections">
           <TabsTrigger value="balance" className="w-full">
             Balance
           </TabsTrigger>

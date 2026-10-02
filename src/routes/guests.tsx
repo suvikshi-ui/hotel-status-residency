@@ -47,7 +47,7 @@ function GuestsPage() {
         <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight">Guest</h1>
       </div>
       <Tabs defaultValue="form">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList>
           <TabsTrigger value="list">Guest list</TabsTrigger>
           <TabsTrigger value="form">Form</TabsTrigger>
           <TabsTrigger value="corporate">Corporate</TabsTrigger>

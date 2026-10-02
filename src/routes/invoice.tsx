@@ -123,7 +123,7 @@ function InvoicePage() {
       </div>
 
       <Tabs defaultValue="gst">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList>
           <TabsTrigger value="gst">GST invoice</TabsTrigger>
           <TabsTrigger value="register">Register</TabsTrigger>
         </TabsList>

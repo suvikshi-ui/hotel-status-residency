@@ -144,6 +144,23 @@
   color: #1b2e28;
 }
 
+.nav-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.nav-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+input,
+textarea,
+select {
+  background-color: #fffdf8;
+  color: #14241e;
+}
+
 .paper-card {
   border-radius: 18px;
 }

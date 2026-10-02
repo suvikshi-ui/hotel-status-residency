@@ -67,7 +67,7 @@ function InventoryPage() {
         </p>
       </div>
       <Tabs defaultValue="linen">
-        <TabsList className="grid w-full grid-cols-3" aria-label="Inventory books">
+        <TabsList aria-label="Inventory books">
           {BOOKS.map((book) => (
             <TabsTrigger key={book.id} value={book.id} className="w-full">
               {book.label}
