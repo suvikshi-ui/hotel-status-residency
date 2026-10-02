@@ -61,9 +61,8 @@ function InventoryPage() {
           Inventory
         </h1>
         <p className="mt-1 text-sm text-muted">
-          Linen and kitchen files are monthly. WS is one file per day. Save
-          locks the file. Open Reports to see the saved files. Housekeeping
-          can view them, not delete them.
+          Linen and kitchen files are monthly. WS is one file per day. Year, then
+          month. WS also opens the days of that month. Save locks the file.
         </p>
       </div>
       <Tabs defaultValue="linen">
@@ -99,12 +98,14 @@ function WsFileNav({
   period,
   saved,
   openId,
+  daily,
   onOpen,
 }: {
   files: InventoryFile[];
   period: string;
   saved: boolean;
   openId: string;
+  daily: boolean;
   onOpen: (id: string) => void;
 }) {
   const todayYear = period.slice(0, 4);
@@ -166,8 +167,26 @@ function WsFileNav({
                 key={value}
                 type="button"
                 size="sm"
-                variant={month === value ? "default" : "outline"}
-                onClick={() => setMonth(value)}
+                variant={
+                  daily
+                    ? month === value
+                      ? "default"
+                      : "outline"
+                    : openId === files.find((file) => file.period === value)?.id ||
+                        (!saved && value === period && openId === "draft")
+                      ? "default"
+                      : "outline"
+                }
+                onClick={() => {
+                  if (daily) {
+                    setMonth(value);
+                    return;
+                  }
+                  setMonth(value);
+                  const file = files.find((row) => row.period === value);
+                  if (file) onOpen(file.id);
+                  else if (value === todayMonth && !saved) onOpen("draft");
+                }}
               >
                 {monthName(value)}
               </Button>
@@ -175,7 +194,7 @@ function WsFileNav({
           </div>
         </div>
       ) : null}
-      {month ? (
+      {daily && month ? (
         <div>
           <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">
             Day
@@ -420,48 +439,17 @@ function InventoryBookPanel({ kind }: { kind: InventoryBook }) {
       </div>
 
       <div className="flex flex-col gap-3">
-        {kind === "ws" ? (
           <WsFileNav
             files={bookFiles}
             period={period}
             saved={Boolean(saved)}
             openId={openId}
+            daily={kind === "ws"}
             onOpen={(id) => {
               setEditing(false);
               setOpenId(id);
             }}
           />
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {!saved ? (
-              <Button
-                type="button"
-                size="sm"
-                variant={openId === "draft" ? "default" : "outline"}
-                onClick={() => {
-                  setEditing(false);
-                  setOpenId("draft");
-                }}
-              >
-                {periodLabel(kind, period)} · new
-              </Button>
-            ) : null}
-            {bookFiles.map((file) => (
-              <Button
-                key={file.id}
-                type="button"
-                size="sm"
-                variant={openId === file.id ? "default" : "outline"}
-                onClick={() => {
-                  setEditing(false);
-                  setOpenId(file.id);
-                }}
-              >
-                {periodLabel(kind, file.period)}
-              </Button>
-            ))}
-          </div>
-        )}
       </div>
 
       <div className="grid grid-cols-3 gap-3">

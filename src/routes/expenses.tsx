@@ -1,11 +1,11 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ModeBadge } from "@/components/mode-badge";
 import { GuardedPkRef } from "@/components/pk-ref";
-import { sumByDay, sumByHead, sumByMode } from "@/lib/expense-tally";
+import { EXPENSE_DESKS, expenseDesk, sumByDay, sumByHead, sumByMode } from "@/lib/expense-tally";
 import { formatDayShort, money } from "@/lib/format";
 import { isDayLocked } from "@/lib/register-lock";
 import { useLedger } from "@/lib/store";
@@ -23,17 +23,24 @@ function ExpensesPage() {
     () => all.filter((e) => e.date.startsWith(month)),
     [all, month],
   );
-  const byHead = useMemo(() => sumByHead(monthRows), [monthRows]);
-  const byDay = useMemo(() => sumByDay(monthRows), [monthRows]);
-  const byMode = useMemo(() => sumByMode(monthRows), [monthRows]);
   const monthTotal = monthRows.reduce((s, e) => s + e.amount, 0);
+  const [desk, setDesk] = useState<string>("all");
+  const shown = useMemo(
+    () =>
+      desk === "all" ? monthRows : monthRows.filter((row) => expenseDesk(row.particular) === desk),
+    [desk, monthRows],
+  );
+  const shownTotal = shown.reduce((s, e) => s + e.amount, 0);
+  const byHead = useMemo(() => sumByHead(shown), [shown]);
+  const byDay = useMemo(() => sumByDay(shown), [shown]);
+  const byMode = useMemo(() => sumByMode(monthRows), [monthRows]);
   const sorted = useMemo(
     () =>
-      [...monthRows].sort(
+      [...shown].sort(
         (a, b) =>
           a.date.localeCompare(b.date) || a.particular.localeCompare(b.particular),
       ),
-    [monthRows],
+    [shown],
   );
 
   return (
@@ -86,10 +93,48 @@ function ExpensesPage() {
         </Card>
       </div>
 
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <button
+          type="button"
+          onClick={() => setDesk("all")}
+          className={`rounded-2xl border px-4 py-3 text-left ${
+            desk === "all" ? "border-[#1f4a3c] bg-[#1f4a3c] text-[#f4faf6]" : "border-border bg-card"
+          }`}
+        >
+          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] opacity-70">
+            All
+          </div>
+          <div className="mt-1 font-display text-xl font-semibold tabular">{money(monthTotal)}</div>
+        </button>
+        {EXPENSE_DESKS.map((item) => {
+          const amount = monthRows
+            .filter((row) => expenseDesk(row.particular) === item.id)
+            .reduce((sum, row) => sum + row.amount, 0);
+          const on = desk === item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setDesk(item.id)}
+              className={`rounded-2xl border px-4 py-3 text-left ${
+                on ? "border-[#1f4a3c] bg-[#1f4a3c] text-[#f4faf6]" : "border-border bg-card"
+              }`}
+            >
+              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] opacity-70">
+                {item.label}
+              </div>
+              <div className="mt-1 font-display text-xl font-semibold tabular">{money(amount)}</div>
+            </button>
+          );
+        })}
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle>By head — what it was for</CardTitle>
-          <p className="text-sm text-muted">Every particular this month, tallied</p>
+          <p className="text-sm text-muted">
+            {desk === "all" ? "Every particular this month" : "This group only"}
+          </p>
         </CardHeader>
         <CardContent className="overflow-x-auto p-0">
           <table className="w-full min-w-[28rem] text-left text-sm">
@@ -106,7 +151,7 @@ function ExpensesPage() {
                   <td className="px-5 py-2.5 font-medium">{name}</td>
                   <td className="px-3 py-2.5 text-right tabular">{money(amt)}</td>
                   <td className="px-5 py-2.5 text-right tabular text-muted">
-                    {monthTotal ? Math.round((amt / monthTotal) * 100) : 0}%
+                    {shownTotal ? Math.round((amt / shownTotal) * 100) : 0}%
                   </td>
                 </tr>
               ))}
@@ -114,7 +159,7 @@ function ExpensesPage() {
             <tfoot>
               <tr className="border-t border-border bg-bg-warm/50 font-semibold">
                 <td className="px-5 py-2.5">Total expenses</td>
-                <td className="px-3 py-2.5 text-right tabular">{money(monthTotal)}</td>
+                <td className="px-3 py-2.5 text-right tabular">{money(shownTotal)}</td>
                 <td className="px-5 py-2.5 text-right">100%</td>
               </tr>
             </tfoot>
@@ -141,7 +186,7 @@ function ExpensesPage() {
                 <tr key={d} className="border-b border-border/70">
                   <td className="px-5 py-2.5">{formatDayShort(d)}</td>
                   <td className="px-3 py-2.5 text-right tabular text-muted">
-                    {monthRows.filter((e) => e.date === d).length}
+                    {shown.filter((e) => e.date === d).length}
                   </td>
                   <td className="px-5 py-2.5 text-right tabular">{money(amt)}</td>
                 </tr>
@@ -150,8 +195,8 @@ function ExpensesPage() {
             <tfoot>
               <tr className="border-t border-border bg-bg-warm/50 font-semibold">
                 <td className="px-5 py-2.5">Month</td>
-                <td className="px-3 py-2.5 text-right tabular">{monthRows.length}</td>
-                <td className="px-5 py-2.5 text-right tabular">{money(monthTotal)}</td>
+                <td className="px-3 py-2.5 text-right tabular">{shown.length}</td>
+                <td className="px-5 py-2.5 text-right tabular">{money(shownTotal)}</td>
               </tr>
             </tfoot>
           </table>
@@ -160,7 +205,7 @@ function ExpensesPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>All entries · {money(monthTotal)}</CardTitle>
+          <CardTitle>All entries · {money(shownTotal)}</CardTitle>
         </CardHeader>
         <CardContent className="overflow-x-auto p-0">
           <table className="w-full min-w-[32rem] text-left text-sm">
@@ -210,7 +255,7 @@ function ExpensesPage() {
                 <td className="px-5 py-2.5" colSpan={4}>
                   Total
                 </td>
-                <td className="px-5 py-2.5 text-right tabular">{money(monthTotal)}</td>
+                <td className="px-5 py-2.5 text-right tabular">{money(shownTotal)}</td>
               </tr>
             </tfoot>
           </table>

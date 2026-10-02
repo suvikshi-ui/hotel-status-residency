@@ -18,6 +18,54 @@ export function expenseBucket(particular: string): ExpBucket {
   return "ops";
 }
 
+export type ExpenseDesk =
+  | "kitchen"
+  | "rooms"
+  | "flysky"
+  | "ws"
+  | "salary"
+  | "utilities"
+  | "office";
+
+export const EXPENSE_DESKS: { id: ExpenseDesk; label: string }[] = [
+  { id: "kitchen", label: "Kitchen" },
+  { id: "rooms", label: "Rooms" },
+  { id: "flysky", label: "Flysky" },
+  { id: "ws", label: "WS" },
+  { id: "salary", label: "Salary" },
+  { id: "utilities", label: "Utilities" },
+  { id: "office", label: "Office" },
+];
+
+export function expenseDesk(particular: string): ExpenseDesk {
+  const p = particular.trim().toUpperCase();
+  if (p.startsWith("FLYSKY") || p.startsWith("FLY SKY") || p.startsWith("FLY-SKY")) {
+    return "flysky";
+  }
+  if (p === "WS" || p.startsWith("WS ") || p.startsWith("WS(") || p.startsWith("WS (")) {
+    return "ws";
+  }
+  if (p.includes("SALARY") || p.includes("WAGES")) return "salary";
+  if (/ELECTRIC|MSEB|MSEDCL|WATER|WIFI|BROADBAND|INTERNET|LIGHT BILL/.test(p)) {
+    return "utilities";
+  }
+  if (
+    /BEDSHEET|PILLOW|LINEN|TOWEL|TOILET|SOAP|ROOM|HOUSEKEEP|LAUNDRY|CURTAIN|MATTRESS|BLANKET|HANGER/.test(
+      p,
+    )
+  ) {
+    return "rooms";
+  }
+  if (
+    /RATION|VEG|CHAPATI|MILK|GAS|FOOD|BREAKFAST|TEA|EGG|DAL|RICE|OIL|MASALA|KITCHEN|DMART|BISLER|COLD DRINK|COFFEE|SUGAR|CLOUD/.test(
+      p,
+    )
+  ) {
+    return "kitchen";
+  }
+  return "office";
+}
+
 export function sumByMode(rows: NamedAmount[]) {
   const out: Record<PayMode, number> = {
     CASH: 0,

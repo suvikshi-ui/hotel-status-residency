@@ -16,20 +16,13 @@ import { toast } from "sonner";
 import { DailyA4 } from "@/components/daily-a4";
 import { DayChart } from "@/components/day-chart";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { buildDayTake } from "@/lib/day-report";
 import { sumByBucket, expenseBucket } from "@/lib/expense-tally";
-import { formatDay, formatDayShort, money, moneyCompact, salaryPayMonth, salaryPayMonthKey } from "@/lib/format";
-import {
-  inventoryDifference,
-  signedCount,
-  type InventoryBook,
-} from "@/lib/inventory";
+import { formatDay, formatDayShort, money, moneyCompact } from "@/lib/format";
 import { printHtmlDocument } from "@/lib/print-sheet";
-import { HOUSEKEEPING_REPORTS, REPORT_TAB, parseReportView } from "@/lib/report-views";
-import { staffPay } from "@/lib/staff-pay";
+import { REPORT_TAB, parseReportView } from "@/lib/report-views";
 import { useLedger, useDayBooks } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
@@ -44,16 +37,20 @@ function ReportsPage() {
   const { view } = Route.useSearch();
   const navigate = Route.useNavigate();
   const role = useLedger((s) => s.appRole);
-
-  const tabs =
-    role === "housekeeping"
-      ? REPORT_TAB.filter((tab) => HOUSEKEEPING_REPORTS.includes(tab.id))
-      : REPORT_TAB;
-  const shown = tabs.some((tab) => tab.id === view) ? view : tabs[0]?.id ?? "inventory";
+  if (role === "housekeeping") {
+    return (
+      <div className="flex flex-col gap-3">
+        <h1 className="font-display text-3xl font-semibold tracking-tight">Reports</h1>
+        <p className="text-sm text-muted">
+          Linen, WS and kitchen files stay in Inventory. Open Inventory to check them.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <Tabs
-      value={shown}
+      value={view}
       onValueChange={(next) =>
         void navigate({ search: { view: parseReportView(next) } })
       }
@@ -68,11 +65,11 @@ function ReportsPage() {
             Reports
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Day book, month, payroll, then stores.
+            Day book, the detailed day, then the month.
           </p>
         </div>
         <TabsList className="flex h-auto min-h-11 w-full flex-wrap justify-start sm:w-auto">
-          {tabs.map((tab) => (
+          {REPORT_TAB.map((tab) => (
             <TabsTrigger key={tab.id} value={tab.id}>
               {tab.label}
             </TabsTrigger>
@@ -80,8 +77,6 @@ function ReportsPage() {
         </TabsList>
       </div>
 
-      {role === "housekeeping" ? null : (
-      <>
       <TabsContent value="daily" className="flex flex-col gap-5">
         <DailyReportPanel />
       </TabsContent>
@@ -93,28 +88,6 @@ function ReportsPage() {
       <TabsContent value="month" className="flex flex-col gap-5">
         <MonthlyReportPanel />
       </TabsContent>
-      </>
-      )}
-
-      <TabsContent value="inventory" className="flex flex-col gap-5">
-        <InventoryReportPanel kind="linen" />
-      </TabsContent>
-      <TabsContent value="ws" className="flex flex-col gap-5">
-        <InventoryReportPanel kind="ws" />
-      </TabsContent>
-      <TabsContent value="kitchen" className="flex flex-col gap-5">
-        <InventoryReportPanel kind="kitchen" />
-      </TabsContent>
-      {role === "housekeeping" ? null : (
-      <>
-      <TabsContent value="salary" className="flex flex-col gap-5">
-        <SalaryReportPanel />
-      </TabsContent>
-      <TabsContent value="advance" className="flex flex-col gap-5">
-        <AdvanceReportPanel />
-      </TabsContent>
-      </>
-      )}
     </Tabs>
   );
 }
@@ -453,320 +426,6 @@ function DetailDailyPanel() {
         receipts={receipts}
         books={books}
       />
-    </div>
-  );
-}
-
-function fileTitle(kind: InventoryBook, period: string) {
-  const iso = kind === "ws" ? period.slice(0, 10) : `${period.slice(0, 7)}-01`;
-  const d = parseISO(iso);
-  if (!isValid(d)) return period;
-  return kind === "ws" ? format(d, "d MMM yyyy") : format(d, "MMMM yyyy");
-}
-
-const BOOK_LABEL: Record<InventoryBook, string> = {
-  linen: "Linen",
-  ws: "WS",
-  kitchen: "Kitchen",
-};
-
-function InventoryReportPanel({ kind }: { kind: InventoryBook }) {
-  const hotel = useLedger((s) => s.hotel);
-  const date = useLedger((s) => s.selectedDate);
-  const files = useLedger((s) => s.inventoryFiles).filter((file) => file.kind === kind);
-  const period = kind === "ws" ? date.slice(0, 10) : date.slice(0, 7);
-  const [picked, setPicked] = useState<string | null>(null);
-  const file =
-    files.find((row) => row.id === picked) ??
-    files.find((row) => row.period === period) ??
-    files[0] ??
-    null;
-  const inventory = file?.lines ?? [];
-  const lastTotal = inventory.reduce((s, r) => s + r.lastMonth, 0);
-  const thisTotal = inventory.reduce((s, r) => s + r.thisMonth, 0);
-  const diffTotal = thisTotal - lastTotal;
-  const lastLabel = kind === "ws" ? "Last count" : "Last month";
-  const nowLabel = kind === "ws" ? "Today" : "This month";
-  const cadence = kind === "ws" ? "day" : "month";
-  return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">
-            {hotel.name}
-          </p>
-          <h2 className="mt-1 font-display text-2xl font-semibold tracking-tight">
-            {BOOK_LABEL[kind]} report
-          </h2>
-          <p className="mt-1 text-sm text-muted">
-            {file
-              ? `Saved ${BOOK_LABEL[kind]} file · ${fileTitle(kind, file.period)}`
-              : `No ${BOOK_LABEL[kind]} file saved yet. Save the ${cadence} on Inventory.`}
-          </p>
-        </div>
-        <Button type="button" onClick={() => window.print()} disabled={!file}>
-          <Printer className="size-4" />
-          Print
-        </Button>
-      </div>
-      {files.length ? (
-        <div className="flex flex-wrap gap-2 print:hidden">
-          {files.map((row) => (
-            <Button
-              key={row.id}
-              type="button"
-              size="sm"
-              variant={file?.id === row.id ? "default" : "outline"}
-              onClick={() => setPicked(row.id)}
-            >
-              {fileTitle(kind, row.period)}
-            </Button>
-          ))}
-        </div>
-      ) : null}
-      {file ? (
-        <>
-      <div className="grid grid-cols-3 gap-3">
-        <Stat label={lastLabel} value={String(lastTotal)} />
-        <Stat label={nowLabel} value={String(thisTotal)} />
-        <Stat label="Difference" value={signedCount(diffTotal)} />
-      </div>
-      <Card>
-        <CardContent className="overflow-x-auto p-0">
-          <table className="w-full min-w-[36rem] text-left text-sm">
-            <thead className="text-xs uppercase tracking-wide text-muted">
-              <tr className="border-y border-border">
-                <th className="px-5 py-2 font-medium">Item</th>
-                <th className="px-3 py-2 text-right font-medium">{lastLabel}</th>
-                <th className="px-3 py-2 text-right font-medium">{nowLabel}</th>
-                <th className="px-3 py-2 text-right font-medium">Difference</th>
-                <th className="px-5 py-2 font-medium">Notes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {inventory.map((r) => {
-                const diff = inventoryDifference(r);
-                return (
-                  <tr key={r.id} className="border-b border-border/70">
-                    <td className="px-5 py-2.5 font-medium">{r.name}</td>
-                    <td className="px-3 py-2.5 text-right tabular">{r.lastMonth}</td>
-                    <td className="px-3 py-2.5 text-right tabular">{r.thisMonth}</td>
-                    <td
-                      className={cn(
-                        "px-3 py-2.5 text-right tabular font-medium",
-                        diff < 0 && "text-danger",
-                      )}
-                    >
-                      {signedCount(diff)}
-                    </td>
-                    <td className="px-5 py-2.5 text-muted">{r.notes || "—"}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </CardContent>
-      </Card>
-        </>
-      ) : null}
-    </div>
-  );
-}
-
-function SalaryReportPanel() {
-  const hotel = useLedger((s) => s.hotel);
-  const date = useLedger((s) => s.selectedDate);
-  const files = useLedger((s) => s.payrollFiles).filter((file) => file.kind === "salary");
-  const period = salaryPayMonthKey(date);
-  const [picked, setPicked] = useState<string | null>(null);
-  const file =
-    files.find((row) => row.id === picked) ??
-    files.find((row) => row.period === period) ??
-    files[0] ??
-    null;
-  const monthDays = 30;
-  const staff = file?.staff ?? [];
-  const rows = staff.map((r) => {
-    const { earned, payable } = staffPay(
-      r.salary,
-      r.working,
-      r.extra ?? 0,
-      r.advance,
-      monthDays,
-    );
-    return { ...r, extra: r.extra ?? 0, earned, payable };
-  });
-  const payroll = rows.reduce((s, r) => s + r.payable, 0);
-  const earnedTotal = rows.reduce((s, r) => s + r.earned, 0);
-  const extraTotal = rows.reduce((s, r) => s + (r.extra ?? 0), 0);
-  const salaryAdv = rows.reduce((s, r) => s + r.advance, 0);
-  const title = file ? fileTitle("linen", file.period) : salaryPayMonth(date);
-  return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">
-            {hotel.name}
-          </p>
-          <h2 className="mt-1 font-display text-2xl font-semibold tracking-tight">
-            Salary report
-          </h2>
-          <p className="mt-1 text-sm text-muted">
-            {file
-              ? `Saved salary file · ${title}`
-              : "No salary file saved yet. Save the month on Staff."}
-          </p>
-        </div>
-        <Button type="button" onClick={() => window.print()} disabled={!file}>
-          <Printer className="size-4" />
-          Print
-        </Button>
-      </div>
-      {files.length ? (
-        <div className="flex flex-wrap gap-2 print:hidden">
-          {files.map((row) => (
-            <Button
-              key={row.id}
-              type="button"
-              size="sm"
-              variant={file?.id === row.id ? "default" : "outline"}
-              onClick={() => setPicked(row.id)}
-            >
-              {fileTitle("linen", row.period)}
-            </Button>
-          ))}
-        </div>
-      ) : null}
-      {file ? (
-        <>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-        <Stat label="Earned" value={money(earnedTotal)} />
-        <Stat label="Advance minus" value={money(salaryAdv)} />
-        <Stat label="To pay" value={money(payroll)} />
-      </div>
-      <Card>
-        <CardContent className="overflow-x-auto p-0">
-          <table className="w-full min-w-[48rem] text-left text-sm">
-            <thead className="text-xs uppercase tracking-wide text-muted">
-              <tr className="border-y border-border">
-                <th className="px-5 py-2 font-medium">Name</th>
-                <th className="px-3 py-2 text-right font-medium">Basic</th>
-                <th className="px-3 py-2 text-right font-medium">Working</th>
-                <th className="px-3 py-2 text-right font-medium">Extra</th>
-                <th className="px-3 py-2 text-right font-medium">Earned</th>
-                <th className="px-3 py-2 text-right font-medium">Advance</th>
-                <th className="px-3 py-2 text-right font-medium">To pay</th>
-                <th className="px-5 py-2 font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.id} className="border-b border-border/70">
-                  <td className="px-5 py-2.5 font-medium">{r.name}</td>
-                  <td className="px-3 py-2.5 text-right tabular">{money(r.salary)}</td>
-                  <td className="px-3 py-2.5 text-right tabular">{r.working}</td>
-                  <td className="px-3 py-2.5 text-right tabular">{r.extra}</td>
-                  <td className="px-3 py-2.5 text-right tabular">{money(r.earned)}</td>
-                  <td className="px-3 py-2.5 text-right tabular">{money(r.advance)}</td>
-                  <td
-                    className={`px-3 py-2.5 text-right tabular font-medium ${r.payable < 0 ? "text-due" : ""}`}
-                  >
-                    {money(r.payable)}
-                  </td>
-                  <td className="px-5 py-2.5">
-                    <Badge variant={r.status === "HOLD" ? "warn" : "ok"}>
-                      {r.status || "PAID"}
-                    </Badge>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="border-t border-border bg-bg-warm/50 font-semibold">
-                <td className="px-5 py-2.5">Total</td>
-                <td />
-                <td />
-                <td className="px-3 py-2.5 text-right tabular">{extraTotal}</td>
-                <td className="px-3 py-2.5 text-right tabular">{money(earnedTotal)}</td>
-                <td className="px-3 py-2.5 text-right tabular">{money(salaryAdv)}</td>
-                <td className="px-3 py-2.5 text-right tabular">{money(payroll)}</td>
-                <td />
-              </tr>
-            </tfoot>
-          </table>
-        </CardContent>
-      </Card>
-        </>
-      ) : null}
-    </div>
-  );
-}
-
-function AdvanceReportPanel() {
-  const hotel = useLedger((s) => s.hotel);
-  const advances = useLedger((s) => s.advances);
-  const advCash = advances.reduce((s, r) => s + r.cash, 0);
-  const advQr = advances.reduce((s, r) => s + r.qrs, 0);
-  return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">
-            {hotel.name}
-          </p>
-          <h2 className="mt-1 font-display text-2xl font-semibold tracking-tight">
-            Staff advance report
-          </h2>
-          <p className="mt-1 text-sm text-muted">
-            Cash and QR advances. Enter figures on Staff.
-          </p>
-        </div>
-        <Button type="button" onClick={() => window.print()}>
-          <Printer className="size-4" />
-          Print
-        </Button>
-      </div>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-        <Stat label="Cash" value={money(advCash)} />
-        <Stat label="Santosh QR" value={money(advQr)} />
-        <Stat label="Advance total" value={money(advCash + advQr)} />
-      </div>
-      <Card>
-        <CardContent className="overflow-x-auto p-0">
-          <table className="w-full min-w-[28rem] text-left text-sm">
-            <thead className="text-xs uppercase tracking-wide text-muted">
-              <tr className="border-y border-border">
-                <th className="px-5 py-2 font-medium">Name</th>
-                <th className="px-3 py-2 text-right font-medium">Cash</th>
-                <th className="px-3 py-2 text-right font-medium">QR</th>
-                <th className="px-5 py-2 text-right font-medium">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {advances.map((r) => (
-                <tr key={r.id} className="border-b border-border/70">
-                  <td className="px-5 py-2.5 font-medium">{r.name || "—"}</td>
-                  <td className="px-3 py-2.5 text-right tabular">{money(r.cash)}</td>
-                  <td className="px-3 py-2.5 text-right tabular">{money(r.qrs)}</td>
-                  <td className="px-5 py-2.5 text-right tabular font-medium">
-                    {money(r.cash + r.qrs)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="border-t border-border bg-bg-warm/50 font-semibold">
-                <td className="px-5 py-2.5">Total</td>
-                <td className="px-3 py-2.5 text-right tabular">{money(advCash)}</td>
-                <td className="px-3 py-2.5 text-right tabular">{money(advQr)}</td>
-                <td className="px-5 py-2.5 text-right tabular">
-                  {money(advCash + advQr)}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        </CardContent>
-      </Card>
     </div>
   );
 }

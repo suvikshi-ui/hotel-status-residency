@@ -56,7 +56,7 @@ export function canAddUsers(role: AppRole) {
 }
 
 export function roleAccess(role: AppRole) {
-  if (role === "housekeeping") return "Complaints + inventory reports";
+  if (role === "housekeeping") return "Complaints + inventory";
   if (role === "staff") return "Register";
   return "Full books";
 }

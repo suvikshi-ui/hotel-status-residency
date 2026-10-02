@@ -23,7 +23,7 @@ describe("housekeeping role", () => {
     assert.equal(canOpenPath("housekeeping", "/register"), false);
     assert.equal(canOpenPath("housekeeping", "/"), false);
     assert.equal(canCountInventory("housekeeping"), true);
-    assert.equal(roleAccess("housekeeping"), "Complaints + inventory reports");
+    assert.equal(roleAccess("housekeeping"), "Complaints + inventory");
     assert.deepEqual(bottomNavPaths("housekeeping"), ["/complaints", "/inventory", "/reports"]);
   });
 

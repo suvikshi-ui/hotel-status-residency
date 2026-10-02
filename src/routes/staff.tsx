@@ -9,7 +9,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatDay, money, salaryPayMonth, salaryPayMonthKey, salaryPayMonthName, uid } from "@/lib/format";
-import { ReportsLink } from "@/components/reports-link";
 import { escapeHtml, printDocument } from "@/lib/print-sheet";
 import { staffPay } from "@/lib/staff-pay";
 import { useLedger } from "@/lib/store";
@@ -385,9 +384,6 @@ function StaffPage() {
             }}
           />
           ) : null}
-          {sheet === "register" ? null : (
-            <ReportsLink view={sheet === "advance" ? "advance" : "salary"} />
-          )}
         </div>
       </div>
 
@@ -782,31 +778,68 @@ function MonthFiles({
   onOpen: (id: string) => void;
   onDelete: (file: PayrollFile) => void;
 }) {
+  const todayYear = current.slice(0, 4);
+  const [year, setYear] = useState(todayYear);
+  const [month, setMonth] = useState("");
   const open = files.find((file) => file.id === openId) ?? null;
+  const years = useMemo(() => {
+    const found = new Set(files.map((file) => file.period.slice(0, 4)).filter((value) => value.length === 4));
+    if (todayYear) found.add(todayYear);
+    return [...found].sort((a, b) => b.localeCompare(a));
+  }, [files, todayYear]);
+  const months = useMemo(() => {
+    const found = new Set(
+      files.filter((file) => file.period.startsWith(`${year}-`)).map((file) => file.period.slice(0, 7)),
+    );
+    if (year === todayYear) found.add(current.slice(0, 7));
+    return [...found].sort((a, b) => a.localeCompare(b));
+  }, [files, year, todayYear, current]);
+
   return (
-    <div className="flex flex-col gap-2 print:hidden">
-      <div className="flex flex-wrap gap-2">
-        {!saved ? (
-          <Button
-            type="button"
-            size="sm"
-            variant={openId === "draft" ? "default" : "outline"}
-            onClick={() => onOpen("draft")}
-          >
-            {monthLabel(current)} · new
-          </Button>
-        ) : null}
-        {files.map((file) => (
-          <Button
-            key={file.id}
-            type="button"
-            size="sm"
-            variant={openId === file.id ? "default" : "outline"}
-            onClick={() => onOpen(file.id)}
-          >
-            {monthLabel(file.period)}
-          </Button>
-        ))}
+    <div className="flex flex-col gap-3 print:hidden">
+      <div>
+        <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">Year</p>
+        <div className="flex flex-wrap gap-2">
+          {years.map((value) => (
+            <Button
+              key={value}
+              type="button"
+              size="sm"
+              variant={year === value ? "default" : "outline"}
+              onClick={() => {
+                setYear(value);
+                setMonth("");
+              }}
+            >
+              {value}
+            </Button>
+          ))}
+        </div>
+      </div>
+      <div>
+        <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">Month</p>
+        <div className="flex flex-wrap gap-2">
+          {months.map((value) => {
+            const file = files.find((row) => row.period === value);
+            const active = file ? openId === file.id : month === value && openId === "draft";
+            return (
+              <Button
+                key={value}
+                type="button"
+                size="sm"
+                variant={active ? "default" : "outline"}
+                onClick={() => {
+                  setMonth(value);
+                  if (file) onOpen(file.id);
+                  else if (value === current.slice(0, 7) && !saved) onOpen("draft");
+                }}
+              >
+                {monthLabel(value)}
+                {!file && value === current.slice(0, 7) ? " · new" : ""}
+              </Button>
+            );
+          })}
+        </div>
       </div>
       {open ? (
         <div className="flex justify-end">

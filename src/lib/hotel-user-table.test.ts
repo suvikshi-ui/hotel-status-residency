@@ -18,7 +18,7 @@ describe("users table", () => {
         ["Housekeeping", "housekeeping", "housekeeping"],
       ],
     );
-    assert.equal(accessForUser("housekeeping"), "Complaints + inventory reports");
+    assert.equal(accessForUser("housekeeping"), "Complaints + inventory");
   });
 
   it("lets public.users win when the same username is in both tables", () => {
