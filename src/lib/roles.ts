@@ -9,7 +9,7 @@ export const ROLE_LABEL: Record<AppRole, string> = {
   owner: "Owner",
 };
 
-export const HOUSEKEEPING_PATHS = ["/complaints", "/inventory", "/reports", "/profile", "/login"] as const;
+export const HOUSEKEEPING_PATHS = ["/complaints", "/inventory", "/login"] as const;
 
 export const OWNER_PATHS = [
   "/",
@@ -20,7 +20,6 @@ export const OWNER_PATHS = [
   "/complaints",
   "/reminders",
   "/reports",
-  "/profile",
   "/login",
 ] as const;
 
@@ -52,7 +51,7 @@ export function navFor(role: AppRole, items: readonly { to: string }[]) {
 }
 
 export function bottomNavPaths(role: AppRole): readonly string[] {
-  if (role === "housekeeping") return ["/complaints", "/inventory", "/reports"];
+  if (role === "housekeeping") return ["/complaints", "/inventory"];
   if (role === "owner") return ["/", "/expenses", "/balance", "/reports"];
   if (role === "staff") return ["/", "/register", "/complaints", "/profile"];
   return ["/", "/register", "/balance", "/reports"];

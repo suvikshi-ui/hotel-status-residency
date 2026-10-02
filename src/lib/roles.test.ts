@@ -18,13 +18,13 @@ describe("housekeeping role", () => {
   it("opens complaints and inventory for Kali / housekeeping", () => {
     assert.equal(canOpenPath("housekeeping", "/complaints"), true);
     assert.equal(canOpenPath("housekeeping", "/inventory"), true);
-    assert.equal(canOpenPath("housekeeping", "/profile"), true);
-    assert.equal(canOpenPath("housekeeping", "/reports"), true);
+    assert.equal(canOpenPath("housekeeping", "/profile"), false);
+    assert.equal(canOpenPath("housekeeping", "/reports"), false);
     assert.equal(canOpenPath("housekeeping", "/register"), false);
     assert.equal(canOpenPath("housekeeping", "/"), false);
     assert.equal(canCountInventory("housekeeping"), true);
     assert.equal(roleAccess("housekeeping"), "Complaints + inventory");
-    assert.deepEqual(bottomNavPaths("housekeeping"), ["/complaints", "/inventory", "/reports"]);
+    assert.deepEqual(bottomNavPaths("housekeeping"), ["/complaints", "/inventory"]);
   });
 
   it("lands housekeeping on complaints", () => {
