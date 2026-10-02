@@ -5,6 +5,7 @@ import {
   extractRef,
   parseStatementText,
   reconcileBank,
+  mergeBankBooks,
 } from "./bank-recon.ts";
 import type { GuestEntry } from "./types.ts";
 
@@ -350,6 +351,21 @@ describe("bank recon", () => {
       },
     );
     assert.equal(lines[0]?.office?.reason, "food bill");
+  });
+
+  it("keeps the other desk's statement when this desk has not loaded it", () => {
+    const cloud = parseStatementText(
+      "Date,Narration,Ch./Ref. no.,Withdrawal,Deposit\n01/09/2026,UPI RENT,REF111122223333,0,2000",
+      "2026-09",
+    );
+    const local = parseStatementText(
+      "Date,Narration,Ch./Ref. no.,Withdrawal,Deposit\n02/10/2026,UPI FOOD,REF444455556666,0,500",
+      "2026-10",
+    );
+    const merged = mergeBankBooks(local, cloud);
+    assert.equal(merged.some((row) => row.month === "2026-09"), true);
+    assert.equal(merged.some((row) => row.month === "2026-10"), true);
+    assert.equal(mergeBankBooks([], cloud).length, cloud.length);
   });
 
   it("pulls UPI/IMPS numbers out of narration", () => {

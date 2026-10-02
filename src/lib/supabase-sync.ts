@@ -16,6 +16,7 @@ import { ledgerOwnerKey, useLedger } from "./store";
 import { isSupabaseConfigured } from "./supabase-config";
 import { isPermissionMessage } from "./cloud-errors";
 import { preferLocalOverCloud } from "./cloud-save";
+import { mergeBankBooks } from "./bank-recon";
 import { todayIso } from "./reminders";
 import {
   isDayLocked,
@@ -700,6 +701,7 @@ function withLocalSavedFiles(cloud: LedgerSnapshot): LedgerSnapshot {
       deleted,
       (id) => id,
     ),
+    bankRows: mergeBankBooks(local.bankRows ?? [], cloud.bankRows ?? []),
   };
 }
 

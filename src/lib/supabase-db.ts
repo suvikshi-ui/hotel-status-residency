@@ -13,6 +13,7 @@ import {
 } from "./inventory";
 import {
   bankRowsFromHotel,
+  mergeBankBooks,
   normalizeBankRows,
   type BankRow,
 } from "./bank-recon";
@@ -411,6 +412,7 @@ export function booksFromHotel(hotel: unknown): Partial<LedgerSnapshot> | null {
     : [];
   const advances = Array.isArray(b.advances) ? (b.advances as AdvanceRow[]) : [];
   const rooms = Array.isArray(b.rooms) ? (b.rooms as RoomDef[]) : [];
+  const bankRows = normalizeBankRows(b.bankRows);
   if (
     !guests.length &&
     !food.length &&
@@ -419,7 +421,8 @@ export function booksFromHotel(hotel: unknown): Partial<LedgerSnapshot> | null {
     !balReceived.length &&
     !staffRegister.length &&
     !payrollFiles.length &&
-    !inventoryFiles.length
+    !inventoryFiles.length &&
+    !bankRows.length
   ) {
     return null;
   }
@@ -436,6 +439,7 @@ export function booksFromHotel(hotel: unknown): Partial<LedgerSnapshot> | null {
     advances,
     rooms,
     savedAt: num(b.savedAt) || undefined,
+    bankRows: normalizeBankRows(b.bankRows),
   };
 }
 
@@ -491,6 +495,9 @@ function overlayBooks(snapshot: LedgerSnapshot, hotelRaw: unknown): LedgerSnapsh
     next.rooms = books.rooms ?? snapshot.rooms;
   }
   if ((books.savedAt ?? 0) > (snapshot.savedAt ?? 0)) next.savedAt = books.savedAt;
+  if ((books.bankRows?.length ?? 0) > 0 || (next.bankRows?.length ?? 0) > 0) {
+    next.bankRows = mergeBankBooks(next.bankRows ?? [], books.bankRows ?? []);
+  }
   return next;
 }
 
@@ -508,6 +515,7 @@ function booksForHotel(snap: LedgerSnapshot) {
     advances: snap.advances,
     rooms: snap.rooms,
     savedAt: snap.savedAt ?? Date.now(),
+    bankRows: snap.bankRows ?? [],
   };
 }
 
@@ -987,6 +995,27 @@ export async function pushLedger(
   prune?: LedgerPrune,
 ): Promise<{ ok: true } | { ok: false; missingSchema: boolean; message: string }> {
   const ownerId = await resolveSharedHotelUserId(userId);
+  const priorMeta = await getSupabase()
+    .from("ledger_meta")
+    .select("hotel")
+    .eq("user_id", ownerId)
+    .maybeSingle();
+  const priorHotel = priorMeta.data
+    ? (priorMeta.data as { hotel?: unknown }).hotel
+    : undefined;
+  const priorBookRows =
+    priorHotel && typeof priorHotel === "object"
+      ? normalizeBankRows(
+          (priorHotel as { _books?: { bankRows?: unknown } })._books?.bankRows,
+        )
+      : [];
+  snap = {
+    ...snap,
+    bankRows: mergeBankBooks(snap.bankRows ?? [], [
+      ...bankRowsFromHotel(priorHotel),
+      ...priorBookRows,
+    ]),
+  };
   const tombs = tombstonePrune(snap);
   const writePrune =
     prune === undefined && ownerId !== userId ? tombs : unionPrune(prune, tombs);

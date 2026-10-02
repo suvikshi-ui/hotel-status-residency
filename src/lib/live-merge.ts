@@ -4,7 +4,7 @@ import {
   parseLockRev,
   parseLockedDates,
 } from "./register-lock.ts";
-import { mergeBankRows } from "./bank-recon.ts";
+import { mergeBankBooks } from "./bank-recon.ts";
 import { mergeGuestGst } from "./invoice.ts";
 import { mergeSealed, parseSealedIds, dropDeletedRows, sealKey } from "./sheet-seal.ts";
 import { mergeInventoryFiles } from "./inventory.ts";
@@ -315,7 +315,7 @@ export function mergeLiveSnapshot(
       local.reminders ?? [],
       cloud.reminders ?? [],
     ),
-    bankRows: mergeBankRows(local.bankRows ?? [], cloud.bankRows ?? []),
+    bankRows: mergeBankBooks(local.bankRows ?? [], cloud.bankRows ?? []),
     savedAt: Math.max(local.savedAt ?? 0, cloud.savedAt ?? 0),
     cloudUpdatedAt: cloud.cloudUpdatedAt,
   };

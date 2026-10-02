@@ -141,6 +141,16 @@ export function mergeBankRows(current: BankRow[], incoming: BankRow[], month?: s
   return normalizeBankRows(keep);
 }
 
+/** Months saved on this desk replace that month. Months only on the other desk stay. An empty desk never wipes the statement. */
+export function mergeBankBooks(local: BankRow[], cloud: BankRow[]) {
+  const mine = normalizeBankRows(local);
+  const theirs = normalizeBankRows(cloud);
+  if (!mine.length) return theirs;
+  const months = new Set(mine.map((row) => row.month).filter(Boolean));
+  const kept = theirs.filter((row) => row.month && !months.has(row.month));
+  return mergeBankRows(kept, mine);
+}
+
 type RefRow = {
   id: string;
   date: string;
