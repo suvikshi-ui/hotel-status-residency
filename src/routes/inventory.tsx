@@ -84,6 +84,131 @@ function InventoryPage() {
   );
 }
 
+function monthName(ym: string) {
+  const d = parseISO(`${ym}-01`);
+  return isValid(d) ? format(d, "MMM") : ym;
+}
+
+function dayName(iso: string) {
+  const d = parseISO(iso);
+  return isValid(d) ? format(d, "d MMM") : iso;
+}
+
+function WsFileNav({
+  files,
+  period,
+  saved,
+  openId,
+  onOpen,
+}: {
+  files: InventoryFile[];
+  period: string;
+  saved: boolean;
+  openId: string;
+  onOpen: (id: string) => void;
+}) {
+  const todayYear = period.slice(0, 4);
+  const todayMonth = period.slice(0, 7);
+  const [year, setYear] = useState(todayYear);
+  const [month, setMonth] = useState("");
+  const years = useMemo(() => {
+    const found = new Set(
+      files.map((file) => file.period.slice(0, 4)).filter((value) => value.length === 4),
+    );
+    if (todayYear) found.add(todayYear);
+    return [...found].sort((a, b) => b.localeCompare(a));
+  }, [files, todayYear]);
+  const months = useMemo(() => {
+    const found = new Set(
+      files
+        .filter((file) => file.period.startsWith(`${year}-`))
+        .map((file) => file.period.slice(0, 7)),
+    );
+    if (year === todayYear && todayMonth) found.add(todayMonth);
+    return [...found].sort((a, b) => a.localeCompare(b));
+  }, [files, year, todayYear, todayMonth]);
+  const days = files
+    .filter((file) => month && file.period.startsWith(`${month}-`))
+    .sort((a, b) => a.period.localeCompare(b.period));
+  const showDraft = Boolean(month) && month === todayMonth && !saved;
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div>
+        <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">
+          Year
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {years.map((value) => (
+            <Button
+              key={value}
+              type="button"
+              size="sm"
+              variant={year === value ? "default" : "outline"}
+              onClick={() => {
+                setYear(value);
+                setMonth("");
+              }}
+            >
+              {value}
+            </Button>
+          ))}
+        </div>
+      </div>
+      {year ? (
+        <div>
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">
+            Month
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {months.map((value) => (
+              <Button
+                key={value}
+                type="button"
+                size="sm"
+                variant={month === value ? "default" : "outline"}
+                onClick={() => setMonth(value)}
+              >
+                {monthName(value)}
+              </Button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {month ? (
+        <div>
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">
+            Day
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {showDraft ? (
+              <Button
+                type="button"
+                size="sm"
+                variant={openId === "draft" ? "default" : "outline"}
+                onClick={() => onOpen("draft")}
+              >
+                {dayName(period)} · new
+              </Button>
+            ) : null}
+            {days.map((file) => (
+              <Button
+                key={file.id}
+                type="button"
+                size="sm"
+                variant={openId === file.id ? "default" : "outline"}
+                onClick={() => onOpen(file.id)}
+              >
+                {dayName(file.period)}
+              </Button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function InventoryBookPanel({ kind }: { kind: InventoryBook }) {
   const hotel = useLedger((s) => s.hotel);
   const date = useLedger((s) => s.selectedDate);
@@ -294,34 +419,49 @@ function InventoryBookPanel({ kind }: { kind: InventoryBook }) {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {!saved ? (
-          <Button
-            type="button"
-            size="sm"
-            variant={openId === "draft" ? "default" : "outline"}
-            onClick={() => {
+      <div className="flex flex-col gap-3">
+        {kind === "ws" ? (
+          <WsFileNav
+            files={bookFiles}
+            period={period}
+            saved={Boolean(saved)}
+            openId={openId}
+            onOpen={(id) => {
               setEditing(false);
-              setOpenId("draft");
+              setOpenId(id);
             }}
-          >
-            {periodLabel(kind, period)} · new
-          </Button>
-        ) : null}
-        {bookFiles.map((file) => (
-          <Button
-            key={file.id}
-            type="button"
-            size="sm"
-            variant={openId === file.id ? "default" : "outline"}
-            onClick={() => {
-              setEditing(false);
-              setOpenId(file.id);
-            }}
-          >
-            {periodLabel(kind, file.period)}
-          </Button>
-        ))}
+          />
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {!saved ? (
+              <Button
+                type="button"
+                size="sm"
+                variant={openId === "draft" ? "default" : "outline"}
+                onClick={() => {
+                  setEditing(false);
+                  setOpenId("draft");
+                }}
+              >
+                {periodLabel(kind, period)} · new
+              </Button>
+            ) : null}
+            {bookFiles.map((file) => (
+              <Button
+                key={file.id}
+                type="button"
+                size="sm"
+                variant={openId === file.id ? "default" : "outline"}
+                onClick={() => {
+                  setEditing(false);
+                  setOpenId(file.id);
+                }}
+              >
+                {periodLabel(kind, file.period)}
+              </Button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-3 gap-3">
