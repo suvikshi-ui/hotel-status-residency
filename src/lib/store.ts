@@ -63,6 +63,7 @@ import {
 import { guestCardsFromHotel, normalizeGuestCards, type GuestCard } from "./guest-cards";
 import { contactsFromHotel, normalizeContacts, type HotelContact } from "./contacts";
 import { corporatesFromHotel, normalizeCorporates, type CorporateCompany } from "./corporates";
+import { agentsFromHotel, normalizeAgents, type TravelAgent } from "./agents";
 import { monthDrawsFromHotel, normalizeMonthDraws, type MonthDraw } from "./month-draw";
 
 function afterSave() {
@@ -112,6 +113,7 @@ export interface LedgerState {
   reminders: HotelReminder[];
   contacts: HotelContact[];
   corporates: CorporateCompany[];
+  agents: TravelAgent[];
   monthDraws: MonthDraw[];
   guestCards: GuestCard[];
   bankRows: BankRow[];
@@ -165,6 +167,7 @@ export interface LedgerState {
   setReminders: (reminders: HotelReminder[]) => void;
   setContacts: (contacts: HotelContact[]) => void;
   setCorporates: (rows: CorporateCompany[]) => void;
+  setAgents: (rows: TravelAgent[]) => void;
   setMonthDraws: (rows: MonthDraw[]) => void;
   saveGuestCard: (card: GuestCard) => void;
   setBankRows: (bankRows: BankRow[]) => void;
@@ -211,6 +214,7 @@ function seedState(): Omit<
   | "setReminders"
   | "setContacts"
   | "setCorporates"
+  | "setAgents"
   | "setMonthDraws"
   | "saveGuestCard"
   | "setBankRows"
@@ -243,6 +247,7 @@ function seedState(): Omit<
     reminders: [],
     contacts: [],
     corporates: [],
+    agents: [],
     monthDraws: [],
     guestCards: [],
     bankRows: [],
@@ -338,6 +343,12 @@ function mergeSnapshot(
         const fromHotel = corporatesFromHotel(persisted.hotel);
         return fromHotel.length ? fromHotel : normalizeCorporates(current.corporates);
       })();
+  const agents = Array.isArray(persisted.agents)
+    ? normalizeAgents(persisted.agents)
+    : (() => {
+        const fromHotel = agentsFromHotel(persisted.hotel);
+        return fromHotel.length ? fromHotel : normalizeAgents(current.agents);
+      })();
   const monthDraws = Array.isArray(persisted.monthDraws)
     ? normalizeMonthDraws(persisted.monthDraws)
     : (() => {
@@ -430,6 +441,7 @@ function mergeSnapshot(
     reminders,
     contacts,
     corporates,
+    agents,
     monthDraws,
     guestCards,
     bankRows,
@@ -818,6 +830,7 @@ export const useLedger = create<LedgerState>()(
         save({ contacts: normalizeContacts(contacts) }),
       setCorporates: (rows) =>
         save({ corporates: normalizeCorporates(rows) }),
+      setAgents: (rows) => save({ agents: normalizeAgents(rows) }),
       setMonthDraws: (rows) => {
         const monthDraws = normalizeMonthDraws(rows);
         const next = { ...get(), monthDraws };
@@ -885,6 +898,7 @@ export const useLedger = create<LedgerState>()(
           corporates: Array.isArray(p.corporates)
             ? normalizeCorporates(p.corporates)
             : cur.corporates,
+          agents: Array.isArray(p.agents) ? normalizeAgents(p.agents) : cur.agents,
           monthDraws: Array.isArray(p.monthDraws)
             ? normalizeMonthDraws(p.monthDraws)
             : cur.monthDraws,
@@ -949,6 +963,7 @@ export const useLedger = create<LedgerState>()(
         reminders: s.reminders,
         contacts: s.contacts,
         corporates: s.corporates,
+        agents: s.agents,
         monthDraws: s.monthDraws,
         guestCards: s.guestCards,
         bankRows: s.bankRows,

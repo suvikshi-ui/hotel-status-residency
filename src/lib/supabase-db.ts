@@ -26,6 +26,7 @@ import {
 } from "./invoice";
 import { contactsFromHotel, normalizeContacts, type HotelContact } from "./contacts";
 import { corporatesFromHotel, normalizeCorporates, type CorporateCompany } from "./corporates";
+import { agentsFromHotel, normalizeAgents, type TravelAgent } from "./agents";
 import { monthDrawsFromHotel, normalizeMonthDraws, type MonthDraw } from "./month-draw";
 import {
   normalizeReminders,
@@ -121,6 +122,7 @@ export type LedgerSnapshot = {
   reminders?: HotelReminder[];
   contacts?: HotelContact[];
   corporates?: CorporateCompany[];
+  agents?: TravelAgent[];
   monthDraws?: MonthDraw[];
   guestCards?: GuestCard[];
   bankRows?: BankRow[];
@@ -299,6 +301,11 @@ export function snapshotFromUnknown(
       : corporatesFromHotel(p.hotel).length
         ? corporatesFromHotel(p.hotel)
         : normalizeCorporates(fallback.corporates),
+    agents: Array.isArray((p as { agents?: TravelAgent[] }).agents)
+      ? normalizeAgents((p as { agents?: TravelAgent[] }).agents)
+      : agentsFromHotel(p.hotel).length
+        ? agentsFromHotel(p.hotel)
+        : normalizeAgents(fallback.agents),
     monthDraws: Array.isArray((p as { monthDraws?: MonthDraw[] }).monthDraws)
       ? normalizeMonthDraws((p as { monthDraws?: MonthDraw[] }).monthDraws)
       : monthDrawsFromHotel(p.hotel).length
@@ -798,6 +805,7 @@ export async function pullLedger(userId: string): Promise<CloudPull> {
     reminders: remindersFromHotel(hotelRaw),
     contacts: contactsFromHotel(hotelRaw),
     corporates: corporatesFromHotel(hotelRaw),
+    agents: agentsFromHotel(hotelRaw),
     monthDraws: monthDrawsFromHotel(hotelRaw),
     guestCards: guestCardsFromHotel(hotelRaw),
     bankRows: bankRowsFromHotel(hotelRaw),
@@ -1220,6 +1228,7 @@ export async function pushLedger(
         snap.contacts ?? [],
         snap.corporates ?? [],
         snap.monthDraws ?? [],
+        snap.agents ?? [],
       ),
       _books: booksForHotel(snap),
     },

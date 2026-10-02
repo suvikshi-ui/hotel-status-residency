@@ -51,6 +51,7 @@ function GuestsPage() {
           <TabsTrigger value="list">Guest list</TabsTrigger>
           <TabsTrigger value="form">Form</TabsTrigger>
           <TabsTrigger value="corporate">Corporate</TabsTrigger>
+          <TabsTrigger value="agent">Travel agent</TabsTrigger>
         </TabsList>
         <TabsContent value="list" className="flex flex-col gap-4">
           <Input
@@ -171,6 +172,9 @@ function GuestsPage() {
         <TabsContent value="corporate">
           <CorporateTab />
         </TabsContent>
+        <TabsContent value="agent">
+          <AgentTab />
+        </TabsContent>
       </Tabs>
     </div>
   );
@@ -190,6 +194,7 @@ function CorporateTab() {
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [note, setNote] = useState("");
+  const [open, setOpen] = useState(false);
 
   function add() {
     const company = name.trim();
@@ -222,6 +227,7 @@ function CorporateTab() {
         setPhone("");
         setEmail("");
         setNote("");
+        setOpen(false);
         toast.success("Company added");
       },
       {
@@ -256,9 +262,17 @@ function CorporateTab() {
         <p className="text-sm text-muted">
           Companies the hotel has a tie-up with. Name, GST, agreed booking amount and address.
         </p>
-        {write ? <SaveCube busy={saving} onSave={() => void saveToServer()} /> : null}
+        {write ? (
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant={open ? "outline" : "default"} onClick={() => setOpen((v) => !v)}>
+              <Plus className="size-4" />
+              {open ? "Close" : "Add"}
+            </Button>
+            <SaveCube busy={saving} onSave={() => void saveToServer()} />
+          </div>
+        ) : null}
       </div>
-      {write ? (
+      {write && open ? (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Add company</CardTitle>
@@ -319,6 +333,163 @@ function CorporateTab() {
                       {row.email ? <div className="text-xs text-muted">{row.email}</div> : null}
                     </td>
                     <td className="px-3 py-2.5 tabular">{row.phone || "—"}</td>
+                    <td className="px-3 py-2.5">{row.address || "—"}</td>
+                    <td className="px-3 py-2.5">{row.note || "—"}</td>
+                    {write ? (
+                      <td className="py-2.5 pr-3 text-right">
+                        <Button type="button" size="sm" variant="ghost" onClick={() => remove(row.id)}>
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </td>
+                    ) : null}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function AgentTab() {
+  const rows = useLedger((s) => s.agents);
+  const setAgents = useLedger((s) => s.setAgents);
+  const write = canWrite(useLedger((s) => s.appRole));
+  const { busy: saving, saveToServer } = useAccountSave();
+  const { gate } = useGate();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [address, setAddress] = useState("");
+  const [city, setCity] = useState("");
+  const [note, setNote] = useState("");
+
+  function add() {
+    const who = name.trim();
+    if (!who) {
+      toast.error("Write the travel agent name");
+      return;
+    }
+    gate(
+      () => {
+        setAgents([
+          ...rows,
+          {
+            id: uid("ta"),
+            name: who,
+            phone: phone.trim(),
+            email: email.trim(),
+            address: address.trim(),
+            city: city.trim(),
+            note: note.trim(),
+          },
+        ]);
+        setName("");
+        setPhone("");
+        setEmail("");
+        setAddress("");
+        setCity("");
+        setNote("");
+        setOpen(false);
+        toast.success("Travel agent added");
+      },
+      {
+        title: "Add this travel agent?",
+        message: who,
+        confirmLabel: "Add",
+      },
+    );
+  }
+
+  function remove(id: string) {
+    const row = rows.find((item) => item.id === id);
+    if (!row) return;
+    gate(
+      () => {
+        setAgents(rows.filter((item) => item.id !== id));
+        toast.success("Travel agent deleted");
+      },
+      {
+        title: "Delete this travel agent?",
+        message: row.name,
+        confirmLabel: "Delete",
+        danger: true,
+        requireCode: true,
+      },
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <p className="text-sm text-muted">
+          Travel agents the hotel works with. Name, phone, email and other detail.
+        </p>
+        {write ? (
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant={open ? "outline" : "default"} onClick={() => setOpen((v) => !v)}>
+              <Plus className="size-4" />
+              {open ? "Close" : "Add"}
+            </Button>
+            <SaveCube busy={saving} onSave={() => void saveToServer()} />
+          </div>
+        ) : null}
+      </div>
+      {write && open ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">New travel agent</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-2">
+            <FieldBox label="Agent name" value={name} onChange={setName} />
+            <FieldBox label="Phone" value={phone} onChange={setPhone} />
+            <FieldBox label="Email" value={email} onChange={setEmail} />
+            <FieldBox label="City" value={city} onChange={setCity} />
+            <div className="sm:col-span-2">
+              <FieldBox label="Address" value={address} onChange={setAddress} />
+            </div>
+            <div className="sm:col-span-2">
+              <FieldBox label="Other detail" value={note} onChange={setNote} />
+            </div>
+            <div>
+              <Button type="button" onClick={add}>
+                <Plus className="size-4" />
+                Save agent
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Agent list · {rows.length}</CardTitle>
+        </CardHeader>
+        <CardContent className="overflow-x-auto p-0">
+          {rows.length === 0 ? (
+            <p className="px-5 py-8 text-center text-sm text-muted">No travel agent yet.</p>
+          ) : (
+            <table className="w-full min-w-[48rem] text-left text-sm">
+              <thead className="text-[11px] uppercase tracking-wide text-muted">
+                <tr className="border-y border-border">
+                  <th className="px-5 py-2 font-medium">Name</th>
+                  <th className="px-3 py-2 font-medium">Phone</th>
+                  <th className="px-3 py-2 font-medium">Email</th>
+                  <th className="px-3 py-2 font-medium">City</th>
+                  <th className="px-3 py-2 font-medium">Address</th>
+                  <th className="px-3 py-2 font-medium">Detail</th>
+                  {write ? <th className="py-2" /> : null}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.id} className="border-b border-border/70">
+                    <td className="px-5 py-2.5 font-medium">{row.name}</td>
+                    <td className="px-3 py-2.5 tabular">{row.phone || "—"}</td>
+                    <td className="px-3 py-2.5">{row.email || "—"}</td>
+                    <td className="px-3 py-2.5">{row.city || "—"}</td>
                     <td className="px-3 py-2.5">{row.address || "—"}</td>
                     <td className="px-3 py-2.5">{row.note || "—"}</td>
                     {write ? (

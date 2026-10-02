@@ -4,6 +4,7 @@ import { parseSealedIds } from "./sheet-seal.ts";
 import type { HotelReminder } from "./reminders.ts";
 import type { HotelContact } from "./contacts.ts";
 import type { CorporateCompany } from "./corporates.ts";
+import type { TravelAgent } from "./agents.ts";
 import type { MonthDraw } from "./month-draw.ts";
 import type { GstBillMeta } from "./invoice.ts";
 import type { BankRow } from "./bank-recon.ts";
@@ -134,6 +135,7 @@ export function hotelForCloud(
   contacts: HotelContact[] = [],
   corporates: CorporateCompany[] = [],
   monthDraws: MonthDraw[] = [],
+  agents: TravelAgent[] = [],
 ): HotelInfo & {
   _lockedDates: Record<string, true>;
   _lockRev: Record<string, number>;
@@ -147,6 +149,7 @@ export function hotelForCloud(
   _contacts: HotelContact[];
   _corporates: CorporateCompany[];
   _monthDraws: MonthDraw[];
+  _agents: TravelAgent[];
 } {
   return {
     ...hotel,
@@ -162,6 +165,7 @@ export function hotelForCloud(
     _contacts: contacts,
     _corporates: corporates,
     _monthDraws: monthDraws,
+    _agents: agents,
   };
 }
 

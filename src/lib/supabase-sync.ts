@@ -117,6 +117,7 @@ function snapshotFromStore(): LedgerSnapshot {
     reminders: s.reminders,
     contacts: s.contacts,
     corporates: s.corporates,
+    agents: s.agents,
     monthDraws: s.monthDraws,
     guestCards: s.guestCards,
     bankRows: s.bankRows,
@@ -215,6 +216,7 @@ function applyMerged(merged: LedgerSnapshot, previous: LedgerSnapshot) {
     reminders: merged.reminders,
     contacts: merged.contacts,
     corporates: merged.corporates,
+    agents: merged.agents,
     monthDraws: merged.monthDraws,
     guestCards: merged.guestCards,
     bankRows: merged.bankRows,
@@ -734,6 +736,12 @@ function withLocalSavedFiles(cloud: LedgerSnapshot): LedgerSnapshot {
       [],
       local.corporates ?? [],
       cloud.corporates ?? [],
+    ),
+    agents: mergeByKey(
+      (row) => row.id,
+      [],
+      local.agents ?? [],
+      cloud.agents ?? [],
     ),
     monthDraws: mergeByKey(
       (row) => row.month,

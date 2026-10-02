@@ -22,6 +22,7 @@ function ContactsPage() {
   const write = canWrite(useLedger((s) => s.appRole));
   const { busy: saving, saveToServer } = useAccountSave();
   const { gate } = useGate();
+  const [open, setOpen] = useState(false);
   const [topic, setTopic] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -37,6 +38,7 @@ function ContactsPage() {
     gate(
       () => {
         setContacts([
+          ...contacts,
           {
             id: uid("ct"),
             topic: point,
@@ -44,12 +46,12 @@ function ContactsPage() {
             phone: phone.trim(),
             address: address.trim(),
           },
-          ...contacts,
         ]);
         setTopic("");
         setName("");
         setPhone("");
         setAddress("");
+        setOpen(false);
         toast.success("Contact added");
       },
       {
@@ -88,10 +90,18 @@ function ContactsPage() {
             Add a point, then the name, phone and address. Example: AC service.
           </p>
         </div>
-        {write ? <SaveCube busy={saving} onSave={() => void saveToServer()} /> : null}
+        {write ? (
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant={open ? "outline" : "default"} onClick={() => setOpen((v) => !v)}>
+              <Plus className="size-4" />
+              {open ? "Close" : "Add"}
+            </Button>
+            <SaveCube busy={saving} onSave={() => void saveToServer()} />
+          </div>
+        ) : null}
       </div>
 
-      {write ? (
+      {write && open ? (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">New contact</CardTitle>

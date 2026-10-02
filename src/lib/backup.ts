@@ -29,6 +29,7 @@ export type BackupTables = {
   reminders?: unknown[];
   contacts?: unknown[];
   corporates?: unknown[];
+  agents?: unknown[];
   guestCards?: unknown[];
   monthDraws?: unknown[];
   bankRows?: unknown[];
@@ -94,6 +95,7 @@ export function backupCounts(s: {
   reminders?: unknown[];
   contacts?: unknown[];
   corporates?: unknown[];
+  agents?: unknown[];
   guestCards?: unknown[];
   bankRows?: unknown[];
 }) {
@@ -120,6 +122,7 @@ export function backupCounts(s: {
     reminders: s.reminders?.length ?? 0,
     contacts: s.contacts?.length ?? 0,
     corporates: s.corporates?.length ?? 0,
+    agents: s.agents?.length ?? 0,
     guestCards: s.guestCards?.length ?? 0,
     bankRows: s.bankRows?.length ?? 0,
     dates: [

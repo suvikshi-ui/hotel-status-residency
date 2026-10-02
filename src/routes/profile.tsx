@@ -77,6 +77,7 @@ function snapshotNow(): LedgerSnapshot {
     reminders: s.reminders,
     contacts: s.contacts,
     corporates: s.corporates,
+    agents: s.agents,
     monthDraws: s.monthDraws,
     guestCards: s.guestCards,
     bankRows: s.bankRows,

@@ -1,18 +1,16 @@
-export interface CorporateCompany {
+export interface TravelAgent {
   id: string;
   name: string;
-  gst: string;
-  bookingAmount: number;
-  address: string;
-  person: string;
   phone: string;
   email: string;
+  address: string;
+  city: string;
   note: string;
 }
 
-export function normalizeCorporates(raw: unknown): CorporateCompany[] {
+export function normalizeAgents(raw: unknown): TravelAgent[] {
   if (!Array.isArray(raw)) return [];
-  const out: CorporateCompany[] = [];
+  const out: TravelAgent[] = [];
   const seen = new Set<string>();
   for (const row of raw) {
     if (!row || typeof row !== "object") continue;
@@ -21,23 +19,20 @@ export function normalizeCorporates(raw: unknown): CorporateCompany[] {
     const name = typeof r.name === "string" ? r.name.trim() : "";
     if (!id || !name || seen.has(id)) continue;
     seen.add(id);
-    const amount = Number(r.bookingAmount);
     out.push({
       id,
       name,
-      gst: typeof r.gst === "string" ? r.gst.trim() : "",
-      bookingAmount: Number.isFinite(amount) ? Math.max(0, Math.round(amount)) : 0,
-      address: typeof r.address === "string" ? r.address.trim() : "",
-      person: typeof r.person === "string" ? r.person.trim() : "",
       phone: typeof r.phone === "string" ? r.phone.trim() : "",
       email: typeof r.email === "string" ? r.email.trim() : "",
+      address: typeof r.address === "string" ? r.address.trim() : "",
+      city: typeof r.city === "string" ? r.city.trim() : "",
       note: typeof r.note === "string" ? r.note.trim() : "",
     });
   }
   return out;
 }
 
-export function corporatesFromHotel(hotel: unknown): CorporateCompany[] {
+export function agentsFromHotel(hotel: unknown): TravelAgent[] {
   if (!hotel || typeof hotel !== "object") return [];
-  return normalizeCorporates((hotel as { _corporates?: unknown })._corporates);
+  return normalizeAgents((hotel as { _agents?: unknown })._agents);
 }
