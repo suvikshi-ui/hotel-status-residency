@@ -24,6 +24,7 @@ import {
   gstIdsFromHotel,
   withGuestGst,
 } from "./invoice";
+import { contactsFromHotel, normalizeContacts, type HotelContact } from "./contacts";
 import {
   normalizeReminders,
   remindersFromHotel,
@@ -116,6 +117,7 @@ export type LedgerSnapshot = {
   inventoryFiles?: InventoryFile[];
   complaints?: RoomComplaint[];
   reminders?: HotelReminder[];
+  contacts?: HotelContact[];
   guestCards?: GuestCard[];
   bankRows?: BankRow[];
   savedAt?: number;
@@ -283,6 +285,11 @@ export function snapshotFromUnknown(
       : remindersFromHotel(p.hotel).length
         ? remindersFromHotel(p.hotel)
         : normalizeReminders(fallback.reminders),
+    contacts: Array.isArray((p as { contacts?: HotelContact[] }).contacts)
+      ? normalizeContacts((p as { contacts?: HotelContact[] }).contacts)
+      : contactsFromHotel(p.hotel).length
+        ? contactsFromHotel(p.hotel)
+        : normalizeContacts(fallback.contacts),
     guestCards: Array.isArray((p as { guestCards?: GuestCard[] }).guestCards)
       ? normalizeGuestCards((p as { guestCards?: GuestCard[] }).guestCards)
       : guestCardsFromHotel(p.hotel).length
@@ -757,6 +764,7 @@ export async function pullLedger(userId: string): Promise<CloudPull> {
         ),
     savedAt: Date.parse(str(row.updated_at)) || 0,
     reminders: remindersFromHotel(hotelRaw),
+    contacts: contactsFromHotel(hotelRaw),
     guestCards: guestCardsFromHotel(hotelRaw),
     bankRows: bankRowsFromHotel(hotelRaw),
   };
@@ -1175,6 +1183,7 @@ export async function pushLedger(
         gstBillsFromGuests(snap.guests),
         snap.bankRows ?? [],
         snap.guestCards ?? [],
+        snap.contacts ?? [],
       ),
       _books: booksForHotel(snap),
     },

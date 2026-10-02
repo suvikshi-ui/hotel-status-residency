@@ -9,7 +9,7 @@ export const ROLE_LABEL: Record<AppRole, string> = {
   owner: "Owner",
 };
 
-export const HOUSEKEEPING_PATHS = ["/complaints", "/inventory", "/login"] as const;
+export const HOUSEKEEPING_PATHS = ["/complaints", "/inventory", "/contacts", "/login"] as const;
 
 export const OWNER_PATHS = [
   "/",
@@ -18,6 +18,7 @@ export const OWNER_PATHS = [
   "/bank-recon",
   "/staff",
   "/complaints",
+  "/contacts",
   "/reminders",
   "/reports",
   "/login",

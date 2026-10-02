@@ -86,6 +86,7 @@ export interface InventoryFile {
   period: string;
   createdAt: string;
   updatedAt?: number;
+  by?: string;
   lines: InventoryItem[];
 }
 
@@ -169,6 +170,7 @@ export function encodeInventoryFile(file: InventoryFile): InventoryItem {
       period: file.period,
       createdAt: file.createdAt,
       updatedAt: file.updatedAt ?? 0,
+      by: file.by ?? "",
       lines: file.lines,
     }),
   };
@@ -186,6 +188,7 @@ export function decodeInventoryFile(row: {
       period?: string;
       createdAt?: string;
       updatedAt?: number;
+      by?: string;
       lines?: RawInventory[];
     };
     const kind =
@@ -205,6 +208,7 @@ export function decodeInventoryFile(row: {
       period: kind === "ws" ? period.slice(0, 10) : period.slice(0, 7),
       createdAt: (parsed.createdAt || period).slice(0, 10),
       updatedAt: Number.isFinite(updatedAt) ? updatedAt : 0,
+      by: typeof parsed.by === "string" ? parsed.by.trim() : "",
       lines:
         kind === "linen"
           ? normalizeInventory(parsed.lines)
@@ -255,6 +259,7 @@ export function normalizeInventoryFiles(rows: InventoryFile[] | undefined | null
       period,
       createdAt: (row.createdAt || period).slice(0, 10),
       updatedAt: Number.isFinite(row.updatedAt) ? row.updatedAt : 0,
+      by: typeof row.by === "string" ? row.by.trim() : "",
       lines:
         row.kind === "linen"
           ? normalizeInventory(row.lines)
@@ -299,7 +304,11 @@ export function mergeInventoryFiles(
 function mergeOneInventoryFile(older: InventoryFile, newer: InventoryFile): InventoryFile {
   const olderAt = older.updatedAt ?? 0;
   const newerAt = newer.updatedAt ?? 0;
-  if (newerAt !== olderAt) return newerAt > olderAt ? newer : older;
+  if (newerAt !== olderAt) {
+    const winner = newerAt > olderAt ? newer : older;
+    const other = winner === newer ? older : newer;
+    return winner.by ? winner : { ...winner, by: other.by ?? "" };
+  }
   const lines: InventoryItem[] = [];
   const index = new Map<string, number>();
   const add = (line: InventoryItem, replace: boolean) => {
@@ -325,7 +334,7 @@ function mergeOneInventoryFile(older: InventoryFile, newer: InventoryFile): Inve
   };
   for (const line of older.lines) add(line, false);
   for (const line of newer.lines) add(line, true);
-  return { ...newer, lines };
+  return { ...newer, by: newer.by || older.by || "", lines };
 }
 
 export function seedInventory(): InventoryItem[] {

@@ -27,6 +27,7 @@ import {
 import { SaveCube, useAccountSave } from "@/components/save-cube";
 import { escapeHtml, printDocument } from "@/lib/print-sheet";
 import { useLedger } from "@/lib/store";
+import { useStaffSession } from "@/lib/supabase-auth";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/inventory")({ component: InventoryPage });
@@ -211,15 +212,19 @@ function WsFileNav({
               </Button>
             ) : null}
             {days.map((file) => (
-              <Button
-                key={file.id}
-                type="button"
-                size="sm"
-                variant={openId === file.id ? "default" : "outline"}
-                onClick={() => onOpen(file.id)}
-              >
-                {dayName(file.period)}
-              </Button>
+              <div key={file.id} className="flex flex-col items-start gap-0.5">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={openId === file.id ? "default" : "outline"}
+                  onClick={() => onOpen(file.id)}
+                >
+                  {dayName(file.period)}
+                </Button>
+                {file.by ? (
+                  <span className="px-1 text-[10px] text-muted">By {file.by}</span>
+                ) : null}
+              </div>
             ))}
           </div>
         </div>
@@ -239,6 +244,8 @@ function InventoryBookPanel({ kind }: { kind: InventoryBook }) {
   const canDelete = role !== "housekeeping";
   const canEdit = role === "admin" || role === "supervisor";
   const { busy: saving, saveToServer } = useAccountSave();
+  const { user } = useStaffSession();
+  const who = (user?.name || user?.username || "").trim();
   const { gate } = useGate();
   const period = inventoryPeriod(kind, date);
   const bookFiles = useMemo(
@@ -321,6 +328,7 @@ function InventoryBookPanel({ kind }: { kind: InventoryBook }) {
       kind,
       period,
       createdAt: date.slice(0, 10),
+      by: who,
       lines: rows,
     };
     saveInventoryFile(file);
@@ -416,6 +424,7 @@ function InventoryBookPanel({ kind }: { kind: InventoryBook }) {
             : editing
               ? `${periodLabel(kind, openFile?.period ?? period)} — editing.`
               : `${periodLabel(kind, period)} is not saved yet.`}
+          {kind === "ws" && openFile?.by ? ` By ${openFile.by}.` : ""}
         </p>
         <div className="flex flex-wrap gap-2">
           {!saved && openId === "draft" ? (

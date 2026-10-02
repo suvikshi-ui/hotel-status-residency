@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as BalanceRouteImport } from './routes/balance'
 import { Route as BankReconRouteImport } from './routes/bank-recon'
 import { Route as ComplaintsRouteImport } from './routes/complaints'
+import { Route as ContactsRouteImport } from './routes/contacts'
 import { Route as DaySheetRouteImport } from './routes/day-sheet'
 import { Route as ExpensesRouteImport } from './routes/expenses'
 import { Route as GuestsRouteImport } from './routes/guests'
@@ -44,6 +45,11 @@ const BankReconRoute = BankReconRouteImport.update({
 const ComplaintsRoute = ComplaintsRouteImport.update({
   id: '/complaints',
   path: '/complaints',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContactsRoute = ContactsRouteImport.update({
+  id: '/contacts',
+  path: '/contacts',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DaySheetRoute = DaySheetRouteImport.update({
@@ -112,6 +118,7 @@ export interface FileRoutesByFullPath {
   '/balance': typeof BalanceRoute
   '/bank-recon': typeof BankReconRoute
   '/complaints': typeof ComplaintsRoute
+  '/contacts': typeof ContactsRoute
   '/day-sheet': typeof DaySheetRoute
   '/expenses': typeof ExpensesRoute
   '/guests': typeof GuestsRoute
@@ -130,6 +137,7 @@ export interface FileRoutesByTo {
   '/balance': typeof BalanceRoute
   '/bank-recon': typeof BankReconRoute
   '/complaints': typeof ComplaintsRoute
+  '/contacts': typeof ContactsRoute
   '/day-sheet': typeof DaySheetRoute
   '/expenses': typeof ExpensesRoute
   '/guests': typeof GuestsRoute
@@ -149,6 +157,7 @@ export interface FileRoutesById {
   '/balance': typeof BalanceRoute
   '/bank-recon': typeof BankReconRoute
   '/complaints': typeof ComplaintsRoute
+  '/contacts': typeof ContactsRoute
   '/day-sheet': typeof DaySheetRoute
   '/expenses': typeof ExpensesRoute
   '/guests': typeof GuestsRoute
@@ -169,6 +178,7 @@ export interface FileRouteTypes {
     | '/balance'
     | '/bank-recon'
     | '/complaints'
+    | '/contacts'
     | '/day-sheet'
     | '/expenses'
     | '/guests'
@@ -187,6 +197,7 @@ export interface FileRouteTypes {
     | '/balance'
     | '/bank-recon'
     | '/complaints'
+    | '/contacts'
     | '/day-sheet'
     | '/expenses'
     | '/guests'
@@ -205,6 +216,7 @@ export interface FileRouteTypes {
     | '/balance'
     | '/bank-recon'
     | '/complaints'
+    | '/contacts'
     | '/day-sheet'
     | '/expenses'
     | '/guests'
@@ -224,6 +236,7 @@ export interface RootRouteChildren {
   BalanceRoute: typeof BalanceRoute
   BankReconRoute: typeof BankReconRoute
   ComplaintsRoute: typeof ComplaintsRoute
+  ContactsRoute: typeof ContactsRoute
   DaySheetRoute: typeof DaySheetRoute
   ExpensesRoute: typeof ExpensesRoute
   GuestsRoute: typeof GuestsRoute
@@ -266,6 +279,13 @@ declare module '@tanstack/react-router' {
       path: '/complaints'
       fullPath: '/complaints'
       preLoaderRoute: typeof ComplaintsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contacts': {
+      id: '/contacts'
+      path: '/contacts'
+      fullPath: '/contacts'
+      preLoaderRoute: typeof ContactsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/day-sheet': {
@@ -360,6 +380,7 @@ const rootRouteChildren: RootRouteChildren = {
   BalanceRoute: BalanceRoute,
   BankReconRoute: BankReconRoute,
   ComplaintsRoute: ComplaintsRoute,
+  ContactsRoute: ContactsRoute,
   DaySheetRoute: DaySheetRoute,
   ExpensesRoute: ExpensesRoute,
   GuestsRoute: GuestsRoute,

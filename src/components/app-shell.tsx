@@ -13,6 +13,7 @@ import {
   LogOut,
   Menu,
   MessageSquareWarning,
+  Phone,
   Receipt,
   Scale,
   Users,
@@ -40,6 +41,7 @@ const NAV = [
   { to: "/inventory", label: "Inventory", icon: Layers, group: "Stores" },
   { to: "/complaints", label: "Complaints", icon: MessageSquareWarning, group: "Desk" },
   { to: "/reminders", label: "Reminder", icon: Bell, group: "Desk" },
+  { to: "/contacts", label: "Contacts", icon: Phone, group: "Desk" },
   { to: "/reports", label: "Reports", icon: BarChart3, group: "Close" },
   { to: "/profile", label: "Profile", icon: CircleUser, group: "Close" },
 ] as const;
