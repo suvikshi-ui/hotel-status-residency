@@ -72,34 +72,55 @@ describe("balance carry-forward", () => {
     assert.equal(d2.cashBook.cb, 0);
   });
 
-  it("month-end withdraw is the next month opening, September opening stays", () => {
-    const { map } = booksFor([guest("2026-09-30", 10000, "CASH")], "2026-10-01", {
-      opening: { cash: 500, santosh: 200, pk: 100, online: 0, outstanding: 0 },
-    });
+  it("October opening does not change September, and outstanding still carries", () => {
     const days = rebuildDayBooks({
       openingDate: "2026-09-01",
-      opening: { cash: 500, santosh: 200, pk: 100, online: 0, outstanding: 0 },
+      opening: { cash: 500, santosh: 200, pk: 100, online: 50, outstanding: 0 },
       guests: [
+        guest("2026-09-15", 4000, "BALANCE"),
         guest("2026-09-30", 10000, "CASH"),
         guest("2026-09-30", 3000, "QRS"),
         guest("2026-09-30", 2000, "QRPK"),
+        guest("2026-10-01", 1000, "CASH"),
       ],
       food: [],
       wholesale: [],
       expenses: [],
       balReceived: [],
       throughDates: ["2026-10-01"],
-      draws: [{ month: "2026-09", cash: 4000, santosh: 1000, pk: 500 }],
+      openings: [{ month: "2026-10", cash: 9000, santosh: 1500, pk: 800, online: 50 }],
     });
     const byDay = new Map(days.map((d) => [d.date, d]));
     assert.equal(byDay.get("2026-09-01")?.cashBook.ob, 500);
     assert.equal(byDay.get("2026-09-30")?.cashBook.cb, 10500);
     assert.equal(byDay.get("2026-09-30")?.santosh.cb, 3200);
     assert.equal(byDay.get("2026-09-30")?.pk.cb, 2100);
-    assert.equal(byDay.get("2026-10-01")?.cashBook.ob, 6500);
-    assert.equal(byDay.get("2026-10-01")?.santosh.ob, 2200);
-    assert.equal(byDay.get("2026-10-01")?.pk.ob, 1600);
-    assert.equal(map.get("2026-10-01")?.cashBook.ob, 10500);
+    assert.equal(byDay.get("2026-09-30")?.outstanding.cb, 4000);
+    assert.equal(byDay.get("2026-10-01")?.cashBook.ob, 9000);
+    assert.equal(byDay.get("2026-10-01")?.santosh.ob, 1500);
+    assert.equal(byDay.get("2026-10-01")?.pk.ob, 800);
+    assert.equal(byDay.get("2026-10-01")?.online.ob, 50);
+    assert.equal(byDay.get("2026-10-01")?.outstanding.ob, 4000);
+    assert.equal(byDay.get("2026-10-01")?.cashBook.cb, 10000);
+  });
+
+  it("without an October opening, September close carries and September stays", () => {
+    const days = rebuildDayBooks({
+      openingDate: "2026-09-01",
+      opening: { cash: 500, santosh: 200, pk: 100, online: 0, outstanding: 0 },
+      guests: [
+        guest("2026-09-30", 10000, "CASH"),
+        guest("2026-10-01", 1000, "CASH"),
+      ],
+      food: [],
+      wholesale: [],
+      expenses: [],
+      balReceived: [],
+      throughDates: ["2026-10-01"],
+    });
+    const byDay = new Map(days.map((d) => [d.date, d]));
+    assert.equal(byDay.get("2026-09-30")?.cashBook.cb, 10500);
+    assert.equal(byDay.get("2026-10-01")?.cashBook.ob, 10500);
   });
 
   it("Santosh QR and P.K. QR carry independently", () => {

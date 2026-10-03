@@ -65,6 +65,7 @@ import { contactsFromHotel, normalizeContacts, type HotelContact } from "./conta
 import { corporatesFromHotel, normalizeCorporates, type CorporateCompany } from "./corporates";
 import { agentsFromHotel, normalizeAgents, type TravelAgent } from "./agents";
 import { monthDrawsFromHotel, normalizeMonthDraws, type MonthDraw } from "./month-draw";
+import { monthOpeningsFromHotel, normalizeMonthOpenings, type MonthOpening } from "./month-opening";
 
 function afterSave() {
   void import("./supabase-sync").then((m) => m.requestCloudSave());
@@ -115,6 +116,7 @@ export interface LedgerState {
   corporates: CorporateCompany[];
   agents: TravelAgent[];
   monthDraws: MonthDraw[];
+  monthOpenings: MonthOpening[];
   guestCards: GuestCard[];
   bankRows: BankRow[];
   selectedDate: string;
@@ -169,6 +171,7 @@ export interface LedgerState {
   setCorporates: (rows: CorporateCompany[]) => void;
   setAgents: (rows: TravelAgent[]) => void;
   setMonthDraws: (rows: MonthDraw[]) => void;
+  setMonthOpenings: (rows: MonthOpening[]) => void;
   saveGuestCard: (card: GuestCard) => void;
   setBankRows: (bankRows: BankRow[]) => void;
   applySnapshot: (p: Partial<LedgerState>) => void;
@@ -216,6 +219,7 @@ function seedState(): Omit<
   | "setCorporates"
   | "setAgents"
   | "setMonthDraws"
+  | "setMonthOpenings"
   | "saveGuestCard"
   | "setBankRows"
   | "applySnapshot"
@@ -249,6 +253,7 @@ function seedState(): Omit<
     corporates: [],
     agents: [],
     monthDraws: [],
+    monthOpenings: [],
     guestCards: [],
     bankRows: [],
     selectedDate: DEFAULT_DATE,
@@ -355,6 +360,12 @@ function mergeSnapshot(
         const fromHotel = monthDrawsFromHotel(persisted.hotel);
         return fromHotel.length ? fromHotel : normalizeMonthDraws(current.monthDraws);
       })();
+  const monthOpenings = Array.isArray(persisted.monthOpenings)
+    ? normalizeMonthOpenings(persisted.monthOpenings)
+    : (() => {
+        const fromHotel = monthOpeningsFromHotel(persisted.hotel);
+        return fromHotel.length ? fromHotel : normalizeMonthOpenings(current.monthOpenings);
+      })();
   const guestCards = Array.isArray(persisted.guestCards)
     ? normalizeGuestCards(persisted.guestCards)
     : (() => {
@@ -443,6 +454,7 @@ function mergeSnapshot(
     corporates,
     agents,
     monthDraws,
+    monthOpenings,
     guestCards,
     bankRows,
     guests,
@@ -492,7 +504,7 @@ function rebuildFrom(
     expenses: state.expenses,
     balReceived: state.balReceived,
     throughDates: [fromDate, state.selectedDate, state.openingDate],
-    draws: state.monthDraws,
+    openings: state.monthOpenings,
   });
   const dirty: Record<string, true> = { ...state.dirty };
   for (const d of days) {
@@ -836,6 +848,11 @@ export const useLedger = create<LedgerState>()(
         const next = { ...get(), monthDraws };
         save({ monthDraws, ...rebuildFrom(next, next.openingDate || BASE_OPENING_DATE) });
       },
+      setMonthOpenings: (rows) => {
+        const monthOpenings = normalizeMonthOpenings(rows);
+        const next = { ...get(), monthOpenings };
+        save({ monthOpenings, ...rebuildFrom(next, next.openingDate || BASE_OPENING_DATE) });
+      },
       saveGuestCard: (card) => {
         const next = normalizeGuestCards([
           card,
@@ -902,6 +919,9 @@ export const useLedger = create<LedgerState>()(
           monthDraws: Array.isArray(p.monthDraws)
             ? normalizeMonthDraws(p.monthDraws)
             : cur.monthDraws,
+          monthOpenings: Array.isArray(p.monthOpenings)
+            ? normalizeMonthOpenings(p.monthOpenings)
+            : cur.monthOpenings,
           guestCards: Array.isArray(p.guestCards)
             ? normalizeGuestCards(p.guestCards)
             : cur.guestCards,
@@ -965,6 +985,7 @@ export const useLedger = create<LedgerState>()(
         corporates: s.corporates,
         agents: s.agents,
         monthDraws: s.monthDraws,
+        monthOpenings: s.monthOpenings,
         guestCards: s.guestCards,
         bankRows: s.bankRows,
         appRole: s.appRole,
@@ -1106,7 +1127,7 @@ export function pickDayBooks(state: LedgerState, date: string): DayBooks | undef
     expenses: state.expenses,
     balReceived: state.balReceived,
     throughDates: [date, state.selectedDate],
-    draws: state.monthDraws,
+    openings: state.monthOpenings,
   }).find((d) => d.date === date);
 }
 

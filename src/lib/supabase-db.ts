@@ -28,6 +28,7 @@ import { contactsFromHotel, normalizeContacts, type HotelContact } from "./conta
 import { corporatesFromHotel, normalizeCorporates, type CorporateCompany } from "./corporates";
 import { agentsFromHotel, normalizeAgents, type TravelAgent } from "./agents";
 import { monthDrawsFromHotel, normalizeMonthDraws, type MonthDraw } from "./month-draw";
+import { monthOpeningsFromHotel, normalizeMonthOpenings, type MonthOpening } from "./month-opening";
 import {
   normalizeReminders,
   remindersFromHotel,
@@ -124,6 +125,7 @@ export type LedgerSnapshot = {
   corporates?: CorporateCompany[];
   agents?: TravelAgent[];
   monthDraws?: MonthDraw[];
+  monthOpenings?: MonthOpening[];
   guestCards?: GuestCard[];
   bankRows?: BankRow[];
   savedAt?: number;
@@ -311,6 +313,11 @@ export function snapshotFromUnknown(
       : monthDrawsFromHotel(p.hotel).length
         ? monthDrawsFromHotel(p.hotel)
         : normalizeMonthDraws(fallback.monthDraws),
+    monthOpenings: Array.isArray((p as { monthOpenings?: MonthOpening[] }).monthOpenings)
+      ? normalizeMonthOpenings((p as { monthOpenings?: MonthOpening[] }).monthOpenings)
+      : monthOpeningsFromHotel(p.hotel).length
+        ? monthOpeningsFromHotel(p.hotel)
+        : normalizeMonthOpenings(fallback.monthOpenings),
     guestCards: Array.isArray((p as { guestCards?: GuestCard[] }).guestCards)
       ? normalizeGuestCards((p as { guestCards?: GuestCard[] }).guestCards)
       : guestCardsFromHotel(p.hotel).length
@@ -807,6 +814,7 @@ export async function pullLedger(userId: string): Promise<CloudPull> {
     corporates: corporatesFromHotel(hotelRaw),
     agents: agentsFromHotel(hotelRaw),
     monthDraws: monthDrawsFromHotel(hotelRaw),
+    monthOpenings: monthOpeningsFromHotel(hotelRaw),
     guestCards: guestCardsFromHotel(hotelRaw),
     bankRows: bankRowsFromHotel(hotelRaw),
   };
@@ -1229,6 +1237,7 @@ export async function pushLedger(
         snap.corporates ?? [],
         snap.monthDraws ?? [],
         snap.agents ?? [],
+        snap.monthOpenings ?? [],
       ),
       _books: booksForHotel(snap),
     },

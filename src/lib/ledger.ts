@@ -238,7 +238,7 @@ export function rebuildDayBooks(input: {
   expenses: NamedAmount[];
   balReceived: NamedAmount[];
   throughDates?: string[];
-  draws?: { month: string; cash: number; santosh: number; pk: number }[];
+  openings?: { month: string; cash: number; santosh: number; pk: number; online: number }[];
 }): DayBooks[] {
   const epoch = input.openingDate || "2026-09-01";
   const markers = [
@@ -270,13 +270,14 @@ export function rebuildDayBooks(input: {
     prev = closeAsPrev(books);
     const nextDate = addDaysIso(date, 1);
     if (nextDate.slice(0, 7) !== date.slice(0, 7)) {
-      const draw = input.draws?.find((row) => row.month === date.slice(0, 7));
-      if (draw) {
+      const opening = input.openings?.find((row) => row.month === nextDate.slice(0, 7));
+      if (opening) {
         prev = {
           ...prev,
-          cash: prev.cash - draw.cash,
-          santosh: prev.santosh - draw.santosh,
-          pk: prev.pk - draw.pk,
+          cash: opening.cash,
+          santosh: opening.santosh,
+          pk: opening.pk,
+          online: opening.online,
         };
       }
     }

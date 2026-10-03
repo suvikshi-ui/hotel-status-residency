@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { format, parseISO } from "date-fns";
 import { createFileRoute } from "@tanstack/react-router";
 import { Pencil, Search, Trash2, Lock, LockOpen, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
@@ -25,6 +26,8 @@ import { formatDay, formatDayShort, money, uid } from "@/lib/format";
 import { stayDates } from "@/lib/stay";
 import { useLedger } from "@/lib/store";
 import { isDayLocked } from "@/lib/register-lock";
+import { openingForMonth } from "@/lib/month-opening";
+import { canWrite } from "@/lib/roles";
 import type { GuestEntry } from "@/lib/types";
 import { requestCloudPullNow } from "@/lib/supabase-sync";
 import { SaveCube, useAccountSave } from "@/components/save-cube";
@@ -85,6 +88,7 @@ function RegisterPage() {
   return (
     <div className="flex flex-col gap-5">
         <AccountWriteFix />
+        <MonthBooks />
         <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
         <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">
@@ -484,6 +488,224 @@ function GuestDetailDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function monthSpan(openingDate: string, dates: string[]) {
+  const start = (openingDate || "2026-09-01").slice(0, 7);
+  const now = new Date();
+  let end = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  for (const date of dates) {
+    const month = (date || "").slice(0, 7);
+    if (/^\d{4}-\d{2}$/.test(month) && month > end) end = month;
+  }
+  if (start > end) end = start;
+  const out: string[] = [];
+  let year = Number(start.slice(0, 4));
+  let month = Number(start.slice(5, 7));
+  const endYear = Number(end.slice(0, 4));
+  const endMonth = Number(end.slice(5, 7));
+  while (year < endYear || (year === endYear && month <= endMonth)) {
+    out.push(`${year}-${String(month).padStart(2, "0")}`);
+    month += 1;
+    if (month > 12) {
+      month = 1;
+      year += 1;
+    }
+  }
+  return out;
+}
+
+function MonthBooks() {
+  const date = useLedger((s) => s.selectedDate);
+  const setDate = useLedger((s) => s.setDate);
+  const openingDate = useLedger((s) => s.openingDate);
+  const days = useLedger((s) => s.days);
+  const guests = useLedger((s) => s.guests);
+  const openings = useLedger((s) => s.monthOpenings);
+  const setMonthOpenings = useLedger((s) => s.setMonthOpenings);
+  const role = useLedger((s) => s.appRole);
+  const write = canWrite(role);
+  const { gate } = useGate();
+  const { busy, saveToServer } = useAccountSave();
+  const dates = useMemo(
+    () => [
+      ...guests.map((row) => row.date),
+      ...days.map((row) => row.date),
+    ],
+    [guests, days],
+  );
+  const months = useMemo(
+    () => monthSpan(openingDate, dates),
+    [openingDate, dates],
+  );
+  const years = [...new Set(months.map((month) => month.slice(0, 4)))];
+  const selectedMonth = date.slice(0, 7);
+  const selectedYear = selectedMonth.slice(0, 4);
+  const yearMonths = months.filter((month) => month.startsWith(selectedYear));
+  const firstMonth = (openingDate || "2026-09-01").slice(0, 7);
+  const saved = openingForMonth(openings, selectedMonth);
+  const carriedDay = [...days].reverse().find((day) => day.date.slice(0, 7) < selectedMonth);
+  const [cash, setCash] = useState(saved ? String(saved.cash) : "");
+  const [santosh, setSantosh] = useState(saved ? String(saved.santosh) : "");
+  const [pk, setPk] = useState(saved ? String(saved.pk) : "");
+  const [online, setOnline] = useState(saved ? String(saved.online) : "");
+
+  useEffect(() => {
+    const row = openingForMonth(openings, selectedMonth);
+    setCash(row ? String(row.cash) : "");
+    setSantosh(row ? String(row.santosh) : "");
+    setPk(row ? String(row.pk) : "");
+    setOnline(row ? String(row.online) : "");
+  }, [selectedMonth, openings]);
+
+  function openMonth(month: string) {
+    if (date.startsWith(month)) return;
+    const today = format(new Date(), "yyyy-MM-dd");
+    if (today.startsWith(month)) {
+      setDate(today);
+      return;
+    }
+    const inMonth = days.filter((day) => day.date.startsWith(month)).map((day) => day.date);
+    setDate(inMonth.length ? inMonth[inMonth.length - 1] : `${month}-01`);
+  }
+
+  function saveOpening() {
+    const row = {
+      month: selectedMonth,
+      cash: Math.max(0, Math.round(Number(cash) || 0)),
+      santosh: Math.max(0, Math.round(Number(santosh) || 0)),
+      pk: Math.max(0, Math.round(Number(pk) || 0)),
+      online: Math.max(0, Math.round(Number(online) || 0)),
+    };
+    gate(
+      () => {
+        const rest = openings.filter((item) => item.month !== selectedMonth);
+        setMonthOpenings([...rest, row]);
+        toast.success(`${format(parseISO(`${selectedMonth}-01`), "MMMM yyyy")} opening saved`);
+        void saveToServer();
+      },
+      {
+        title: "Set this month's opening?",
+        message:
+          "Cash, Santosh QR, P.K. QR and online start from these figures. Outstanding balance still comes from the previous month.",
+        confirmLabel: "Set opening",
+      },
+    );
+  }
+
+  const monthDays = useMemo(() => {
+    const [year, month] = selectedMonth.split("-").map(Number);
+    const count = new Date(year, month, 0).getDate();
+    const today = format(new Date(), "yyyy-MM-dd");
+    const out: string[] = [];
+    for (let day = 1; day <= count; day += 1) {
+      const iso = `${selectedMonth}-${String(day).padStart(2, "0")}`;
+      if (iso.slice(0, 7) < firstMonth) continue;
+      if (selectedMonth >= today.slice(0, 7) && iso > today) break;
+      out.push(iso);
+    }
+    return out;
+  }, [selectedMonth, firstMonth]);
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {years.map((year) => (
+          <Button
+            key={year}
+            type="button"
+            size="sm"
+            variant={year === selectedYear ? "default" : "outline"}
+            onClick={() => openMonth(months.find((month) => month.startsWith(year)) || `${year}-01`)}
+          >
+            {year}
+          </Button>
+        ))}
+      </div>
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {yearMonths.map((month) => (
+          <Button
+            key={month}
+            type="button"
+            size="sm"
+            variant={month === selectedMonth ? "default" : "outline"}
+            onClick={() => openMonth(month)}
+          >
+            {format(parseISO(`${month}-01`), "MMMM")}
+          </Button>
+        ))}
+      </div>
+      <div className="flex gap-1.5 overflow-x-auto pb-1">
+        {monthDays.map((iso) => (
+          <Button
+            key={iso}
+            type="button"
+            size="sm"
+            variant={iso === date ? "default" : "outline"}
+            className="min-w-10 px-2"
+            onClick={() => setDate(iso)}
+          >
+            {Number(iso.slice(8))}
+          </Button>
+        ))}
+      </div>
+      {selectedMonth === firstMonth ? (
+        <p className="text-sm text-muted">
+          {format(parseISO(`${selectedMonth}-01`), "MMMM")} stays in this cube. Adding the next
+          month does not change this register.
+        </p>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              {format(parseISO(`${selectedMonth}-01`), "MMMM yyyy")} opening
+            </CardTitle>
+            <p className="text-sm text-muted">
+              Cash, Santosh QR, P.K. QR and online start here.
+              {saved ? " Saved opening is in use." : " Not set yet, so yesterday's close is still carrying."}
+              {" "}Outstanding balance carries as it is
+              {carriedDay ? `: ${money(carriedDay.outstanding.cb)}` : ""}.
+            </p>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            {carriedDay ? (
+              <p className="text-sm text-muted">
+                Previous close · cash {money(carriedDay.cashBook.cb)} · Santosh{" "}
+                {money(carriedDay.santosh.cb)} · P.K. {money(carriedDay.pk.cb)} · online{" "}
+                {money(carriedDay.online.cb)}
+              </p>
+            ) : null}
+            {write ? (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  {(
+                    [
+                      ["Cash", cash, setCash],
+                      ["Santosh QR", santosh, setSantosh],
+                      ["P.K. QR", pk, setPk],
+                      ["Online", online, setOnline],
+                    ] as const
+                  ).map(([label, value, set]) => (
+                    <div key={label} className="grid gap-1.5">
+                      <Label>{label}</Label>
+                      <Input
+                        inputMode="numeric"
+                        value={value}
+                        onChange={(e) => set(e.target.value.replace(/[^\d]/g, ""))}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <Button type="button" disabled={busy} onClick={saveOpening}>
+                  {busy ? "Saving…" : "Set opening"}
+                </Button>
+              </>
+            ) : null}
+          </CardContent>
+        </Card>
+      )}
+    </div>
   );
 }
 
