@@ -96,9 +96,9 @@ function TopLink({
       className={cn(
         "flex h-11 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-semibold",
         active
-          ? "bg-[#1f4a3c] text-[#f4faf6] shadow-[inset_0_1px_0_rgba(255,255,255,0.28)]"
+          ? "bg-[#f4faf6] text-[#1b3f32]"
           : onDark
-            ? "text-[#1b2e28] hover:bg-[#1f4a3c]/8"
+            ? "text-[#f4faf6] hover:bg-white/12"
             : "text-fg hover:bg-bg-warm",
       )}
     >
@@ -131,10 +131,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-dvh text-[#1b2e28]">
       <div className="flex min-w-0 flex-col">
-        <header className="page-bar sticky top-0 z-30 border-b text-[#1b2e28] print:hidden">
+        <header className="page-bar sticky top-0 z-30 border-b text-[#f4faf6] print:hidden">
           <div className="flex items-center gap-2 px-3 py-2 md:px-6">
             <div className="flex min-w-0 flex-1 items-center gap-2">
-              <HotelLogo mark className="h-9 w-auto shrink-0" />
+              <span className="rounded-md bg-[#f4faf6] px-1 py-0.5">
+                <HotelLogo mark className="h-9 w-auto shrink-0" />
+              </span>
               <div className="min-w-0">
                 <div className="truncate font-display text-base font-semibold leading-tight">
                   {hotel.name}
@@ -142,19 +144,19 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <div
                   className={cn(
                     "truncate text-[11px] font-semibold uppercase tracking-[0.12em]",
-                    cloud.phase === "error" ? "text-[#9b3d32]" : "text-[#3d5c50]",
+                    cloud.phase === "error" ? "text-[#ffd0c8]" : "text-[#d7efe4]",
                   )}
                 >
                   {saved}
                 </div>
               </div>
             </div>
-            <DateNav />
+            <DateNav light />
             {user ? (
               <Button
                 variant="ghost"
                 size="icon"
-                className="shrink-0 !text-[#1b2e28] hover:!bg-[#1f4a3c]/8"
+                className="shrink-0 !text-[#f4faf6] hover:!bg-white/12"
                 aria-label={leaving ? "Signing out" : "Sign out"}
                 onClick={onSignOut}
                 disabled={leaving}
@@ -163,7 +165,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               </Button>
             ) : null}
           </div>
-          <div className="border-t border-[#1b2e28]/15 px-3 pb-2 md:px-6">
+          <div className="border-t border-white/15 px-3 pb-2 md:px-6">
             <NavLinks onDark />
           </div>
         </header>

@@ -136,12 +136,12 @@
 }
 
 .page-bar {
-  background: #d5e6dc;
+  background: #2f6a54;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  border-color: rgba(27, 46, 40, 0.16);
+  border-color: rgba(10, 32, 24, 0.35);
   box-shadow: none;
-  color: #1b2e28;
+  color: #f4faf6;
 }
 
 .nav-scroll {
@@ -181,7 +181,7 @@ select {
 }
 
 .daily-a4-head {
-  background: #1b2622 !important;
+  background: #2f6a54 !important;
   color: #f6f0e6 !important;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
@@ -235,6 +235,6 @@ select {
   }
 
   .daily-a4-head {
-    background: #1b2622 !important;
+    background: #2f6a54 !important;
   }
 }

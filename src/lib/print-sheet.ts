@@ -121,7 +121,7 @@ html, body {
   min-height: 0 !important;
   border-radius: 16px;
 }
-.daily-a4-head { background: #1b2622 !important; color: #f4efe4 !important; }
+.daily-a4-head { background: #2f6a54 !important; color: #f4efe4 !important; }
 .day-chart { background: #f7f1e6 !important; }`;
 
 export function a4PrintDocument(title: string, inner: string) {

@@ -330,19 +330,9 @@ async function doFlush(userId: string) {
       useLedger.setState({ inventoryFiles: files, deletedIds: deleted, complaints });
       writeHouseFiles(ledgerOwnerKey(), files);
     }
-    const keepLocal = preferLocalOverCloud({
-      localSavedAt: Math.max(local.savedAt ?? 0, latest.savedAt ?? 0),
-      cloudUpdatedAt: cloud.savedAt ?? 0,
-      localScore: ledgerActivityScore(latest),
-      cloudScore: ledgerActivityScore(cloud),
-    });
-    if (!keepLocal) {
-      const merged = mergeLiveSnapshot(base, snapshotFromStore(), cloud);
-      if (hashOf(merged) !== hashOf(snapshotFromStore())) applyMerged(merged, local);
-      toPush = merged;
-    } else {
-      toPush = snapshotFromStore();
-    }
+    const merged = mergeLiveSnapshot(base, snapshotFromStore(), cloud);
+    if (hashOf(merged) !== hashOf(snapshotFromStore())) applyMerged(merged, local);
+    toPush = withHouseFiles(userId, snapshotFromStore());
   }
 
   const result = await pushLedger(
