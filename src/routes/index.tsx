@@ -1,13 +1,5 @@
+import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { ArrowUpRight, BedDouble, UtensilsCrossed, Wallet } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ModeBadge } from "@/components/mode-badge";
@@ -135,56 +127,7 @@ function Overview() {
           </Link>
         </CardHeader>
         <CardContent className="h-56 md:h-72">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chart} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="salesFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#1f4a3c" stopOpacity={0.35} />
-                  <stop offset="100%" stopColor="#1f4a3c" stopOpacity={0.02} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid stroke="#e3d7c6" vertical={false} />
-              <XAxis
-                dataKey="date"
-                tick={{ fill: "#3e5a4c", fontSize: 11 }}
-                tickLine={false}
-                axisLine={false}
-                interval={3}
-              />
-              <YAxis
-                tickFormatter={(v) => moneyCompact(Number(v))}
-                tick={{ fill: "#3e5a4c", fontSize: 11 }}
-                tickLine={false}
-                axisLine={false}
-                width={52}
-              />
-              <Tooltip
-                formatter={(v: number) => money(v)}
-                contentStyle={{
-                  background: "#fffdf8",
-                  border: "1px solid #e3d7c6",
-                  borderRadius: 12,
-                  fontSize: 12,
-                }}
-              />
-              <Area
-                type="monotone"
-                dataKey="target"
-                stroke="#c4b8a1"
-                strokeDasharray="4 4"
-                fill="none"
-                name="Target"
-              />
-              <Area
-                type="monotone"
-                dataKey="sales"
-                stroke="#1f4a3c"
-                strokeWidth={2}
-                fill="url(#salesFill)"
-                name="Sales"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+          <SalesChart chart={chart} />
         </CardContent>
       </Card>
 
@@ -245,5 +188,64 @@ function Overview() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function SalesChart({
+  chart,
+}: {
+  chart: { date: string; sales: number; target: number }[];
+}) {
+  const [lib, setLib] = useState<typeof import("recharts") | null>(null);
+  useEffect(() => {
+    let live = true;
+    void import("recharts").then((mod) => {
+      if (live) setLib(mod);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+  if (!lib) {
+    return <div className="h-full animate-pulse rounded-md bg-bg-warm" />;
+  }
+  const { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } = lib;
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <AreaChart data={chart} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+        <defs>
+          <linearGradient id="salesFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#1f4a3c" stopOpacity={0.35} />
+            <stop offset="100%" stopColor="#1f4a3c" stopOpacity={0.02} />
+          </linearGradient>
+        </defs>
+        <CartesianGrid stroke="#e3d7c6" vertical={false} />
+        <XAxis
+          dataKey="date"
+          tick={{ fill: "#3e5a4c", fontSize: 11 }}
+          tickLine={false}
+          axisLine={false}
+          interval={3}
+        />
+        <YAxis
+          tickFormatter={(v) => moneyCompact(Number(v))}
+          tick={{ fill: "#3e5a4c", fontSize: 11 }}
+          tickLine={false}
+          axisLine={false}
+          width={52}
+        />
+        <Tooltip
+          formatter={(v) => money(Number(v))}
+          contentStyle={{
+            background: "#fffdf8",
+            border: "1px solid #e3d7c6",
+            borderRadius: 12,
+            fontSize: 12,
+          }}
+        />
+        <Area type="monotone" dataKey="target" stroke="#c4b8a1" strokeDasharray="4 4" fill="none" name="Target" />
+        <Area type="monotone" dataKey="sales" stroke="#1f4a3c" strokeWidth={2} fill="url(#salesFill)" name="Sales" />
+      </AreaChart>
+    </ResponsiveContainer>
   );
 }

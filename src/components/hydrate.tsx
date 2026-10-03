@@ -35,12 +35,12 @@ export function HydrateLedger({ children }: { children: ReactNode }) {
       await setLedgerOwner(ownerId);
       if (cancelled) return;
       if (user) useLedger.getState().setAppRole(user.role);
+      if (!cancelled) setReady(true);
       if (ownerId && user) {
         await hydrateFromCloud(ownerId);
         if (cancelled) return;
         startCloudSync(ownerId);
       }
-      if (!cancelled) setReady(true);
     })();
 
     return () => {

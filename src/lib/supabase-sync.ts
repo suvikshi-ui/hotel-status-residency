@@ -617,26 +617,12 @@ export async function hydrateFromCloud(userId: string): Promise<CloudPhase> {
           cloudScore,
         });
       if (keepLocal) {
-        const base = lastPulled;
-        const merged = mergeLiveSnapshot(base, local, cloud);
+        const merged = mergeLiveSnapshot(lastPulled, local, cloud);
         if (hashOf(merged) !== hashOf(local)) applyMerged(merged, local);
         openOnToday();
-        const toPush = snapshotFromStore();
-        rememberPulled(toPush, cloud.cloudUpdatedAt);
-        lastHash = hashOf(toPush);
-        setPhase("synced");
-        hydrating = false;
-        await pushLedger(
-          userId,
-          { ...toPush, savedAt: Date.now() + 2_000 },
-          undefined,
-          useLedger.getState().appRole,
-          pruneFromBase(base, toPush),
-        );
-        useLedger.setState({ savedAt: Date.now() + 2_000 });
+        rememberPulled(snapshotFromStore(), cloud.cloudUpdatedAt);
         lastHash = hashOf(snapshotFromStore());
-        const stamp = (await pullLedgerStamp(userId)) || cloud.cloudUpdatedAt;
-        rememberPulled(snapshotFromStore(), stamp);
+        setPhase("synced");
         return "synced";
       }
       clearLocalLedgerCache();
