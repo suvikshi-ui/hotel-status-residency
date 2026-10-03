@@ -82,9 +82,10 @@ export function mergeLineRefs<T extends { id: string; payRef?: string | null }>(
   const localMap = new Map((local ?? []).map((row) => [row.id, row.payRef?.trim() || ""]));
   const cloudMap = new Map((cloud ?? []).map((row) => [row.id, row.payRef?.trim() || ""]));
   return merged.map((row) => {
-    const ref = localMap.has(row.id)
-      ? localMap.get(row.id) || ""
-      : cloudMap.get(row.id) || row.payRef?.trim() || "";
+    const localRef = (localMap.get(row.id) || "").trim();
+    const cloudRef = (cloudMap.get(row.id) || "").trim();
+    const own = (row.payRef || "").trim();
+    const ref = localRef || cloudRef || own;
     if ((row.payRef?.trim() || "") === ref) return row;
     return { ...row, payRef: ref || null };
   });

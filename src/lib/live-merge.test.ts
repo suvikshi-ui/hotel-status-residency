@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { mergeByKey, mergeLiveSnapshot, mergeRowsById, pick3 } from "./live-merge.ts";
+import { mergeByKey, mergeLineRefs, mergeLiveSnapshot, mergeRowsById, pick3 } from "./live-merge.ts";
 import { mergeLockState } from "./register-lock.ts";
 import type { LedgerSnapshot } from "./supabase-db.ts";
 
@@ -171,5 +171,21 @@ describe("live merge across desks", () => {
     );
     assert.equal(next.complaints?.length, 1);
     assert.equal(next.complaints?.[0].id, "c1");
+  });
+
+  it("keeps a reference saved on the other desk when this desk has none", () => {
+    const row = {
+      id: "f1",
+      date: "2026-09-09",
+      mode: "QRPK" as const,
+      amount: 46563,
+      payRef: null,
+    };
+    const merged = mergeLineRefs(
+      [{ ...row }],
+      [{ ...row }],
+      [{ ...row, payRef: "46563" }],
+    );
+    assert.equal(merged[0]?.payRef, "46563");
   });
 });

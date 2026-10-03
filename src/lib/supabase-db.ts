@@ -1062,17 +1062,17 @@ export async function pushLedger(
   const priorHotel = priorMeta.data
     ? (priorMeta.data as { hotel?: unknown }).hotel
     : undefined;
-  const priorBookRows =
-    priorHotel && typeof priorHotel === "object"
-      ? normalizeBankRows(
-          (priorHotel as { _books?: { bankRows?: unknown } })._books?.bankRows,
-        )
-      : [];
+  const priorBooks = booksFromHotel(priorHotel);
   snap = {
     ...snap,
+    guests: overlayGuestBooks(snap.guests, priorBooks?.guests),
+    food: overlayPayRefs(snap.food, priorBooks?.food),
+    wholesale: overlayPayRefs(snap.wholesale, priorBooks?.wholesale),
+    expenses: overlayPayRefs(snap.expenses, priorBooks?.expenses),
+    balReceived: overlayPayRefs(snap.balReceived, priorBooks?.balReceived),
     bankRows: mergeBankBooks(snap.bankRows ?? [], [
+      ...(priorBooks?.bankRows ?? []),
       ...bankRowsFromHotel(priorHotel),
-      ...priorBookRows,
     ]),
   };
   const tombs = tombstonePrune(snap);
