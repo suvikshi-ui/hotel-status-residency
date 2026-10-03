@@ -23,7 +23,7 @@ const GREEN: [number, number, number] = [84, 130, 53];
 const RED: [number, number, number] = [192, 0, 0];
 const CREAM: [number, number, number] = [243, 234, 212];
 const SUB: [number, number, number] = [239, 232, 216];
-const HEAD: [number, number, number] = [47, 106, 84];
+const HEAD: [number, number, number] = [27, 51, 42];
 const IVORY: [number, number, number] = [244, 239, 228];
 
 function money(v: number) {

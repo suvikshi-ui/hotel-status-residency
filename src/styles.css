@@ -136,12 +136,20 @@
 }
 
 .page-bar {
-  background: #2f6a54;
+  background: #1b332a;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  border-color: rgba(10, 32, 24, 0.35);
+  border-color: rgba(0, 0, 0, 0.35);
   box-shadow: none;
   color: #f4faf6;
+}
+
+.logo-3d {
+  transform: perspective(180px) rotateX(10deg) rotateY(-12deg);
+  filter:
+    drop-shadow(0 1px 0 rgba(255, 236, 186, 0.7))
+    drop-shadow(0 3px 0 rgba(62, 40, 8, 0.65))
+    drop-shadow(0 8px 10px rgba(0, 0, 0, 0.55));
 }
 
 .nav-scroll {
@@ -181,7 +189,7 @@ select {
 }
 
 .daily-a4-head {
-  background: #2f6a54 !important;
+  background: #1b332a !important;
   color: #f6f0e6 !important;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
@@ -235,6 +243,6 @@ select {
   }
 
   .daily-a4-head {
-    background: #2f6a54 !important;
+    background: #1b332a !important;
   }
 }

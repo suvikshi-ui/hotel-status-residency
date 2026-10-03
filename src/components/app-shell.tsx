@@ -134,9 +134,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <header className="page-bar sticky top-0 z-30 border-b text-[#f4faf6] print:hidden">
           <div className="flex items-center gap-2 px-3 py-2 md:px-6">
             <div className="flex min-w-0 flex-1 items-center gap-2">
-              <span className="rounded-md bg-[#f4faf6] px-1 py-0.5">
-                <HotelLogo mark className="h-9 w-auto shrink-0" />
-              </span>
+              <HotelLogo mark className="logo-3d h-11 w-auto shrink-0" />
               <div className="min-w-0">
                 <div className="truncate font-display text-base font-semibold leading-tight">
                   {hotel.name}
