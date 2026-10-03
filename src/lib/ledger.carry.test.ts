@@ -88,7 +88,7 @@ describe("balance carry-forward", () => {
       expenses: [],
       balReceived: [],
       throughDates: ["2026-10-01"],
-      openings: [{ month: "2026-10", cash: 9000, santosh: 1500, pk: 800, online: 50 }],
+      openings: [{ month: "2026-10", cash: 9000, santosh: 1500, pk: 800, online: 0 }],
     });
     const byDay = new Map(days.map((d) => [d.date, d]));
     assert.equal(byDay.get("2026-09-01")?.cashBook.ob, 500);

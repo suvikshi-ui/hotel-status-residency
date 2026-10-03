@@ -549,15 +549,15 @@ function MonthBooks() {
   const [cash, setCash] = useState(saved ? String(saved.cash) : "");
   const [santosh, setSantosh] = useState(saved ? String(saved.santosh) : "");
   const [pk, setPk] = useState(saved ? String(saved.pk) : "");
-  const [online, setOnline] = useState(saved ? String(saved.online) : "");
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     const row = openingForMonth(openings, selectedMonth);
     setCash(row ? String(row.cash) : "");
     setSantosh(row ? String(row.santosh) : "");
     setPk(row ? String(row.pk) : "");
-    setOnline(row ? String(row.online) : "");
-  }, [selectedMonth, openings]);
+    setOpen(false);
+  }, [date, selectedMonth, openings]);
 
   function openMonth(month: string) {
     if (date.startsWith(month)) return;
@@ -576,7 +576,7 @@ function MonthBooks() {
       cash: Math.max(0, Math.round(Number(cash) || 0)),
       santosh: Math.max(0, Math.round(Number(santosh) || 0)),
       pk: Math.max(0, Math.round(Number(pk) || 0)),
-      online: Math.max(0, Math.round(Number(online) || 0)),
+      online: 0,
     };
     gate(
       () => {
@@ -588,7 +588,7 @@ function MonthBooks() {
       {
         title: "Set this month's opening?",
         message:
-          "Cash, Santosh QR, P.K. QR and online start from these figures. Outstanding balance still comes from the previous month.",
+          "Cash, Santosh QR and P.K. QR start from these figures. Online and outstanding balance still come from the previous month.",
         confirmLabel: "Set opening",
       },
     );
@@ -650,61 +650,57 @@ function MonthBooks() {
           </Button>
         ))}
       </div>
-      {selectedMonth === firstMonth ? (
-        <p className="text-sm text-muted">
-          {format(parseISO(`${selectedMonth}-01`), "MMMM")} stays in this cube. Adding the next
-          month does not change this register.
-        </p>
-      ) : (
+      {date.endsWith("-01") && selectedMonth !== firstMonth ? (
         <Card>
-          <CardHeader>
-            <CardTitle>
-              {format(parseISO(`${selectedMonth}-01`), "MMMM yyyy")} opening
-            </CardTitle>
-            <p className="text-sm text-muted">
-              Cash, Santosh QR, P.K. QR and online start here.
-              {saved ? " Saved opening is in use." : " Not set yet, so yesterday's close is still carrying."}
-              {" "}Outstanding balance carries as it is
-              {carriedDay ? `: ${money(carriedDay.outstanding.cb)}` : ""}.
-            </p>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3">
-            {carriedDay ? (
+          <CardHeader className="flex-row items-center justify-between gap-3">
+            <div>
+              <CardTitle>Opening balance · 1st</CardTitle>
               <p className="text-sm text-muted">
-                Previous close · cash {money(carriedDay.cashBook.cb)} · Santosh{" "}
-                {money(carriedDay.santosh.cb)} · P.K. {money(carriedDay.pk.cb)} · online{" "}
-                {money(carriedDay.online.cb)}
+                Cash, Santosh QR, P.K. QR only. Online and balance carry forward.
+                {saved ? " Saved." : " Not set yet."}
               </p>
-            ) : null}
-            {write ? (
-              <>
-                <div className="grid grid-cols-2 gap-3">
-                  {(
-                    [
-                      ["Cash", cash, setCash],
-                      ["Santosh QR", santosh, setSantosh],
-                      ["P.K. QR", pk, setPk],
-                      ["Online", online, setOnline],
-                    ] as const
-                  ).map(([label, value, set]) => (
-                    <div key={label} className="grid gap-1.5">
-                      <Label>{label}</Label>
-                      <Input
-                        inputMode="numeric"
-                        value={value}
-                        onChange={(e) => set(e.target.value.replace(/[^\d]/g, ""))}
-                      />
-                    </div>
-                  ))}
-                </div>
-                <Button type="button" disabled={busy} onClick={saveOpening}>
-                  {busy ? "Saving…" : "Set opening"}
-                </Button>
-              </>
-            ) : null}
-          </CardContent>
+            </div>
+            <Button type="button" size="sm" variant="outline" onClick={() => setOpen((v) => !v)}>
+              {open ? "Hide" : "Expand"}
+            </Button>
+          </CardHeader>
+          {open ? (
+            <CardContent className="flex flex-col gap-3">
+              {carriedDay ? (
+                <p className="text-sm text-muted">
+                  Carried · online {money(carriedDay.online.cb)} · balance{" "}
+                  {money(carriedDay.outstanding.cb)}
+                </p>
+              ) : null}
+              {write ? (
+                <>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    {(
+                      [
+                        ["Cash", cash, setCash],
+                        ["Santosh QR", santosh, setSantosh],
+                        ["P.K. QR", pk, setPk],
+                      ] as const
+                    ).map(([label, value, set]) => (
+                      <div key={label} className="grid gap-1.5">
+                        <Label>{label}</Label>
+                        <Input
+                          inputMode="numeric"
+                          value={value}
+                          onChange={(e) => set(e.target.value.replace(/[^\d]/g, ""))}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <Button type="button" disabled={busy} onClick={saveOpening}>
+                    {busy ? "Saving…" : "Set opening"}
+                  </Button>
+                </>
+              ) : null}
+            </CardContent>
+          ) : null}
         </Card>
-      )}
+      ) : null}
     </div>
   );
 }

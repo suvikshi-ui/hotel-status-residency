@@ -277,7 +277,6 @@ export function rebuildDayBooks(input: {
           cash: opening.cash,
           santosh: opening.santosh,
           pk: opening.pk,
-          online: opening.online,
         };
       }
     }
