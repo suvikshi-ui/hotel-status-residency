@@ -124,6 +124,57 @@ export function mergeLockState(local: LockState, cloud: LockState): LockState {
   return { locked, rev };
 }
 
+export function monthRevScore(rev: Record<string, number> | undefined, month: string) {
+  let max = 0;
+  if (!rev) return 0;
+  for (const [date, n] of Object.entries(rev)) {
+    if (date.startsWith(month) && n > max) max = n;
+  }
+  return max;
+}
+
+/** A newer lock beats an older "month is open" flag. Ties stay closed. */
+export function mergeOpenMonths(
+  localOpen: string[] | undefined,
+  cloudOpen: string[] | undefined,
+  localRev: Record<string, number> | undefined,
+  cloudRev: Record<string, number> | undefined,
+): string[] {
+  const local = readOpenMonths(localOpen);
+  const cloud = readOpenMonths(cloudOpen);
+  const months = new Set([...local, ...cloud]);
+  const out: string[] = [];
+  for (const month of months) {
+    const localHas = local.includes(month);
+    const cloudHas = cloud.includes(month);
+    if (localHas && cloudHas) {
+      if (monthRevScore(localRev, month) > 0 || monthRevScore(cloudRev, month) > 0) {
+        out.push(month);
+      }
+      continue;
+    }
+    if (!localHas && !cloudHas) continue;
+    const localScore = monthRevScore(localRev, month);
+    const cloudScore = monthRevScore(cloudRev, month);
+    if (localHas && localScore > cloudScore) out.push(month);
+    else if (cloudHas && cloudScore > localScore) out.push(month);
+  }
+  return out.sort();
+}
+
+export function isPriorMonthClosed(
+  date: string,
+  openMonths: string[] | undefined,
+  latestDate: string,
+  rev?: Record<string, number>,
+) {
+  const month = date.slice(0, 7);
+  const latest = (latestDate || date).slice(0, 7);
+  if (!/^\d{4}-\d{2}$/.test(month) || month >= latest) return false;
+  if (!readOpenMonths(openMonths).includes(month)) return true;
+  return monthRevScore(rev, month) === 0;
+}
+
 export function readOpenMonths(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
   return [...new Set(raw.filter((month) => typeof month === "string" && /^\d{4}-\d{2}$/.test(month)))];

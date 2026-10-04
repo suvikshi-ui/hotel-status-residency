@@ -24,7 +24,7 @@ import {
   money,
 } from "@/lib/format";
 import { useLedger } from "@/lib/store";
-import { isDayLocked } from "@/lib/register-lock";
+import { isDayLocked, isPriorMonthClosed } from "@/lib/register-lock";
 import type { ModeAmount, NamedAmount, PayMode } from "@/lib/types";
 
 function ModeLineCard({
@@ -389,7 +389,22 @@ export function RegisterLines() {
   const removeBal = useLedger((s) => s.removeBalReceived);
   const addExpense = useLedger((s) => s.addExpense);
   const removeExpense = useLedger((s) => s.removeExpense);
-  const locked = isDayLocked(useLedger((s) => s.lockedDates), date);
+  const lockedDay = isDayLocked(useLedger((s) => s.lockedDates), date);
+  const openMonths = useLedger((s) => s.openMonths);
+  const lockRev = useLedger((s) => s.lockRev);
+  const openingDate = useLedger((s) => s.openingDate);
+  const latestMark = [
+    openingDate,
+    date,
+    ...guests.map((row) => row.date),
+    ...allFood.map((row) => row.date),
+    ...allWs.map((row) => row.date),
+    ...allExp.map((row) => row.date),
+    ...allBal.map((row) => row.date),
+  ]
+    .filter(Boolean)
+    .reduce((max, value) => (value > max ? value : max), openingDate || date);
+  const locked = lockedDay || isPriorMonthClosed(date, openMonths, latestMark, lockRev);
   const { gate } = useGate();
   const sources = useMemo(() => uniqueSources(guests), [guests]);
   const accounts = useMemo(

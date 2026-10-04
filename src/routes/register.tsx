@@ -25,7 +25,7 @@ import { buildDayTake } from "@/lib/day-report";
 import { formatDay, formatDayShort, money, uid } from "@/lib/format";
 import { stayDates } from "@/lib/stay";
 import { useLedger } from "@/lib/store";
-import { isDayLocked } from "@/lib/register-lock";
+import { isDayLocked, isPriorMonthClosed } from "@/lib/register-lock";
 import { openingForMonth } from "@/lib/month-opening";
 import { buildBackupFile, downloadBackupJson } from "@/lib/backup";
 import { canWrite } from "@/lib/roles";
@@ -53,11 +53,13 @@ function RegisterPage() {
   const setStay = useLedger((s) => s.setStay);
   const setLineRef = useLedger((s) => s.setLineRef);
   const lockedDates = useLedger((s) => s.lockedDates);
+  const lockRev = useLedger((s) => s.lockRev);
   const openingDate = useLedger((s) => s.openingDate);
   const openMonths = useLedger((s) => s.openMonths);
   const lockRegister = useLedger((s) => s.lockRegister);
   const unlockRegister = useLedger((s) => s.unlockRegister);
   const lockMonth = useLedger((s) => s.lockMonth);
+  const unlockMonth = useLedger((s) => s.unlockMonth);
   const { busy: saving, saveToServer } = useAccountSave();
   const guestCards = useLedger((s) => s.guestCards);
   const saveGuestCard = useLedger((s) => s.saveGuestCard);
@@ -70,10 +72,6 @@ function RegisterPage() {
   useEffect(() => {
     setEditingId(null);
   }, [date]);
-
-  useEffect(() => {
-    if (locked) setEditingId(null);
-  }, [locked]);
 
   const editing = allGuests.find((g) => g.id === editingId) ?? null;
 
@@ -105,7 +103,13 @@ function RegisterPage() {
     .filter(Boolean)
     .reduce((max, value) => (value > max ? value : max), openingDate || date);
   const priorMonth = month < latestMark.slice(0, 7);
-  const monthReopened = (openMonths ?? []).includes(month);
+  const monthClosed = isPriorMonthClosed(date, openMonths, latestMark, lockRev);
+  const monthReopened = priorMonth && !monthClosed;
+  const sealed = locked || monthClosed;
+
+  useEffect(() => {
+    if (sealed) setEditingId(null);
+  }, [sealed]);
 
   return (
     <div className="flex flex-col gap-5">
@@ -129,7 +133,30 @@ function RegisterPage() {
         </div>
         <div className="flex flex-wrap gap-2 print:hidden">
           <SaveCube busy={saving} onSave={() => void saveToServer()} />
-          {priorMonth && !monthReopened ? null : priorMonth && monthReopened ? (
+          {monthClosed ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() =>
+                gate(
+                  () => {
+                    unlockMonth(month);
+                    toast.success(`${monthName} unlocked`);
+                  },
+                  {
+                    title: `Unlock ${monthName}?`,
+                    message:
+                      "Enter the security code. The whole month opens for entry. Lock it again when you are done.",
+                    confirmLabel: "Unlock month",
+                    requireCode: true,
+                  },
+                )
+              }
+            >
+              <LockOpen className="size-4" />
+              Unlock {monthName}
+            </Button>
+          ) : priorMonth && monthReopened ? (
             <Button
               type="button"
               variant="outline"
@@ -216,10 +243,10 @@ function RegisterPage() {
         </div>
         </div>
 
-      {priorMonth && !monthReopened ? (
+      {monthClosed ? (
         <p className="rounded-lg bg-bg-warm px-4 py-3 text-sm">
-          {monthName} is a locked cube. Tap a date to read that day. Reports stay
-          open, and not one entry is deleted. October does not change this month.
+          {monthName} is locked. New posting is closed. Press Unlock {monthName}
+          and enter the security code if you need to add or edit. Nothing is deleted.
         </p>
       ) : locked ? (
         <p className="rounded-lg bg-bg-warm px-4 py-3 text-sm">
@@ -229,7 +256,7 @@ function RegisterPage() {
         </p>
       ) : null}
       <YesterdayRoll />
-      {locked ? null : (
+      {sealed ? null : (
       <GuestForm
         editing={editing}
         onCancelEdit={() => setEditingId(null)}
@@ -309,7 +336,7 @@ function RegisterPage() {
                     {g.mode === "QRPK" ? (
                       <PkRefField
                         value={g.payRefNo}
-                        disabled={locked}
+                        disabled={sealed}
                         onSave={(ref) => setLineRef("guest", g.id, ref)}
                       />
                     ) : (
@@ -337,7 +364,7 @@ function RegisterPage() {
                   <td className="px-3 py-2">
                     {g.stay === "out" ? (
                       <Badge variant="muted">Out</Badge>
-                    ) : locked ? (
+                    ) : sealed ? (
                       <Badge variant="muted">Continue</Badge>
                     ) : (
                       <Button
@@ -370,7 +397,7 @@ function RegisterPage() {
                     />
                   </td>
                   <td className="px-3 py-2.5 text-right">
-                    {locked ? null : (
+                    {sealed ? null : (
                     <div className="flex justify-end gap-1 print:hidden">
                       <Button
                         variant="outline"

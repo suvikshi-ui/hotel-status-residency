@@ -25,6 +25,7 @@ import {
   mergeLockState,
   parseLockRev,
   parseLockedDates,
+  mergeOpenMonths,
   writeStoredLocks,
 } from "./register-lock";
 import { dropDeletedRows, sealKey } from "./sheet-seal";
@@ -739,7 +740,12 @@ function withLocalSavedFiles(cloud: LedgerSnapshot): LedgerSnapshot {
       cloud.monthOpenings ?? [],
     ),
     monthArchives: keepMonthArchives([local.monthArchives ?? [], cloud.monthArchives ?? []]),
-    openMonths: [...new Set([...(local.openMonths ?? []), ...(cloud.openMonths ?? [])])],
+  openMonths: mergeOpenMonths(
+    local.openMonths,
+    cloud.openMonths,
+    local.lockRev,
+    cloud.lockRev,
+  ),
   };
 }
 

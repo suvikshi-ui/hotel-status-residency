@@ -3,7 +3,7 @@ import {
   mergeLockState,
   parseLockRev,
   parseLockedDates,
-  readOpenMonths,
+  mergeOpenMonths,
 } from "./register-lock.ts";
 import { mergeBankBooks } from "./bank-recon.ts";
 import { normalizeGuestCards } from "./guest-cards.ts";
@@ -376,7 +376,12 @@ export function mergeLiveSnapshot(
       normalizeMonthArchives(local.monthArchives),
       normalizeMonthArchives(cloud.monthArchives),
     ]),
-    openMonths: readOpenMonths([...(local.openMonths ?? []), ...(cloud.openMonths ?? [])]),
+    openMonths: mergeOpenMonths(
+      local.openMonths,
+      cloud.openMonths,
+      local.lockRev,
+      cloud.lockRev,
+    ),
     guestCards: normalizeGuestCards(
       mergeByKey(
         (r) => r.id,

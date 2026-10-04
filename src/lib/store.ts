@@ -28,7 +28,7 @@ import { eachIsoDay, closeAsPrev, rebuildDayBooks } from "./ledger";
 import { fillAllSeedDates } from "./seed-fill";
 import { earlierDate, mergeRowsByDate } from "./cloud-save";
 import { parseAppRole, type AppRole } from "./roles";
-import { isDayLocked, withLocked, withoutLocked, pickLockedDates, parseLockedDates, parseLockRev, hotelFromCloud, bumpLockRev, readOpenMonths, openMonthsFromHotel } from "./register-lock";
+import { isDayLocked, withLocked, withoutLocked, pickLockedDates, parseLockedDates, parseLockRev, hotelFromCloud, bumpLockRev, readOpenMonths, openMonthsFromHotel, mergeOpenMonths, monthRevScore } from "./register-lock";
 import {
   freezeIfSealed,
   isSealed,
@@ -413,11 +413,15 @@ function mergeSnapshot(
       : (current.lockRev ?? {});
   const openMonths = opts?.replace
     ? readOpenMonths(persisted.openMonths ?? openMonthsFromHotel(persisted.hotel))
-    : readOpenMonths([
-        ...(current.openMonths ?? []),
-        ...readOpenMonths(persisted.openMonths),
-        ...openMonthsFromHotel(persisted.hotel),
-      ]);
+    : mergeOpenMonths(
+        current.openMonths,
+        [
+          ...readOpenMonths(persisted.openMonths),
+          ...openMonthsFromHotel(persisted.hotel),
+        ],
+        current.lockRev,
+        persisted.lockRev !== undefined ? parseLockRev(persisted.lockRev) : current.lockRev,
+      );
   const sealedIds = opts?.replace
     ? parseSealedIds(persisted.sealedIds)
     : mergeSealed(current.sealedIds, persisted.sealedIds);
@@ -547,7 +551,9 @@ function sealPriorMonths(state: LedgerState): Pick<LedgerState, "lockedDates" | 
   ].filter(Boolean);
   const latest = marks.reduce((max, date) => (date > max ? date : max), state.openingDate || BASE_OPENING_DATE);
   const latestMonth = monthStamp(latest);
-  const opened = new Set(state.openMonths ?? []);
+  const opened = new Set(
+    (state.openMonths ?? []).filter((month) => monthRevScore(state.lockRev, month) > 0),
+  );
   const locked = { ...(state.lockedDates ?? {}) };
   let rev = { ...(state.lockRev ?? {}) };
   const start = state.openingDate || BASE_OPENING_DATE;
@@ -693,10 +699,12 @@ export const useLedger = create<LedgerState>()(
       unlockMonth: (month) => {
         const openMonths = readOpenMonths([...(get().openMonths ?? []), month]);
         const lockedDates = { ...(get().lockedDates ?? {}) };
-        for (const date of Object.keys(lockedDates)) {
-          if (date.startsWith(month)) delete lockedDates[date];
+        let lockRev = { ...(get().lockRev ?? {}) };
+        for (const date of eachIsoDay(`${month}-01`, monthEnd(month))) {
+          delete lockedDates[date];
+          lockRev = bumpLockRev(lockRev, date);
         }
-        const next = { ...get(), openMonths, lockedDates };
+        const next = { ...get(), openMonths, lockedDates, lockRev };
         afterLockChange();
         save(rebuildFrom(next, `${month}-01`));
       },
@@ -1037,11 +1045,15 @@ export const useLedger = create<LedgerState>()(
           appRole: cur.appRole,
           lockedDates: parseLockedDates(p.lockedDates ?? cur.lockedDates),
           lockRev: parseLockRev(p.lockRev ?? cur.lockRev),
-          openMonths: readOpenMonths([
-            ...(cur.openMonths ?? []),
-            ...readOpenMonths(p.openMonths),
-            ...openMonthsFromHotel(p.hotel),
-          ]),
+          openMonths: mergeOpenMonths(
+            cur.openMonths,
+            [
+              ...readOpenMonths(p.openMonths),
+              ...openMonthsFromHotel(p.hotel),
+            ],
+            cur.lockRev,
+            parseLockRev(p.lockRev ?? cur.lockRev),
+          ),
           sealedIds: mergeSealed(cur.sealedIds, p.sealedIds),
           deletedIds: mergeSealed(cur.deletedIds, p.deletedIds),
           staff: normalizeStaff(p.staff ?? cur.staff),
