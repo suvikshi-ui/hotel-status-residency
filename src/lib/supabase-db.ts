@@ -1090,21 +1090,29 @@ export async function pushLedger(
     ? (priorMeta.data as { hotel?: unknown }).hotel
     : undefined;
   const priorBooks = booksFromHotel(priorHotel);
-  snap = {
-    ...snap,
-    guests: overlayGuestBooks(snap.guests, priorBooks?.guests),
-    food: overlayPayRefs(snap.food, priorBooks?.food),
-    wholesale: overlayPayRefs(snap.wholesale, priorBooks?.wholesale),
-    expenses: overlayPayRefs(snap.expenses, priorBooks?.expenses),
-    balReceived: overlayPayRefs(snap.balReceived, priorBooks?.balReceived),
-    bankRows: mergeBankBooks(snap.bankRows ?? [], [
-      ...(priorBooks?.bankRows ?? []),
-      ...bankRowsFromHotel(priorHotel),
-    ]),
-  };
+  const monthImport = migratedFrom === "month-import";
+  // A month import already merged every other month into `snap`. Do not pull
+  // the previous cloud copy back in — that would resurrect a month the desk emptied.
+  if (!monthImport) {
+    snap = {
+      ...snap,
+      guests: overlayGuestBooks(snap.guests, priorBooks?.guests),
+      food: overlayPayRefs(snap.food, priorBooks?.food),
+      wholesale: overlayPayRefs(snap.wholesale, priorBooks?.wholesale),
+      expenses: overlayPayRefs(snap.expenses, priorBooks?.expenses),
+      balReceived: overlayPayRefs(snap.balReceived, priorBooks?.balReceived),
+      bankRows: mergeBankBooks(snap.bankRows ?? [], [
+        ...(priorBooks?.bankRows ?? []),
+        ...bankRowsFromHotel(priorHotel),
+      ]),
+    };
+  }
   const tombs = tombstonePrune(snap);
-  const writePrune =
-    prune === undefined && ownerId !== userId ? tombs : unionPrune(prune, tombs);
+  const writePrune = monthImport
+    ? undefined
+    : prune === undefined && ownerId !== userId
+      ? tombs
+      : unionPrune(prune, tombs);
   const rooms = snap.rooms.map((r, i) => ({
     no: r.no,
     floor: r.floor,

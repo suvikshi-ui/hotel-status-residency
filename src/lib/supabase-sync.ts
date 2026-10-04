@@ -790,7 +790,7 @@ export async function importBackupAndRefresh(
     const pushed = await pushLedger(
       userId,
       { ...local, savedAt: local.savedAt ?? Date.now() },
-      undefined,
+      "month-import",
       useLedger.getState().appRole,
       undefined,
     );
@@ -812,6 +812,29 @@ export async function importBackupAndRefresh(
       return {
         ok: false,
         message: `Server पर ${serverGuests} guests, file में ${local.guests.length}. Account में सेव नहीं हुआ.`,
+      };
+    }
+    const wantedMonths = new Set(
+      local.guests.map((row) => row.date.slice(0, 7)).filter((month) => /^\d{4}-\d{2}$/.test(month)),
+    );
+    const extraMonths = [
+      ...new Set(
+        pulled.snapshot.guests
+          .map((row) => row.date.slice(0, 7))
+          .filter((month) => /^\d{4}-\d{2}$/.test(month) && !wantedMonths.has(month)),
+      ),
+    ];
+    if (extraMonths.length) {
+      useLedger.getState().applyCloudBooks({
+        ...local,
+        lockedDates: parseLockedDates(local.lockedDates),
+        lockRev: parseLockRev(local.lockRev),
+        savedAt: Date.now() + 2_000,
+      });
+      setPhase("error", "Server still has another month");
+      return {
+        ok: false,
+        message: `Yeh desk par sirf chosen months hain. Server par ${extraMonths.join(", ")} abhi bhi hai. Save ek baar aur dabao.`,
       };
     }
     useLedger.getState().applyCloudBooks({

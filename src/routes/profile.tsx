@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Download, Loader2, Upload } from "lucide-react";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -21,7 +21,12 @@ import {
   backupFilename,
   buildBackupFile,
   downloadBackupJson,
+  mergeMonthBooks,
+  monthLabel,
+  monthsInTables,
   parseBackupFile,
+  sliceBackupTables,
+  type BackupTables,
 } from "@/lib/backup";
 import { hotelForCloud } from "@/lib/register-lock";
 import { gstBillsFromGuests } from "@/lib/invoice";
@@ -96,64 +101,96 @@ function BackupCard() {
   const { user } = useStaffSession();
   const { busy: saving, saveToServer } = useAccountSave();
   const [busy, setBusy] = useState<"file" | "import" | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [importMonths, setImportMonths] = useState<string[]>([]);
+  const [pendingTables, setPendingTables] = useState<BackupTables | null>(null);
   const ownerId = user?.ownerId || user?.id || null;
+  const savedAt = useLedger((s) => s.savedAt);
+  const exportMonths = useMemo(
+    () => monthsInTables(snapshotNow()).slice().reverse(),
+    [savedAt, guests, exportOpen],
+  );
 
-  async function download() {
+  async function downloadMonth(month: string | null) {
     setBusy("file");
     try {
       const account = await saveAccountNow();
       const snap = snapshotNow();
-      downloadBackupJson(buildBackupFile(snap), backupFilename());
-      const n = backupCounts(snap);
+      const file = month
+        ? buildBackupFile(sliceBackupTables(snap, month), month)
+        : buildBackupFile(snap);
+      downloadBackupJson(file, month ? backupFilename(month) : backupFilename());
+      const n = backupCounts(month ? sliceBackupTables(snap, month) : snap);
+      const label = month ? monthLabel(month) : "Saare months";
       if (account.ok) {
         toast.success(
-          `Account saved · file saved · ${n.guests} guests · ${n.inventoryFiles} inventory files · ${n.payrollFiles} salary files · ${n.dates.length || 0} days`,
+          `${label} file save ho gayi · ${n.guests} guests · ${n.dates.length || 0} days`,
         );
       } else {
-        toast.error(
-          `File saved on this computer. Account: ${account.message}`,
-        );
+        toast.error(`File is computer par save ho gayi. Account: ${account.message}`);
       }
+      setExportOpen(false);
     } finally {
       setBusy(null);
     }
   }
 
-  function onFile(file: File) {
-    if (!ownerId) {
+  function confirmImport(month: string) {
+    if (!ownerId || !pendingTables) {
       toast.error("Sign in to import into the hotel books.");
       return;
     }
+    const sliced = sliceBackupTables(pendingTables, month);
+    const incoming = snapshotFromUnknown(sliced, clearedSnapshot(snapshotNow()));
+    const monthOpen = (sliced.openMonths ?? []).includes(month);
+    const merged = mergeMonthBooks(snapshotNow(), incoming, month, monthOpen);
+    const n = backupCounts(sliced);
+    const other = monthsInTables(merged).filter((item) => item !== month);
+    gate(
+      () => {
+        setBusy("import");
+        void importBackupAndRefresh(ownerId, merged)
+          .then((result) => {
+            if (!result.ok) {
+              toast.error(result.message || "JSON account में सेव नहीं हुआ");
+              return;
+            }
+            toast.success(
+              `${monthLabel(month)} import ho gaya · ${n.guests} guests. ${
+                other.length ? `${other.map(monthLabel).join(", ")} delete nahi hua.` : "Doosra koi month books mein nahi tha."
+              }`,
+            );
+            setPendingTables(null);
+            setImportMonths([]);
+          })
+          .catch((err) => {
+            toast.error(err instanceof Error ? err.message : "Could not import backup");
+          })
+          .finally(() => setBusy(null));
+      },
+      {
+        title: `${monthLabel(month)} import karein?`,
+        message: `Sirf ${monthLabel(month)} replace hoga (${n.guests} guests). ${
+          other.length ? `${other.map(monthLabel).join(", ")} waise ka waisa rahega.` : "Baaki months khali rahenge jab tak unki file import na karo."
+        }`,
+        confirmLabel: "Import",
+      },
+    );
+  }
+
+  function onFile(file: File) {
     const reader = new FileReader();
     reader.onload = () => {
       try {
         const parsed = parseBackupFile(JSON.parse(String(reader.result)));
-        const tables = snapshotFromUnknown(parsed.tables, snapshotNow());
-        const n = backupCounts(tables);
-        gate(
-          () => {
-            setBusy("import");
-            void importBackupAndRefresh(ownerId, tables)
-              .then((result) => {
-                if (!result.ok) {
-                  toast.error(result.message || "JSON account में सेव नहीं हुआ");
-                  return;
-                }
-                toast.success(
-                  `JSON account में सेव हो गया · ${n.guests} guests · ${n.dates[0] ?? "—"} to ${n.dates.at(-1) ?? "—"}. Refresh के बाद भी यही रहेगा.`,
-                );
-              })
-              .catch((err) => {
-                toast.error(err instanceof Error ? err.message : "Could not import backup");
-              })
-              .finally(() => setBusy(null));
-          },
-          {
-            title: "Import this backup into the hotel account?",
-            message: `This JSON will save into the hotel account (${n.guests} guests, ${n.food} food, ${n.expenses} expenses). After that, refresh will keep this copy.`,
-            confirmLabel: "Import",
-          },
-        );
+        const months = monthsInTables(parsed.tables);
+        if (!months.length) {
+          toast.error("Is file mein koi month nahi mila.");
+          return;
+        }
+        setPendingTables(parsed.tables);
+        setImportMonths(months.slice().reverse());
+        setExportOpen(false);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Could not read backup");
       }
@@ -167,45 +204,137 @@ function BackupCard() {
       <CardHeader>
         <CardTitle>Backup</CardTitle>
         <p className="text-sm text-muted">
-          Download JSON, import JSON, or Save to send the live books to the
-          hotel account. Import JSON सेव करके account में चढ़ा देता है —
-          refresh के बाद पुराना डेटा वापस नहीं आएगा.
+          Backup dabate hi month choose karo. Import bhi ek month ka hota hai —
+          October import karne se September delete nahi hota. Pehle system khali
+          ho, to sirf jo month import karoge wahi dikhega.
         </p>
       </CardHeader>
-      <CardContent className="flex flex-wrap items-center gap-3">
-        <Button type="button" onClick={() => void download()} disabled={Boolean(busy)}>
-          {busy === "file" ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
-          {busy === "file" ? "Saving…" : "Save file"}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={Boolean(busy)}
-          onClick={() => fileRef.current?.click()}
-        >
-          {busy === "import" ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
-          {busy === "import" ? "Saving to account…" : "Import JSON"}
-        </Button>
-        <SaveCube
-          busy={saving || Boolean(busy)}
-          onSave={() => void saveToServer()}
-        />
-        <input
-          ref={fileRef}
-          type="file"
-          accept="application/json,.json"
-          className="hidden"
-          disabled={Boolean(busy)}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            e.target.value = "";
-            if (file) onFile(file);
-          }}
-        />
-        <p className="text-xs text-muted">{guests} guests in the live books</p>
+      <CardContent className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <Button type="button" onClick={() => setExportOpen((open) => !open)} disabled={Boolean(busy)}>
+            {busy === "file" ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+            {busy === "file" ? "Saving…" : "Monthly backup"}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={Boolean(busy)}
+            onClick={() => fileRef.current?.click()}
+          >
+            {busy === "import" ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+            {busy === "import" ? "Saving to account…" : "Import month"}
+          </Button>
+          <SaveCube
+            busy={saving || Boolean(busy)}
+            onSave={() => void saveToServer()}
+          />
+          <input
+            ref={fileRef}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            disabled={Boolean(busy)}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (file) onFile(file);
+            }}
+          />
+          <p className="text-xs text-muted">{guests} guests in the live books</p>
+        </div>
+        {exportOpen ? (
+          <div className="flex flex-col gap-2">
+            <p className="text-sm font-medium">Kaun se month ka backup?</p>
+            <div className="flex flex-wrap gap-2">
+              {exportMonths.map((month) => (
+                <Button
+                  key={month}
+                  type="button"
+                  variant="outline"
+                  disabled={Boolean(busy)}
+                  onClick={() => void downloadMonth(month)}
+                >
+                  {monthLabel(month)}
+                </Button>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                disabled={Boolean(busy)}
+                onClick={() => void downloadMonth(null)}
+              >
+                Saare months
+              </Button>
+            </div>
+          </div>
+        ) : null}
+        {importMonths.length ? (
+          <div className="flex flex-col gap-2">
+            <p className="text-sm font-medium">Kaun sa month import karein? Doosra month delete nahi hoga.</p>
+            <div className="flex flex-wrap gap-2">
+              {importMonths.map((month) => (
+                <Button
+                  key={month}
+                  type="button"
+                  disabled={Boolean(busy)}
+                  onClick={() => confirmImport(month)}
+                >
+                  {monthLabel(month)}
+                </Button>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setPendingTables(null);
+                  setImportMonths([]);
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );
+}
+
+function clearedSnapshot(base: LedgerSnapshot): LedgerSnapshot {
+  return {
+    ...base,
+    guests: [],
+    food: [],
+    wholesale: [],
+    expenses: [],
+    balReceived: [],
+    staff: [],
+    staffRegister: [],
+    payrollFiles: [],
+    advances: [],
+    ota: [],
+    janSales: [],
+    janFood: [],
+    creditGuests: [],
+    inventory: [],
+    inventoryFiles: [],
+    complaints: [],
+    reminders: [],
+    contacts: [],
+    corporates: [],
+    agents: [],
+    guestCards: [],
+    bankRows: [],
+    monthDraws: [],
+    monthOpenings: [],
+    monthArchives: [],
+    openMonths: [],
+    lockedDates: {},
+    lockRev: {},
+    sealedIds: {},
+    deletedIds: {},
+    rooms: [],
+  };
 }
 
 function EmptyBooksCard() {

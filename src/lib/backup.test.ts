@@ -5,7 +5,10 @@ import {
   backupCounts,
   backupFilename,
   buildBackupFile,
+  mergeMonthBooks,
+  monthsInTables,
   parseBackupFile,
+  sliceBackupTables,
 } from "./backup.ts";
 
 describe("ledger backup", () => {
@@ -111,5 +114,119 @@ describe("ledger backup", () => {
     assert.equal(counts.inventoryFiles, 1);
     assert.equal(counts.payrollFiles, 1);
     assert.equal(counts.staffRegister, 1);
+  });
+});
+
+describe("monthly backup", () => {
+  const both = {
+    guests: [
+      { id: "s1", date: "2026-09-02", slNo: 4, name: "SEPT" },
+      { id: "o1", date: "2026-10-01", slNo: 9, name: "OCT" },
+    ],
+    food: [{ id: "f9", date: "2026-09-02", amount: 100 }],
+    expenses: [{ id: "e10", date: "2026-10-03", amount: 50 }],
+    bankRows: [
+      { id: "b9", month: "2026-09", date: "2026-09-02", particular: "sept" },
+      { id: "b10", month: "2026-10", date: "2026-10-01", particular: "oct" },
+    ],
+    monthOpenings: [
+      { month: "2026-09", cash: 25000, santosh: 0, pk: 0 },
+      { month: "2026-10", cash: 9000, santosh: 100, pk: 0 },
+    ],
+    monthArchives: [
+      { month: "2026-09", guests: [{ id: "s1" }] },
+      { month: "2026-10", guests: [{ id: "o1" }] },
+    ],
+    lockedDates: { "2026-09-02": true, "2026-10-01": true },
+    lockRev: { "2026-09-02": 2, "2026-10-01": 1 },
+    openMonths: ["2026-10"],
+    rooms: [{ no: "101", floor: "First" }],
+    inventoryFiles: [
+      { id: "ifile:ws:2026-09-02", period: "2026-09-02", kind: "ws" },
+      { id: "ifile:ws:2026-10-01", period: "2026-10-01", kind: "ws" },
+    ],
+  };
+
+  it("lists both months and slices only September", () => {
+    assert.deepEqual(monthsInTables(both), ["2026-09", "2026-10"]);
+    const sliced = sliceBackupTables(both, "2026-09");
+    assert.deepEqual(
+      (sliced.guests as { id: string }[]).map((row) => row.id),
+      ["s1"],
+    );
+    assert.equal((sliced.guests as { slNo: number }[])[0].slNo, 4);
+    assert.equal((sliced.expenses as unknown[]).length, 0);
+    assert.equal((sliced.bankRows as { id: string }[])[0].id, "b9");
+    assert.equal((sliced.monthOpenings as { month: string }[])[0].month, "2026-09");
+    assert.deepEqual(sliced.lockedDates, { "2026-09-02": true });
+    assert.deepEqual(sliced.openMonths, []);
+    assert.equal((sliced.rooms as { no: string }[])[0].no, "101");
+    assert.equal((sliced.inventoryFiles as unknown[]).length, 1);
+    const file = buildBackupFile(sliced, "2026-09");
+    assert.equal(file.month, "2026-09");
+    assert.equal(backupFilename("2026-09"), "HSR-backup-2026-09.json");
+    const parsed = parseBackupFile(JSON.parse(JSON.stringify(file)));
+    assert.equal(parsed.month, "2026-09");
+  });
+
+  it("imports October into empty books, then September, without wiping either", () => {
+    const empty = {
+      guests: [] as { id: string; date: string; slNo: number; name: string }[],
+      bankRows: [] as { id: string; month: string }[],
+      monthOpenings: [] as { month: string; cash: number }[],
+      lockedDates: {} as Record<string, true>,
+      openMonths: [] as string[],
+      opening: { cash: 0, santosh: 0, pk: 0, online: 0, outstanding: 0 },
+    };
+    const october = sliceBackupTables(both, "2026-10");
+    const withOct = mergeMonthBooks(empty, october as never, "2026-10", true);
+    assert.deepEqual(
+      withOct.guests.map((row) => row.id),
+      ["o1"],
+    );
+    assert.equal(withOct.guests[0].slNo, 9);
+    assert.equal(withOct.bankRows.length, 1);
+    assert.equal(withOct.monthOpenings[0].cash, 9000);
+
+    const september = sliceBackupTables(both, "2026-09");
+    const withBoth = mergeMonthBooks(withOct, september as never, "2026-09", false);
+    assert.deepEqual(
+      withBoth.guests.map((row) => row.id).sort(),
+      ["o1", "s1"],
+    );
+    assert.equal(withBoth.guests.find((row) => row.id === "o1")?.slNo, 9);
+    assert.equal(withBoth.guests.find((row) => row.id === "s1")?.slNo, 4);
+    assert.equal(withBoth.bankRows.length, 2);
+    assert.equal(withBoth.monthOpenings.length, 2);
+    assert.equal(withBoth.lockedDates["2026-10-01"], true);
+    assert.equal(withBoth.lockedDates["2026-09-02"], true);
+    assert.deepEqual(withBoth.openMonths, ["2026-10"]);
+  });
+
+  it("replaces only the chosen month and tombstones a dropped guest", () => {
+    const base = {
+      guests: [
+        { id: "s1", date: "2026-09-02", slNo: 4 },
+        { id: "s2", date: "2026-09-03", slNo: 5 },
+        { id: "o1", date: "2026-10-01", slNo: 9 },
+      ],
+      deletedIds: {} as Record<string, true>,
+      openMonths: ["2026-09", "2026-10"],
+      opening: { cash: 25000, santosh: 0, pk: 0, online: 0, outstanding: 0 },
+    };
+    const next = mergeMonthBooks(
+      base,
+      { guests: [{ id: "s2", date: "2026-09-03", slNo: 5 }] },
+      "2026-09",
+      true,
+    );
+    assert.deepEqual(
+      next.guests.map((row) => row.id).sort(),
+      ["o1", "s2"],
+    );
+    assert.equal(next.guests.find((row) => row.id === "o1")?.slNo, 9);
+    assert.equal(next.deletedIds?.["guest:s1"], true);
+    assert.equal(next.deletedIds?.["guest:o1"], undefined);
+    assert.equal(next.opening?.cash, 25000);
   });
 });
