@@ -123,6 +123,49 @@ describe("balance carry-forward", () => {
     assert.equal(byDay.get("2026-10-01")?.cashBook.ob, 10500);
   });
 
+  it("a locked September does not move when October changes", () => {
+    const first = rebuildDayBooks({
+      openingDate: "2026-09-01",
+      opening: { cash: 500, santosh: 200, pk: 100, online: 50, outstanding: 0 },
+      guests: [
+        guest("2026-09-30", 10000, "CASH"),
+        guest("2026-10-01", 1000, "CASH"),
+      ],
+      food: [],
+      wholesale: [],
+      expenses: [],
+      balReceived: [],
+      throughDates: ["2026-10-01"],
+    });
+    const locked: Record<string, true> = {};
+    for (const day of first) {
+      if (day.date.startsWith("2026-09")) locked[day.date] = true;
+    }
+    const second = rebuildDayBooks({
+      openingDate: "2026-09-01",
+      opening: { cash: 500, santosh: 200, pk: 100, online: 50, outstanding: 0 },
+      guests: [
+        guest("2026-09-30", 99999, "CASH"),
+        guest("2026-10-01", 4000, "CASH"),
+      ],
+      food: [],
+      wholesale: [],
+      expenses: [],
+      balReceived: [],
+      throughDates: ["2026-10-01"],
+      openings: [{ month: "2026-10", cash: 9000, santosh: 1500, pk: 800, online: 0 }],
+      lockedDates: locked,
+      previous: first,
+    });
+    const before = new Map(first.map((day) => [day.date, day]));
+    const after = new Map(second.map((day) => [day.date, day]));
+    assert.equal(after.get("2026-09-30")?.cashBook.cb, before.get("2026-09-30")?.cashBook.cb);
+    assert.equal(after.get("2026-09-01")?.cashBook.ob, before.get("2026-09-01")?.cashBook.ob);
+    assert.equal(after.get("2026-10-01")?.cashBook.ob, 9000);
+    assert.equal(after.get("2026-10-01")?.online.ob, before.get("2026-09-30")?.online.cb);
+    assert.equal(after.get("2026-10-01")?.outstanding.ob, before.get("2026-09-30")?.outstanding.cb);
+  });
+
   it("Santosh QR and P.K. QR carry independently", () => {
     const { map } = booksFor(
       [

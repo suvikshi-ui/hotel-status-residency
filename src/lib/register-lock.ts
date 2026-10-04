@@ -123,6 +123,16 @@ export function mergeLockState(local: LockState, cloud: LockState): LockState {
   return { locked, rev };
 }
 
+export function readOpenMonths(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return [...new Set(raw.filter((month) => typeof month === "string" && /^\d{4}-\d{2}$/.test(month)))];
+}
+
+export function openMonthsFromHotel(hotel: unknown): string[] {
+  if (!hotel || typeof hotel !== "object") return [];
+  return readOpenMonths((hotel as { _openMonths?: unknown })._openMonths);
+}
+
 export function hotelForCloud(
   hotel: HotelInfo,
   lockedDates: Record<string, true>,
@@ -138,6 +148,7 @@ export function hotelForCloud(
   monthDraws: MonthDraw[] = [],
   agents: TravelAgent[] = [],
   monthOpenings: MonthOpening[] = [],
+  openMonths: string[] = [],
 ): HotelInfo & {
   _lockedDates: Record<string, true>;
   _lockRev: Record<string, number>;
@@ -153,6 +164,7 @@ export function hotelForCloud(
   _monthDraws: MonthDraw[];
   _agents: TravelAgent[];
   _monthOpenings: MonthOpening[];
+  _openMonths: string[];
 } {
   return {
     ...hotel,
@@ -170,6 +182,7 @@ export function hotelForCloud(
     _monthDraws: monthDraws,
     _agents: agents,
     _monthOpenings: monthOpenings,
+    _openMonths: readOpenMonths(openMonths),
   };
 }
 

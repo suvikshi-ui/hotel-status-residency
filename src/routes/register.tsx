@@ -52,8 +52,12 @@ function RegisterPage() {
   const setStay = useLedger((s) => s.setStay);
   const setLineRef = useLedger((s) => s.setLineRef);
   const lockedDates = useLedger((s) => s.lockedDates);
+  const openingDate = useLedger((s) => s.openingDate);
+  const openMonths = useLedger((s) => s.openMonths);
   const lockRegister = useLedger((s) => s.lockRegister);
   const unlockRegister = useLedger((s) => s.unlockRegister);
+  const lockMonth = useLedger((s) => s.lockMonth);
+  const unlockMonth = useLedger((s) => s.unlockMonth);
   const { busy: saving, saveToServer } = useAccountSave();
   const guestCards = useLedger((s) => s.guestCards);
   const saveGuestCard = useLedger((s) => s.saveGuestCard);
@@ -85,6 +89,22 @@ function RegisterPage() {
     );
   }, [guests, q]);
 
+  const month = date.slice(0, 7);
+  const monthName = format(parseISO(`${month}-01`), "MMMM");
+  const latestMark = [
+    openingDate,
+    date,
+    ...allGuests.map((row) => row.date),
+    ...allFood.map((row) => row.date),
+    ...allWs.map((row) => row.date),
+    ...allExp.map((row) => row.date),
+    ...allBal.map((row) => row.date),
+  ]
+    .filter(Boolean)
+    .reduce((max, value) => (value > max ? value : max), openingDate || date);
+  const priorMonth = month < latestMark.slice(0, 7);
+  const monthReopened = (openMonths ?? []).includes(month);
+
   return (
     <div className="flex flex-col gap-5">
         <AccountWriteFix />
@@ -107,7 +127,54 @@ function RegisterPage() {
         </div>
         <div className="flex flex-wrap gap-2 print:hidden">
           <SaveCube busy={saving} onSave={() => void saveToServer()} />
-          {locked ? (
+          {priorMonth && !monthReopened ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                gate(
+                  () => {
+                    unlockMonth(month);
+                    toast.success(`${monthName} opened`);
+                  },
+                  {
+                    title: `Open ${monthName}?`,
+                    message:
+                      "Enter the security code. The whole month opens. Lock it again after the correction.",
+                    confirmLabel: "Open month",
+                    requireCode: true,
+                  },
+                );
+              }}
+            >
+              <LockOpen className="size-4" />
+              Open {monthName}
+            </Button>
+          ) : priorMonth && monthReopened ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() =>
+                gate(
+                  () => {
+                    lockMonth(month);
+                    setEditingId(null);
+                    toast.success(`${monthName} locked`);
+                  },
+                  {
+                    title: `Lock ${monthName}?`,
+                    message:
+                      "Enter the security code. This month's register and report stay as they are.",
+                    confirmLabel: "Lock month",
+                    requireCode: true,
+                  },
+                )
+              }
+            >
+              <Lock className="size-4" />
+              Lock {monthName}
+            </Button>
+          ) : locked ? (
             <Button
               type="button"
               variant="outline"
@@ -170,7 +237,13 @@ function RegisterPage() {
         </div>
         </div>
 
-      {locked ? (
+      {priorMonth && !monthReopened ? (
+        <p className="rounded-lg bg-bg-warm px-4 py-3 text-sm">
+          {monthName} is locked. Cash, Santosh QR, P.K. QR, online and balance carry
+          forward. The next month cannot change this register or its report. Open it
+          only with the security code.
+        </p>
+      ) : locked ? (
         <p className="rounded-lg bg-bg-warm px-4 py-3 text-sm">
           This day's register is locked on every desk. Unlock with the digit
           code to add or edit. You do not need to press Lock again on another

@@ -45,6 +45,7 @@ import {
   locksFromHotel,
   locksFromMeta,
   mergeLockState,
+  openMonthsFromHotel,
   parseLockedDates,
   parseLockRev,
 } from "./register-lock";
@@ -126,6 +127,7 @@ export type LedgerSnapshot = {
   agents?: TravelAgent[];
   monthDraws?: MonthDraw[];
   monthOpenings?: MonthOpening[];
+  openMonths?: string[];
   guestCards?: GuestCard[];
   bankRows?: BankRow[];
   savedAt?: number;
@@ -318,6 +320,9 @@ export function snapshotFromUnknown(
       : monthOpeningsFromHotel(p.hotel).length
         ? monthOpeningsFromHotel(p.hotel)
         : normalizeMonthOpenings(fallback.monthOpenings),
+    openMonths: openMonthsFromHotel(p.hotel).length
+      ? openMonthsFromHotel(p.hotel)
+      : openMonthsFromHotel(fallback.hotel),
     guestCards: Array.isArray((p as { guestCards?: GuestCard[] }).guestCards)
       ? normalizeGuestCards((p as { guestCards?: GuestCard[] }).guestCards)
       : guestCardsFromHotel(p.hotel).length
@@ -815,6 +820,7 @@ export async function pullLedger(userId: string): Promise<CloudPull> {
     agents: agentsFromHotel(hotelRaw),
     monthDraws: monthDrawsFromHotel(hotelRaw),
     monthOpenings: monthOpeningsFromHotel(hotelRaw),
+    openMonths: openMonthsFromHotel(hotelRaw),
     guestCards: guestCardsFromHotel(hotelRaw),
     bankRows: bankRowsFromHotel(hotelRaw),
   };
@@ -1238,6 +1244,7 @@ export async function pushLedger(
         snap.monthDraws ?? [],
         snap.agents ?? [],
         snap.monthOpenings ?? [],
+        snap.openMonths ?? [],
       ),
       _books: booksForHotel(snap),
     },
