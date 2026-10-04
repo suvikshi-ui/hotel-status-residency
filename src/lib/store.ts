@@ -24,7 +24,7 @@ import {
 } from "./payroll-files";
 import { uid } from "./format";
 import { applyGuestPatch, applyStay, applyYesterdayRoll } from "./stay";
-import { eachIsoDay, rebuildDayBooks } from "./ledger";
+import { eachIsoDay, closeAsPrev, rebuildDayBooks } from "./ledger";
 import { fillAllSeedDates } from "./seed-fill";
 import { earlierDate, mergeRowsByDate } from "./cloud-save";
 import { parseAppRole, type AppRole } from "./roles";
@@ -66,6 +66,12 @@ import { corporatesFromHotel, normalizeCorporates, type CorporateCompany } from 
 import { agentsFromHotel, normalizeAgents, type TravelAgent } from "./agents";
 import { monthDrawsFromHotel, normalizeMonthDraws, type MonthDraw } from "./month-draw";
 import { monthOpeningsFromHotel, normalizeMonthOpenings, type MonthOpening } from "./month-opening";
+import {
+  keepMonthArchives,
+  monthArchivesFromHotel,
+  normalizeMonthArchives,
+  type MonthArchive,
+} from "./month-archive";
 
 function afterSave() {
   void import("./supabase-sync").then((m) => m.requestCloudSave());
@@ -117,6 +123,7 @@ export interface LedgerState {
   agents: TravelAgent[];
   monthDraws: MonthDraw[];
   monthOpenings: MonthOpening[];
+  monthArchives: MonthArchive[];
   guestCards: GuestCard[];
   bankRows: BankRow[];
   selectedDate: string;
@@ -259,6 +266,7 @@ function seedState(): Omit<
     agents: [],
     monthDraws: [],
     monthOpenings: [],
+    monthArchives: [],
     guestCards: [],
     bankRows: [],
     selectedDate: DEFAULT_DATE,
@@ -372,6 +380,11 @@ function mergeSnapshot(
         const fromHotel = monthOpeningsFromHotel(persisted.hotel);
         return fromHotel.length ? fromHotel : normalizeMonthOpenings(current.monthOpenings);
       })();
+  const monthArchives = keepMonthArchives([
+    normalizeMonthArchives(persisted.monthArchives),
+    monthArchivesFromHotel(persisted.hotel),
+    opts?.replace ? [] : normalizeMonthArchives(current.monthArchives),
+  ]);
   const guestCards = Array.isArray(persisted.guestCards)
     ? normalizeGuestCards(persisted.guestCards)
     : (() => {
@@ -468,6 +481,7 @@ function mergeSnapshot(
     agents,
     monthDraws,
     monthOpenings,
+    monthArchives,
     guestCards,
     bankRows,
     guests,
@@ -553,11 +567,58 @@ function sealPriorMonths(state: LedgerState): Pick<LedgerState, "lockedDates" | 
   return { lockedDates: locked, lockRev: rev, openMonths: [...opened] };
 }
 
+function archiveClosedMonths(state: LedgerState, openMonths: string[]): MonthArchive[] {
+  const kept = normalizeMonthArchives(state.monthArchives);
+  const opened = new Set(openMonths);
+  const marks = [
+    state.openingDate,
+    state.selectedDate,
+    ...state.guests.map((row) => row.date),
+    ...state.food.map((row) => row.date),
+    ...state.expenses.map((row) => row.date),
+  ].filter(Boolean);
+  const latest = marks.reduce(
+    (max, date) => (date > max ? date : max),
+    state.openingDate || BASE_OPENING_DATE,
+  );
+  const latestMonth = monthStamp(latest);
+  const start = state.openingDate || BASE_OPENING_DATE;
+  const added: MonthArchive[] = [];
+  for (let month = monthStamp(start); month && month < latestMonth; month = nextMonthStamp(month)) {
+    if (opened.has(month)) continue;
+    const days = state.days
+      .filter((day) => day.date.startsWith(month))
+      .sort((a, b) => a.date.localeCompare(b.date));
+    const guests = state.guests.filter((row) => row.date.startsWith(month));
+    const food = state.food.filter((row) => row.date.startsWith(month));
+    const wholesale = state.wholesale.filter((row) => row.date.startsWith(month));
+    const expenses = state.expenses.filter((row) => row.date.startsWith(month));
+    const balReceived = state.balReceived.filter((row) => row.date.startsWith(month));
+    if (!days.length && !guests.length && !food.length && !expenses.length) continue;
+    const last = days[days.length - 1];
+    added.push({
+      month,
+      savedAt: new Date().toISOString(),
+      carry: last
+        ? closeAsPrev(last)
+        : { cash: 0, santosh: 0, pk: 0, online: 0, outstanding: 0 },
+      guests,
+      food,
+      wholesale,
+      expenses,
+      balReceived,
+      days,
+    });
+  }
+  return keepMonthArchives([kept, added]);
+}
+
 function rebuildFrom(
   state: LedgerState,
   fromDate: string,
-): Pick<LedgerState, "days" | "dirty" | "lockedDates" | "lockRev" | "openMonths"> {
+): Pick<LedgerState, "days" | "dirty" | "lockedDates" | "lockRev" | "openMonths" | "monthArchives"> {
   const sealed = sealPriorMonths(state);
+  const monthArchives = archiveClosedMonths(state, sealed.openMonths);
   const days = rebuildDayBooks({
     openingDate: state.openingDate || BASE_OPENING_DATE,
     opening: state.opening,
@@ -575,7 +636,7 @@ function rebuildFrom(
   for (const day of days) {
     if (day.date >= fromDate && !sealed.lockedDates[day.date]) dirty[day.date] = true;
   }
-  return { days, dirty, ...sealed };
+  return { days, dirty, ...sealed, monthArchives };
 }
 
 function withBooks(state: LedgerState): LedgerState {
@@ -1011,6 +1072,11 @@ export const useLedger = create<LedgerState>()(
           monthOpenings: Array.isArray(p.monthOpenings)
             ? normalizeMonthOpenings(p.monthOpenings)
             : cur.monthOpenings,
+          monthArchives: keepMonthArchives([
+            normalizeMonthArchives(cur.monthArchives),
+            normalizeMonthArchives(p.monthArchives),
+            monthArchivesFromHotel(p.hotel),
+          ]),
           guestCards: Array.isArray(p.guestCards)
             ? normalizeGuestCards(p.guestCards)
             : cur.guestCards,
@@ -1076,6 +1142,7 @@ export const useLedger = create<LedgerState>()(
         agents: s.agents,
         monthDraws: s.monthDraws,
         monthOpenings: s.monthOpenings,
+        monthArchives: s.monthArchives,
         guestCards: s.guestCards,
         bankRows: s.bankRows,
         appRole: s.appRole,

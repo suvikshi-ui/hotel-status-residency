@@ -7,6 +7,7 @@ import type { CorporateCompany } from "./corporates.ts";
 import type { TravelAgent } from "./agents.ts";
 import type { MonthDraw } from "./month-draw.ts";
 import type { MonthOpening } from "./month-opening.ts";
+import type { MonthArchive } from "./month-archive.ts";
 import type { GstBillMeta } from "./invoice.ts";
 import type { BankRow } from "./bank-recon.ts";
 import type { GuestCard } from "./guest-cards.ts";
@@ -149,6 +150,7 @@ export function hotelForCloud(
   agents: TravelAgent[] = [],
   monthOpenings: MonthOpening[] = [],
   openMonths: string[] = [],
+  monthArchives: MonthArchive[] = [],
 ): HotelInfo & {
   _lockedDates: Record<string, true>;
   _lockRev: Record<string, number>;
@@ -165,6 +167,7 @@ export function hotelForCloud(
   _agents: TravelAgent[];
   _monthOpenings: MonthOpening[];
   _openMonths: string[];
+  _monthArchives: MonthArchive[];
 } {
   return {
     ...hotel,
@@ -183,6 +186,7 @@ export function hotelForCloud(
     _agents: agents,
     _monthOpenings: monthOpenings,
     _openMonths: readOpenMonths(openMonths),
+    _monthArchives: monthArchives,
   };
 }
 

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { createFileRoute } from "@tanstack/react-router";
-import { Pencil, Search, Trash2, Lock, LockOpen, RefreshCw } from "lucide-react";
+import { Pencil, Search, Trash2, Lock, LockOpen, RefreshCw, Download } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,7 @@ import { stayDates } from "@/lib/stay";
 import { useLedger } from "@/lib/store";
 import { isDayLocked } from "@/lib/register-lock";
 import { openingForMonth } from "@/lib/month-opening";
+import { buildBackupFile, downloadBackupJson } from "@/lib/backup";
 import { canWrite } from "@/lib/roles";
 import type { GuestEntry } from "@/lib/types";
 import { requestCloudPullNow } from "@/lib/supabase-sync";
@@ -57,7 +58,6 @@ function RegisterPage() {
   const lockRegister = useLedger((s) => s.lockRegister);
   const unlockRegister = useLedger((s) => s.unlockRegister);
   const lockMonth = useLedger((s) => s.lockMonth);
-  const unlockMonth = useLedger((s) => s.unlockMonth);
   const { busy: saving, saveToServer } = useAccountSave();
   const guestCards = useLedger((s) => s.guestCards);
   const saveGuestCard = useLedger((s) => s.saveGuestCard);
@@ -127,30 +127,7 @@ function RegisterPage() {
         </div>
         <div className="flex flex-wrap gap-2 print:hidden">
           <SaveCube busy={saving} onSave={() => void saveToServer()} />
-          {priorMonth && !monthReopened ? (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                gate(
-                  () => {
-                    unlockMonth(month);
-                    toast.success(`${monthName} opened`);
-                  },
-                  {
-                    title: `Open ${monthName}?`,
-                    message:
-                      "Enter the security code. The whole month opens. Lock it again after the correction.",
-                    confirmLabel: "Open month",
-                    requireCode: true,
-                  },
-                );
-              }}
-            >
-              <LockOpen className="size-4" />
-              Open {monthName}
-            </Button>
-          ) : priorMonth && monthReopened ? (
+          {priorMonth && !monthReopened ? null : priorMonth && monthReopened ? (
             <Button
               type="button"
               variant="outline"
@@ -239,9 +216,8 @@ function RegisterPage() {
 
       {priorMonth && !monthReopened ? (
         <p className="rounded-lg bg-bg-warm px-4 py-3 text-sm">
-          {monthName} is locked. Cash, Santosh QR, P.K. QR, online and balance carry
-          forward. The next month cannot change this register or its report. Open it
-          only with the security code.
+          {monthName} is a locked cube. Tap a date to read that day. Reports stay
+          open, and not one entry is deleted. October does not change this month.
         </p>
       ) : locked ? (
         <p className="rounded-lg bg-bg-warm px-4 py-3 text-sm">
@@ -595,7 +571,13 @@ function MonthBooks() {
   const openingDate = useLedger((s) => s.openingDate);
   const days = useLedger((s) => s.days);
   const guests = useLedger((s) => s.guests);
+  const food = useLedger((s) => s.food);
+  const wholesale = useLedger((s) => s.wholesale);
+  const expenses = useLedger((s) => s.expenses);
+  const balReceived = useLedger((s) => s.balReceived);
   const openings = useLedger((s) => s.monthOpenings);
+  const archives = useLedger((s) => s.monthArchives);
+  const openMonths = useLedger((s) => s.openMonths);
   const setMonthOpenings = useLedger((s) => s.setMonthOpenings);
   const role = useLedger((s) => s.appRole);
   const write = canWrite(role);
@@ -617,6 +599,14 @@ function MonthBooks() {
   const selectedYear = selectedMonth.slice(0, 4);
   const yearMonths = months.filter((month) => month.startsWith(selectedYear));
   const firstMonth = (openingDate || "2026-09-01").slice(0, 7);
+  const latestMark = dates.reduce(
+    (max, value) => (value > max ? value : max),
+    openingDate || date,
+  );
+  const latestMonth = (latestMark || date).slice(0, 7);
+  function closedMonth(month: string) {
+    return month < latestMonth && !(openMonths ?? []).includes(month);
+  }
   const saved = openingForMonth(openings, selectedMonth);
   const carriedDay = [...days].reverse().find((day) => day.date.slice(0, 7) < selectedMonth);
   const [cash, setCash] = useState(saved ? String(saved.cash) : "");
@@ -633,6 +623,10 @@ function MonthBooks() {
   }, [date, selectedMonth, openings]);
 
   function openMonth(month: string) {
+    if (closedMonth(month)) {
+      setDate(`${month}-01`);
+      return;
+    }
     if (date.startsWith(month)) return;
     const today = format(new Date(), "yyyy-MM-dd");
     if (today.startsWith(month)) {
@@ -706,9 +700,59 @@ function MonthBooks() {
             onClick={() => openMonth(month)}
           >
             {format(parseISO(`${month}-01`), "MMMM")}
+            {closedMonth(month) ? " · lock" : ""}
           </Button>
         ))}
       </div>
+      {closedMonth(selectedMonth) ? (
+        <Card>
+          <CardHeader className="flex-row items-center justify-between gap-3">
+            <div>
+              <CardTitle>
+                {format(parseISO(`${selectedMonth}-01`), "MMMM")} lock
+              </CardTitle>
+              <p className="text-sm text-muted">
+                Separate cube. Read every date from the 1st to month end. Cash,
+                Santosh QR, P.K. QR, online and balance already carry to the 1st
+                of the next month. This JSON backup stays in the account.
+              </p>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                const savedArchive = archives.find((row) => row.month === selectedMonth);
+                const file = buildBackupFile({
+                  guests:
+                    savedArchive?.guests ??
+                    guests.filter((row) => row.date.startsWith(selectedMonth)),
+                  food:
+                    savedArchive?.food ??
+                    food.filter((row) => row.date.startsWith(selectedMonth)),
+                  wholesale:
+                    savedArchive?.wholesale ??
+                    wholesale.filter((row) => row.date.startsWith(selectedMonth)),
+                  expenses:
+                    savedArchive?.expenses ??
+                    expenses.filter((row) => row.date.startsWith(selectedMonth)),
+                  balReceived:
+                    savedArchive?.balReceived ??
+                    balReceived.filter((row) => row.date.startsWith(selectedMonth)),
+                  openingDate: `${selectedMonth}-01`,
+                  selectedDate: `${selectedMonth}-01`,
+                  savedAt: Date.now(),
+                });
+                downloadBackupJson(file, `HSR-${selectedMonth}-lock.json`);
+                toast.success(`${selectedMonth} backup downloaded. The account copy stays.`);
+              }}
+            >
+              <Download className="size-4" />
+              JSON backup
+            </Button>
+          </CardHeader>
+        </Card>
+      ) : null}
       <div className="flex gap-1.5 overflow-x-auto pb-1">
         {monthDays.map((iso) => (
           <Button

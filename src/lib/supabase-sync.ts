@@ -17,6 +17,7 @@ import { isSupabaseConfigured } from "./supabase-config";
 import { isPermissionMessage } from "./cloud-errors";
 import { preferLocalOverCloud } from "./cloud-save";
 import { mergeBankBooks } from "./bank-recon";
+import { keepMonthArchives } from "./month-archive";
 import { todayIso } from "./reminders";
 import {
   isDayLocked,
@@ -120,6 +121,7 @@ function snapshotFromStore(): LedgerSnapshot {
     agents: s.agents,
     monthDraws: s.monthDraws,
     monthOpenings: s.monthOpenings,
+    monthArchives: s.monthArchives,
     openMonths: s.openMonths,
     guestCards: s.guestCards,
     bankRows: s.bankRows,
@@ -221,6 +223,7 @@ function applyMerged(merged: LedgerSnapshot, previous: LedgerSnapshot) {
     agents: merged.agents,
     monthDraws: merged.monthDraws,
     monthOpenings: merged.monthOpenings,
+    monthArchives: merged.monthArchives,
     openMonths: merged.openMonths,
     guestCards: merged.guestCards,
     bankRows: merged.bankRows,
@@ -735,6 +738,7 @@ function withLocalSavedFiles(cloud: LedgerSnapshot): LedgerSnapshot {
       local.monthOpenings ?? [],
       cloud.monthOpenings ?? [],
     ),
+    monthArchives: keepMonthArchives([local.monthArchives ?? [], cloud.monthArchives ?? []]),
     openMonths: [...new Set([...(local.openMonths ?? []), ...(cloud.openMonths ?? [])])],
   };
 }

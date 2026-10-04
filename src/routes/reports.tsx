@@ -432,6 +432,8 @@ function DetailDailyPanel() {
 
 function DailyReportPanel() {
   const date = useLedger((s) => s.selectedDate);
+  const setDate = useLedger((s) => s.setDate);
+  const days = useLedger((s) => s.days);
   const hotel = useLedger((s) => s.hotel);
   const allGuests = useLedger((s) => s.guests);
   const allFood = useLedger((s) => s.food);
@@ -445,12 +447,17 @@ function DailyReportPanel() {
   const receipts = allRecv.filter((r) => r.date === date);
   const books = useDayBooks(date);
   const take = buildDayTake(guests, food, ws);
+  const month = date.slice(0, 7);
+  const monthDays = days
+    .map((day) => day.date)
+    .filter((iso) => iso.startsWith(month))
+    .sort();
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
         <p className="text-sm text-muted">
-          {formatDay(date)} · A4 daily report
+          {formatDay(date)} · A4 daily report · reports stay open, nothing is deleted
         </p>
         <div className="flex flex-wrap items-center gap-4">
           <Button
@@ -469,6 +476,20 @@ function DailyReportPanel() {
             Print
           </Button>
         </div>
+      </div>
+      <div className="flex gap-1.5 overflow-x-auto pb-1 print:hidden">
+        {monthDays.map((iso) => (
+          <Button
+            key={iso}
+            type="button"
+            size="sm"
+            variant={iso === date ? "default" : "outline"}
+            className="min-w-10 px-2"
+            onClick={() => setDate(iso)}
+          >
+            {Number(iso.slice(8))}
+          </Button>
+        ))}
       </div>
       <div className="mx-auto w-full max-w-[210mm]">
       <DailyA4
