@@ -24,6 +24,8 @@ import { formatDay, formatDayShort, money, moneyCompact } from "@/lib/format";
 import { printHtmlDocument } from "@/lib/print-sheet";
 import { REPORT_TAB, parseReportView } from "@/lib/report-views";
 import { useLedger, useDayBooks } from "@/lib/store";
+import { isPriorMonthClosed } from "@/lib/register-lock";
+import type { DayBooks } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/reports")({
@@ -32,6 +34,62 @@ export const Route = createFileRoute("/reports")({
   }),
   component: ReportsPage,
 });
+
+function latestMarkFor(date: string, rows: { date?: string }[], openingDate: string) {
+  return [openingDate, date, ...rows.map((row) => row.date || "")]
+    .filter(Boolean)
+    .reduce((max, value) => (value > max ? value : max), openingDate || date);
+}
+
+function useMonthLock(date: string) {
+  const openMonths = useLedger((s) => s.openMonths);
+  const lockRev = useLedger((s) => s.lockRev);
+  const openingDate = useLedger((s) => s.openingDate);
+  const guests = useLedger((s) => s.guests);
+  const food = useLedger((s) => s.food);
+  const wholesale = useLedger((s) => s.wholesale);
+  const expenses = useLedger((s) => s.expenses);
+  const balReceived = useLedger((s) => s.balReceived);
+  const latest = latestMarkFor(
+    date,
+    [...guests, ...food, ...wholesale, ...expenses, ...balReceived],
+    openingDate,
+  );
+  const closed = isPriorMonthClosed(date, openMonths, latest, lockRev);
+  const first = `${date.slice(0, 7)}-01`;
+  const books = useDayBooks(first);
+  return { closed, first, books };
+}
+
+function LockedOpening({ first, books }: { first: string; books: DayBooks | undefined }) {
+  const monthName = format(parseISO(first), "MMMM");
+  const rows = [
+    ["Cash", books?.cashBook.ob],
+    ["Santosh QR", books?.santosh.ob],
+    ["P.K. QR", books?.pk.ob],
+    ["Online", books?.online.ob],
+    ["Balance", books?.outstanding.ob],
+  ] as const;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Opening balance · 1 {monthName}</CardTitle>
+        <p className="text-sm text-muted">
+          {monthName} is locked. This report shows only the 1st opening balance.
+          Unlock {monthName} in Register to open the full daily report. Nothing is deleted.
+        </p>
+      </CardHeader>
+      <CardContent className="grid grid-cols-2 gap-3 md:grid-cols-5">
+        {rows.map(([label, value]) => (
+          <div key={label} className="rounded-lg bg-bg-warm px-3 py-3">
+            <div className="text-xs font-medium text-muted">{label}</div>
+            <div className="mt-1 font-display text-xl font-semibold tabular">{money(value ?? 0)}</div>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
 
 function ReportsPage() {
   const { view } = Route.useSearch();
@@ -196,6 +254,8 @@ function MonthlyReportPanel() {
     Due: r.take.due.rooms,
   }));
 
+  const lock = useMonthLock(`${month}-01`);
+
   return (
     <>
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -207,7 +267,9 @@ function MonthlyReportPanel() {
             {label}
           </h1>
           <p className="mt-1 text-sm text-muted">
-            {now.hit} of {now.rows.length} days hit the ₹60,000 target
+            {lock.closed
+              ? `${label} is locked. Only the 1st opening balance is open.`
+              : `${now.hit} of ${now.rows.length} days hit the ₹60,000 target`}
           </p>
         </div>
         <Button type="button" onClick={() => window.print()}>
@@ -230,6 +292,8 @@ function MonthlyReportPanel() {
         ))}
       </div>
 
+      {lock.closed ? <LockedOpening first={lock.first} books={lock.books} /> : (
+      <>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Room sales" value={money(now.sales)} hint={`${prevLabel} ${money(prev.sales)}`} />
         <Stat label="Expenses" value={money(now.expTotal)} hint={`${prevLabel} ${money(prev.expTotal)}`} />
@@ -378,6 +442,8 @@ function MonthlyReportPanel() {
           </ResponsiveContainer>
         </CardContent>
       </Card>
+      </>
+      )}
     </>
   );
 }
@@ -392,6 +458,10 @@ function DetailDailyPanel() {
   const expenses = useLedger((s) => s.expenses).filter((e) => e.date === date);
   const receipts = useLedger((s) => s.balReceived).filter((r) => r.date === date);
   const books = useDayBooks(date);
+  const lock = useMonthLock(date);
+  if (lock.closed) {
+    return <LockedOpening first={lock.first} books={lock.books} />;
+  }
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
@@ -446,12 +516,24 @@ function DailyReportPanel() {
   const expenses = allExp.filter((e) => e.date === date);
   const receipts = allRecv.filter((r) => r.date === date);
   const books = useDayBooks(date);
+  const lock = useMonthLock(date);
   const take = buildDayTake(guests, food, ws);
   const month = date.slice(0, 7);
   const monthDays = days
     .map((day) => day.date)
     .filter((iso) => iso.startsWith(month))
     .sort();
+
+  if (lock.closed) {
+    return (
+      <div className="flex flex-col gap-4">
+        <p className="text-sm text-muted">
+          {formatDay(lock.first)} · locked month · opening balance only
+        </p>
+        <LockedOpening first={lock.first} books={lock.books} />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4">
