@@ -344,7 +344,7 @@ export function DayChart({
             </tr>
           </thead>
           <tbody>
-            {guests.map((g) => {
+            {[...guests].sort((a, b) => a.slNo - b.slNo).map((g) => {
               const dates = stayDates(allGuests, g);
               const cin = dates.checkIn;
               const cout = dates.checkOut || next;

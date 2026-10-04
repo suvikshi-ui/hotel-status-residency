@@ -79,14 +79,16 @@ function RegisterPage() {
 
   const filtered = useMemo(() => {
     const t = q.trim().toLowerCase();
-    if (!t) return guests;
-    return guests.filter(
-      (g) =>
-        g.name.toLowerCase().includes(t) ||
-        g.roomNo.toLowerCase().includes(t) ||
-        g.mode.toLowerCase().includes(t) ||
-        (g.source ?? "").toLowerCase().includes(t),
-    );
+    const rows = !t
+      ? guests
+      : guests.filter(
+          (g) =>
+            g.name.toLowerCase().includes(t) ||
+            g.roomNo.toLowerCase().includes(t) ||
+            g.mode.toLowerCase().includes(t) ||
+            (g.source ?? "").toLowerCase().includes(t),
+        );
+    return [...rows].sort((a, b) => b.slNo - a.slNo);
   }, [guests, q]);
 
   const month = date.slice(0, 7);

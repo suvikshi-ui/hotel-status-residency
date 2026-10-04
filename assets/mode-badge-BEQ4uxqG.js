@@ -1,0 +1,1 @@
+import{n as e}from"./utils-B_IOsGIx.js";import{an as t}from"./index-DNYkjj2A.js";import{t as n}from"./badge-ysbNyDTx.js";var r=e(),i={CASH:`cash`,QRS:`qr`,QRPK:`pk`,ONLINE:`online`,BALANCE:`balance`};function a({mode:e}){return(0,r.jsx)(n,{variant:i[e],children:t[e]})}export{a as t};

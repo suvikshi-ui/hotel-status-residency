@@ -169,7 +169,7 @@ function Overview() {
               </tr>
             </thead>
             <tbody>
-              {guests.slice(0, 12).map((g) => (
+              {[...guests].sort((a, b) => b.slNo - a.slNo).slice(0, 12).map((g) => (
                 <tr key={g.id} className="border-b border-border/70">
                   <td className="py-2.5 pr-3 tabular text-muted">{g.slNo}</td>
                   <td className="py-2.5 pr-3 font-medium">{g.name}</td>
