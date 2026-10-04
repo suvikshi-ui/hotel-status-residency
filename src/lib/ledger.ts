@@ -238,7 +238,14 @@ export function rebuildDayBooks(input: {
   expenses: NamedAmount[];
   balReceived: NamedAmount[];
   throughDates?: string[];
-  openings?: { month: string; cash: number; santosh: number; pk: number; online: number }[];
+  openings?: {
+    month: string;
+    cash: number;
+    santosh: number;
+    pk: number;
+    online?: number | null;
+    outstanding?: number | null;
+  }[];
   lockedDates?: Record<string, true>;
   previous?: DayBooks[];
 }): DayBooks[] {
@@ -283,6 +290,8 @@ export function rebuildDayBooks(input: {
           cash: opening.cash,
           santosh: opening.santosh,
           pk: opening.pk,
+          ...(opening.online != null ? { online: opening.online } : {}),
+          ...(opening.outstanding != null ? { outstanding: opening.outstanding } : {}),
         };
       }
     }

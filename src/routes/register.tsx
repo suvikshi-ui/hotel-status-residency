@@ -641,15 +641,30 @@ function MonthBooks() {
   const [cash, setCash] = useState(saved ? String(saved.cash) : "");
   const [santosh, setSantosh] = useState(saved ? String(saved.santosh) : "");
   const [pk, setPk] = useState(saved ? String(saved.pk) : "");
+  const [online, setOnline] = useState(saved?.online != null ? String(saved.online) : "");
+  const [balance, setBalance] = useState(
+    saved?.outstanding != null ? String(saved.outstanding) : "",
+  );
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
     const row = openingForMonth(openings, selectedMonth);
-    setCash(row ? String(row.cash) : "");
-    setSantosh(row ? String(row.santosh) : "");
-    setPk(row ? String(row.pk) : "");
+    const carried = [...days].reverse().find((day) => day.date.slice(0, 7) < selectedMonth);
+    setCash(row ? String(row.cash) : carried ? String(carried.cashBook.cb) : "");
+    setSantosh(row ? String(row.santosh) : carried ? String(carried.santosh.cb) : "");
+    setPk(row ? String(row.pk) : carried ? String(carried.pk.cb) : "");
+    setOnline(
+      row?.online != null ? String(row.online) : carried ? String(carried.online.cb) : "",
+    );
+    setBalance(
+      row?.outstanding != null
+        ? String(row.outstanding)
+        : carried
+          ? String(carried.outstanding.cb)
+          : "",
+    );
     setOpen(false);
-  }, [date, selectedMonth, openings]);
+  }, [date, selectedMonth, openings, days]);
 
   function openMonth(month: string) {
     if (closedMonth(month)) {
@@ -672,7 +687,8 @@ function MonthBooks() {
       cash: Math.max(0, Math.round(Number(cash) || 0)),
       santosh: Math.max(0, Math.round(Number(santosh) || 0)),
       pk: Math.max(0, Math.round(Number(pk) || 0)),
-      online: 0,
+      online: Math.max(0, Math.round(Number(online) || 0)),
+      outstanding: Math.max(0, Math.round(Number(balance) || 0)),
     };
     gate(
       () => {
@@ -684,7 +700,7 @@ function MonthBooks() {
       {
         title: "Set this month's opening?",
         message:
-          "Cash, Santosh QR and P.K. QR start from these figures. Online and outstanding balance still come from the previous month.",
+          "Cash, Santosh QR, P.K. QR, Online and Balance start from these figures on the 1st.",
         confirmLabel: "Set opening",
       },
     );
@@ -802,7 +818,7 @@ function MonthBooks() {
             <div>
               <CardTitle>Opening balance · 1st</CardTitle>
               <p className="text-sm text-muted">
-                Cash, Santosh QR, P.K. QR only. Online and balance carry forward.
+                Cash, Santosh QR, P.K. QR, Online and Balance.
                 {saved ? " Saved." : " Not set yet."}
               </p>
             </div>
@@ -814,18 +830,21 @@ function MonthBooks() {
             <CardContent className="flex flex-col gap-3">
               {carriedDay ? (
                 <p className="text-sm text-muted">
-                  Carried · online {money(carriedDay.online.cb)} · balance{" "}
-                  {money(carriedDay.outstanding.cb)}
+                  Last month close · cash {money(carriedDay.cashBook.cb)} · Santosh{" "}
+                  {money(carriedDay.santosh.cb)} · P.K. {money(carriedDay.pk.cb)} · online{" "}
+                  {money(carriedDay.online.cb)} · balance {money(carriedDay.outstanding.cb)}
                 </p>
               ) : null}
               {write ? (
                 <>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     {(
                       [
                         ["Cash", cash, setCash],
                         ["Santosh QR", santosh, setSantosh],
                         ["P.K. QR", pk, setPk],
+                        ["Online", online, setOnline],
+                        ["Balance", balance, setBalance],
                       ] as const
                     ).map(([label, value, set]) => (
                       <div key={label} className="grid gap-1.5">

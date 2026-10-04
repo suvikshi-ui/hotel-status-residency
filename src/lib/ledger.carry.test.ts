@@ -88,7 +88,7 @@ describe("balance carry-forward", () => {
       expenses: [],
       balReceived: [],
       throughDates: ["2026-10-01"],
-      openings: [{ month: "2026-10", cash: 9000, santosh: 1500, pk: 800, online: 0 }],
+      openings: [{ month: "2026-10", cash: 9000, santosh: 1500, pk: 800 }],
     });
     const byDay = new Map(days.map((d) => [d.date, d]));
     assert.equal(byDay.get("2026-09-01")?.cashBook.ob, 500);
@@ -102,6 +102,35 @@ describe("balance carry-forward", () => {
     assert.equal(byDay.get("2026-10-01")?.online.ob, 50);
     assert.equal(byDay.get("2026-10-01")?.outstanding.ob, 4000);
     assert.equal(byDay.get("2026-10-01")?.cashBook.cb, 10000);
+  });
+
+  it("the 1st opening can set online and balance too", () => {
+    const days = rebuildDayBooks({
+      openingDate: "2026-09-01",
+      opening: { cash: 500, santosh: 200, pk: 100, online: 50, outstanding: 0 },
+      guests: [
+        guest("2026-09-30", 1000, "ONLINE"),
+        guest("2026-09-30", 4000, "BALANCE"),
+        guest("2026-10-01", 100, "CASH"),
+      ],
+      food: [],
+      wholesale: [],
+      expenses: [],
+      balReceived: [],
+      throughDates: ["2026-10-01"],
+      openings: [{
+        month: "2026-10",
+        cash: 100,
+        santosh: 200,
+        pk: 300,
+        online: 700,
+        outstanding: 900,
+      }],
+    });
+    const oct = days.find((day) => day.date === "2026-10-01");
+    assert.equal(oct?.online.ob, 700);
+    assert.equal(oct?.outstanding.ob, 900);
+    assert.equal(days.find((day) => day.date === "2026-09-30")?.outstanding.cb, 4000);
   });
 
   it("without an October opening, September close carries and September stays", () => {
@@ -153,7 +182,7 @@ describe("balance carry-forward", () => {
       expenses: [],
       balReceived: [],
       throughDates: ["2026-10-01"],
-      openings: [{ month: "2026-10", cash: 9000, santosh: 1500, pk: 800, online: 0 }],
+      openings: [{ month: "2026-10", cash: 9000, santosh: 1500, pk: 800 }],
       lockedDates: locked,
       previous: first,
     });
