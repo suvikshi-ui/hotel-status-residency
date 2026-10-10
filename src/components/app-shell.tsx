@@ -25,6 +25,7 @@ import { useLedger } from "@/lib/store";
 import { canOpenPath } from "@/lib/roles";
 import { useStaffSession } from "@/lib/supabase-auth";
 import { useCloudSync } from "@/lib/supabase-sync";
+import { isSupabaseConfigured } from "@/lib/supabase-config";
 import { ReminderPopup } from "@/components/reminder-popup";
 
 const NAV = [
@@ -112,8 +113,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { user, signOut } = useStaffSession();
   const cloud = useCloudSync();
   const [leaving, setLeaving] = useState(false);
-  const saved =
-    cloud.phase === "saving"
+  const saved = !isSupabaseConfigured()
+    ? "Is computer par"
+    : cloud.phase === "saving"
       ? "Saving…"
       : cloud.phase === "error"
         ? "Not saved"

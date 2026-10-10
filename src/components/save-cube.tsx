@@ -2,8 +2,10 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { saveAccountNow } from "@/lib/supabase-sync";
+import { isSupabaseConfigured } from "@/lib/supabase-config";
 
 const OK_MSG = "Server पर डेटा चला गया · Data is on the server.";
+const LOCAL_MSG = "Is computer par save ho gaya. Doosra desk alag hai.";
 const FAIL_MSG = "Server पर नहीं गया। इस कंप्यूटर का डेटा वैसा का वैसा है।";
 
 export function SaveCube({
@@ -36,7 +38,7 @@ export function useAccountSave() {
     try {
       const result = await saveAccountNow();
       if (result.ok) {
-        toast.success(OK_MSG);
+        toast.success(isSupabaseConfigured() ? OK_MSG : LOCAL_MSG);
         return true;
       }
       toast.error(result.message ? `${FAIL_MSG} ${result.message}` : FAIL_MSG);

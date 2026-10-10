@@ -136,10 +136,11 @@ function BackupCard() {
   }
 
   function confirmImport(month: string) {
-    if (!ownerId || !pendingTables) {
-      toast.error("Sign in to import into the hotel books.");
+    if (!pendingTables) {
+      toast.error("Backup file pehle choose karo.");
       return;
     }
+    const deskId = ownerId || "offline";
     const sliced = sliceBackupTables(pendingTables, month);
     const incoming = snapshotFromUnknown(sliced, clearedSnapshot(snapshotNow()));
     const monthOpen = (sliced.openMonths ?? []).includes(month);
@@ -149,16 +150,18 @@ function BackupCard() {
     gate(
       () => {
         setBusy("import");
-        void importBackupAndRefresh(ownerId, merged)
+        void importBackupAndRefresh(deskId, merged)
           .then((result) => {
             if (!result.ok) {
               toast.error(result.message || "JSON account में सेव नहीं हुआ");
               return;
             }
             toast.success(
-              `${monthLabel(month)} import ho gaya · ${n.guests} guests. ${
-                other.length ? `${other.map(monthLabel).join(", ")} delete nahi hua.` : "Doosra koi month books mein nahi tha."
-              }`,
+              result.cloud
+                ? `${monthLabel(month)} import ho gaya · ${n.guests} guests. ${
+                    other.length ? `${other.map(monthLabel).join(", ")} delete nahi hua.` : "Doosra koi month books mein nahi tha."
+                  }`
+                : `${monthLabel(month)} is computer par save ho gaya · ${n.guests} guests. Server band hai.`,
             );
             setPendingTables(null);
             setImportMonths([]);
@@ -204,9 +207,9 @@ function BackupCard() {
       <CardHeader>
         <CardTitle>Backup</CardTitle>
         <p className="text-sm text-muted">
-          Backup dabate hi month choose karo. Import bhi ek month ka hota hai —
-          October import karne se September delete nahi hota. Pehle system khali
-          ho, to sirf jo month import karoge wahi dikhega.
+          Abhi server band hai. Import isi computer par rehta hai. September ki
+          file, phir October ki file, dono alag se import karo. Doosra desk khud
+          import karega.
         </p>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">

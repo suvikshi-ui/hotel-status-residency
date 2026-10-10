@@ -456,13 +456,11 @@ async function pollCloud(userId: string) {
 }
 
 export async function saveAccountNow(): Promise<
-  { ok: true } | { ok: false; message: string }
+  { ok: true; cloud?: boolean } | { ok: false; message: string }
 > {
   if (!isSupabaseConfigured()) {
-    return {
-      ok: false,
-      message: "Cloud is not connected, so the account cannot be saved yet.",
-    };
+    setPhase("off");
+    return { ok: true, cloud: false };
   }
   const userId = lastUserId;
   if (!userId) {
@@ -770,7 +768,19 @@ export async function importBackupAndRefresh(
   snap: LedgerSnapshot,
 ): Promise<{ ok: true; cloud: boolean; message?: string } | { ok: false; message: string }> {
   if (!isSupabaseConfigured()) {
-    return { ok: false, message: "Sign in to import into the hotel account." };
+    useLedger.getState().applyCloudBooks({
+      ...snap,
+      lockedDates: parseLockedDates(snap.lockedDates),
+      lockRev: parseLockRev(snap.lockRev),
+      savedAt: Date.now(),
+    });
+    writeStoredLocks(ledgerOwnerKey(), parseLockedDates(snap.lockedDates));
+    setPhase("off");
+    return {
+      ok: true,
+      cloud: false,
+      message: "Is computer par save ho gaya. Server band hai.",
+    };
   }
   hydrating = true;
   setPhase("saving");
