@@ -22,6 +22,7 @@ function emptyMix(): DayMix {
   return {
     cash: emptySlice(),
     qr: emptySlice(),
+    pk: emptySlice(),
     online: emptySlice(),
     balance: emptySlice(),
     totals: emptySlice(),
@@ -32,9 +33,18 @@ function add(slice: MixSlice, key: keyof MixSlice, n: number) {
   slice[key] += n;
 }
 
-function bucket(mode: PayMode): keyof Omit<DayMix, "totals"> {
+function sliceOf(mix: DayMix, key: "cash" | "qr" | "pk" | "online" | "balance") {
+  if (key === "pk") {
+    mix.pk ??= emptySlice();
+    return mix.pk;
+  }
+  return mix[key];
+}
+
+function bucket(mode: PayMode): "cash" | "qr" | "pk" | "online" | "balance" {
   if (mode === "CASH") return "cash";
   if (mode === "QRS") return "qr";
+  if (mode === "QRPK") return "pk";
   if (mode === "BALANCE") return "balance";
   return "online";
 }
@@ -49,12 +59,16 @@ export function computeMix(
   wholesale: ModeAmount[],
 ): DayMix {
   const mix = emptyMix();
-  for (const g of guests) add(mix[bucket(g.mode)], "sale", g.amount);
-  for (const f of food) add(mix[bucket(f.mode)], "food", f.amount);
-  for (const w of wholesale) add(mix[bucket(w.mode)], "ws", w.amount);
+  for (const g of guests) add(sliceOf(mix, bucket(g.mode)), "sale", g.amount);
+  for (const f of food) add(sliceOf(mix, bucket(f.mode)), "food", f.amount);
+  for (const w of wholesale) add(sliceOf(mix, bucket(w.mode)), "ws", w.amount);
   for (const k of ["sale", "food", "ws"] as const) {
     mix.totals[k] =
-      mix.cash[k] + mix.qr[k] + mix.online[k] + mix.balance[k];
+      mix.cash[k] +
+      mix.qr[k] +
+      (mix.pk?.[k] ?? 0) +
+      mix.online[k] +
+      mix.balance[k];
   }
   return mix;
 }
@@ -99,6 +113,7 @@ export function computeBooks(input: {
   const otaIn = sumAmt(ota);
 
   const qrOut = mix.qr.sale + mix.qr.food + mix.qr.ws;
+  const pkOut = (mix.pk?.sale ?? 0) + (mix.pk?.food ?? 0) + (mix.pk?.ws ?? 0);
   const onlineOut = mix.online.sale + mix.online.food + mix.online.ws;
 
   const cashBook: CashBook = {
@@ -110,6 +125,7 @@ export function computeBooks(input: {
     gross: 0,
     exp: cashExp,
     qr: qrOut,
+    pk: pkOut,
     online: onlineOut,
     balance: mix.balance.sale,
     cb: 0,
@@ -124,6 +140,7 @@ export function computeBooks(input: {
     cashBook.gross -
     cashBook.exp -
     cashBook.qr -
+    (cashBook.pk ?? 0) -
     cashBook.online -
     cashBook.balance;
 

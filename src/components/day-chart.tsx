@@ -351,7 +351,10 @@ export function DayChart({
               return (
                 <tr key={g.id}>
                   <td style={{ ...td, color: "#6f675c" }}>{g.slNo}</td>
-                  <td style={{ ...td, fontWeight: 700 }}>{g.name.toUpperCase()}</td>
+                  <td style={{ ...td, fontWeight: 700 }}>
+                    {g.name.toUpperCase()}
+                    {g.ota ? " · OTA" : ""}
+                  </td>
                   <td style={td}>{padRoom(g.roomNo)}</td>
                   <td style={td}>
                     <Pill mode={g.mode} />

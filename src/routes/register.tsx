@@ -327,7 +327,14 @@ function RegisterPage() {
                   className="border-b border-border/70 hover:bg-bg-warm/50"
                 >
                   <td className="px-5 py-2.5 tabular text-muted">{g.slNo}</td>
-                  <td className="px-3 py-2.5 font-medium">{g.name}</td>
+                  <td className="px-3 py-2.5 font-medium">
+                    {g.name}
+                    {g.ota ? (
+                      <Badge variant="muted" className="ml-2">
+                        OTA
+                      </Badge>
+                    ) : null}
+                  </td>
                   <td className="px-3 py-2.5 tabular">{g.roomNo}</td>
                   <td className="px-3 py-2.5">
                     <ModeBadge mode={g.mode} />

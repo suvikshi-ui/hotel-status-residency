@@ -345,6 +345,7 @@ export function DailyA4({
             <Row label="TOTAL" value={c?.gross ?? 0} tone="sub" />
             <Row label="EXP" sign="−" value={c?.exp ?? 0} />
             <Row label="QR" sign="−" value={c?.qr ?? 0} />
+            <Row label="P.K. QR" sign="−" value={c?.pk ?? 0} />
             <Row label="ONLINE" sign="−" value={c?.online ?? 0} />
             <Row label={balTag} sign="−" value={c?.balance ?? 0} />
             <Row label="TOTAL" value={c?.cb ?? 0} tone="ok" />

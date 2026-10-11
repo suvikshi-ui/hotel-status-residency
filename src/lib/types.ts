@@ -8,6 +8,8 @@ export interface GuestEntry {
   roomNo: string;
   mode: PayMode;
   amount: number;
+  /** Online / OTA guest. Payment mode stays cash, Santosh QR or P.K. QR. */
+  ota?: boolean;
   checkIn?: string | null;
   checkOut?: string | null;
   inTime?: string | null;
@@ -45,6 +47,7 @@ export interface MixSlice {
 export interface DayMix {
   cash: MixSlice;
   qr: MixSlice;
+  pk?: MixSlice;
   online: MixSlice;
   balance: MixSlice;
   totals: MixSlice;
@@ -59,6 +62,8 @@ export interface CashBook {
   gross: number;
   exp: number;
   qr: number;
+  /** P.K. QR taken out of cash. Not part of the Online line. */
+  pk?: number;
   online: number;
   balance: number;
   cb: number;

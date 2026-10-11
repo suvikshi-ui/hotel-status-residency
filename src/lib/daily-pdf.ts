@@ -105,6 +105,7 @@ function blocksOf(input: DailyPdfInput) {
         { label: "TOTAL", value: c?.gross ?? 0, tone: "sub" },
         { label: "EXP", sign: "−", value: c?.exp ?? 0 },
         { label: "QR", sign: "−", value: c?.qr ?? 0 },
+        { label: "P.K. QR", sign: "−", value: c?.pk ?? 0 },
         { label: "ONLINE", sign: "−", value: c?.online ?? 0 },
         { label: balTag, sign: "−", value: c?.balance ?? 0 },
         { label: "TOTAL", value: c?.cb ?? 0, tone: "ok" },

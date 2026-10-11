@@ -35,6 +35,7 @@ type PendingPost = {
   source: string | null;
   amount: number;
   gst: boolean;
+  ota: boolean;
   gstInvoiceNo: string | null;
   payRefNo: string | null;
 };
@@ -62,6 +63,7 @@ export function GuestForm({
   const [amount, setAmount] = useState("1500");
   const [source, setSource] = useState("");
   const [gst, setGst] = useState(false);
+  const [ota, setOta] = useState(false);
   const [gstInvoiceNo, setGstInvoiceNo] = useState("");
   const [payRefNo, setPayRefNo] = useState("");
   const [dup, setDup] = useState<GuestEntry | null>(null);
@@ -76,6 +78,7 @@ export function GuestForm({
     setAmount(String(editing.amount));
     setSource(editing.source ?? "");
     setGst(Boolean(editing.gst));
+    setOta(Boolean(editing.ota));
     setGstInvoiceNo(editing.gstInvoiceNo ?? "");
     setPayRefNo(editing.payRefNo ?? "");
     cardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -86,6 +89,7 @@ export function GuestForm({
     setName("");
     setSource("");
     setGst(false);
+    setOta(false);
     setGstInvoiceNo("");
     setPayRefNo("");
     setAmount("1500");
@@ -101,6 +105,7 @@ export function GuestForm({
     setName("");
     setSource("");
     setGst(false);
+    setOta(false);
     setGstInvoiceNo("");
     setPayRefNo("");
     pending.current = null;
@@ -150,6 +155,7 @@ export function GuestForm({
       source: source.trim() || null,
       amount: amt,
       gst,
+      ota,
       gstInvoiceNo: gst ? gstInvoiceNo.trim() || null : null,
       payRefNo:
         gst || mode === "QRPK" ? payRefNo.trim() || null : null,
@@ -296,6 +302,22 @@ export function GuestForm({
                 GST
               </label>
             </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="g-ota">OTA guest</Label>
+              <label
+                htmlFor="g-ota"
+                className="flex h-11 cursor-pointer items-center gap-2 rounded-md border border-border bg-card px-3 text-sm"
+              >
+                <input
+                  id="g-ota"
+                  type="checkbox"
+                  className="size-4 accent-primary"
+                  checked={ota}
+                  onChange={(e) => setOta(e.target.checked)}
+                />
+                OTA
+              </label>
+            </div>
           </div>
           {gst || mode === "QRPK" ? (
             <div className={gst ? "grid grid-cols-2 gap-3" : "grid gap-3"}>
@@ -326,8 +348,8 @@ export function GuestForm({
           <div className="flex flex-col-reverse items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs text-muted">
               {isEdit
-                ? "Change name, room, mode, amount, source or GST, then save."
-                : "Default Non GST. Tick GST to send this bill to Invoice."}
+                ? "Change name, room, mode, amount, source, OTA or GST, then save."
+                : "Tick OTA if this is an online guest paying at the hotel. Payment still goes to Cash, Santosh QR or P.K. QR. Online mode stays Online."}
             </p>
             <div className="flex flex-col gap-2 sm:flex-row">
               {isEdit ? (
