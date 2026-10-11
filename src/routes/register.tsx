@@ -329,7 +329,15 @@ function RegisterPage() {
                   <td className="px-5 py-2.5 tabular text-muted">{g.slNo}</td>
                   <td className="px-3 py-2.5 font-medium">
                     {g.name}
-                    {g.ota ? (
+                    {g.otaChannel === "FAB" ? (
+                      <Badge variant="muted" className="ml-2">
+                        FAB
+                      </Badge>
+                    ) : g.otaChannel === "BRAVE" ? (
+                      <Badge variant="muted" className="ml-2">
+                        BraveStay
+                      </Badge>
+                    ) : g.ota ? (
                       <Badge variant="muted" className="ml-2">
                         OTA
                       </Badge>

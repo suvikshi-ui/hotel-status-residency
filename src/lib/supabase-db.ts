@@ -446,6 +446,8 @@ function overlayGuestBooks(rows: GuestEntry[], extra: GuestEntry[] | undefined):
       gst: Boolean(row.gst || saved.gst),
       gstInvoiceNo: row.gstInvoiceNo || saved.gstInvoiceNo || null,
       source: row.source || saved.source || null,
+      ota: Boolean(row.ota || saved.ota),
+      otaChannel: row.otaChannel || saved.otaChannel || null,
     };
   });
 }

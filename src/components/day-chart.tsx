@@ -353,7 +353,13 @@ export function DayChart({
                   <td style={{ ...td, color: "#6f675c" }}>{g.slNo}</td>
                   <td style={{ ...td, fontWeight: 700 }}>
                     {g.name.toUpperCase()}
-                    {g.ota ? " · OTA" : ""}
+                    {g.otaChannel === "FAB"
+                      ? " · FAB"
+                      : g.otaChannel === "BRAVE"
+                        ? " · BraveStay"
+                        : g.ota
+                          ? " · OTA"
+                          : ""}
                   </td>
                   <td style={td}>{padRoom(g.roomNo)}</td>
                   <td style={td}>

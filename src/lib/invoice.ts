@@ -115,6 +115,7 @@ export type GstStayBill = {
   amount: number;
   gstInvoiceNo: string;
   payRefNo: string;
+  otaName: string;
 };
 
 export function payRefsForSource(
@@ -168,7 +169,31 @@ function stayBill(
     amount: billed.reduce((s, g) => s + g.amount, 0),
     gstInvoiceNo: billed.map((g) => g.gstInvoiceNo?.trim() || "").find(Boolean) || "",
     payRefNo: fromGuest || fromRecv.join(" · "),
+    otaName: otaNameOf(chunk),
   };
+}
+
+function otaNameOf(chunk: GuestEntry[]) {
+  const channel = chunk.map((g) => g.otaChannel).find((name) => name === "FAB" || name === "BRAVE");
+  if (channel === "FAB") return "FAB";
+  if (channel === "BRAVE") return "BraveStay";
+  if (chunk.some((g) => g.ota)) return "OTA";
+  return "";
+}
+
+export function buildOtaStays(
+  guests: GuestEntry[],
+  receipts: NamedAmount[] = [],
+): GstStayBill[] {
+  return consecutiveStayNights(guests)
+    .filter((chunk) => otaNameOf(chunk))
+    .map((chunk) => stayBill(chunk, receipts, false))
+    .sort(
+      (a, b) =>
+        a.otaName.localeCompare(b.otaName) ||
+        a.checkIn.localeCompare(b.checkIn) ||
+        a.name.localeCompare(b.name),
+    );
 }
 
 export function buildRegisterStays(

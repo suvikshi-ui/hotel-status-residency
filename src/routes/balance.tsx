@@ -31,7 +31,7 @@ import {
   type DueStay,
 } from "@/lib/balance";
 import { printSourceGuests, printSourceSummary } from "@/lib/balance-print";
-import { DUE_PAY_MODES, formatDayShort, MODE_LABEL, money, stayStamp } from "@/lib/format";
+import { DUE_PAY_MODES, formatDay, formatDayShort, MODE_LABEL, money, stayStamp } from "@/lib/format";
 import { useLedger, useDayBooks } from "@/lib/store";
 import { useGate } from "@/components/security-gate";
 import { SaveCube, useAccountSave } from "@/components/save-cube";
@@ -58,10 +58,19 @@ function BalancePage() {
   const { gate } = useGate();
   const [q, setQ] = useState("");
   const [openKey, setOpenKey] = useState<string | null>(null);
+  const [asOn, setAsOn] = useState("");
+  const guestsAsOf = useMemo(
+    () => (asOn ? guests.filter((g) => g.date <= asOn) : guests),
+    [guests, asOn],
+  );
+  const receiptsAsOf = useMemo(
+    () => (asOn ? receipts.filter((r) => r.date <= asOn) : receipts),
+    [receipts, asOn],
+  );
 
   const accounts = useMemo(
-    () => buildDueAccounts(guests, receipts),
-    [guests, receipts],
+    () => buildDueAccounts(guestsAsOf, receiptsAsOf),
+    [guestsAsOf, receiptsAsOf],
   );
   const books = useDayBooks(date);
   const filtered = useMemo(() => {
@@ -187,10 +196,33 @@ function BalancePage() {
           Balance
         </h1>
         <p className="mt-1 text-sm text-muted">
-          Collect dues, then press Save to send the books to the server.
+          {asOn
+            ? `Balances as on ${formatDay(asOn)}. September ends on 30, not 31.`
+            : "Live balances. Pick a date to see who owed what on that day."}
         </p>
       </div>
-      {write ? <SaveCube busy={saving} onSave={() => void saveToServer()} /> : null}
+      {write && !asOn ? <SaveCube busy={saving} onSave={() => void saveToServer()} /> : null}
+      </div>
+
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="grid gap-1.5">
+          <label htmlFor="balance-as-on" className="text-xs font-medium text-muted">
+            Balance as on
+          </label>
+          <Input
+            id="balance-as-on"
+            type="date"
+            value={asOn}
+            max="2026-12-31"
+            onChange={(e) => setAsOn(e.target.value)}
+          />
+        </div>
+        <Button type="button" variant="outline" onClick={() => setAsOn("2026-09-30")}>
+          30 Sep 2026
+        </Button>
+        <Button type="button" variant="outline" onClick={() => setAsOn("")} disabled={!asOn}>
+          Live
+        </Button>
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -309,7 +341,7 @@ function BalancePage() {
                 toast.message("Opening guest print…");
                 printSourceGuests(searchHit, hotel.name, hotel.place);
               }}
-              write={write}
+              write={write && !asOn}
             />
           ) : null}
 
@@ -331,7 +363,7 @@ function BalancePage() {
                   toast.message("Opening guest print…");
                   printSourceGuests(account, hotel.name, hotel.place);
                 }}
-                write={write}
+                write={write && !asOn}
               />
             ))}
             {listed.length === 0 && !searchHit ? (
@@ -370,7 +402,7 @@ function BalancePage() {
                     toast.message("Opening guest print…");
                     printSourceGuests(account, hotel.name, hotel.place);
                   }}
-                  write={write}
+                  write={write && !asOn}
                 />
               ))}
             </div>

@@ -1,5 +1,7 @@
 export type PayMode = "CASH" | "QRS" | "ONLINE" | "BALANCE" | "QRPK";
 
+export type OtaChannel = "FAB" | "BRAVE";
+
 export interface GuestEntry {
   id: string;
   date: string;
@@ -19,6 +21,8 @@ export interface GuestEntry {
   time?: string | null;
   coDate?: string | null;
   source?: string | null;
+  /** Online channel. FAB or BraveStay. `ota` stays true for either. */
+  otaChannel?: OtaChannel | null;
   gst?: boolean;
   gstInvoiceNo?: string | null;
   payRefNo?: string | null;

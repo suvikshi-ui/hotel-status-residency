@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ModeBadge } from "@/components/mode-badge";
 import { useGate } from "@/components/security-gate";
 import { formatDayShort, money } from "@/lib/format";
-import { buildGstStayBills, buildRegisterStays, type GstStayBill } from "@/lib/invoice";
+import { buildGstStayBills, buildOtaStays, buildRegisterStays, type GstStayBill } from "@/lib/invoice";
 import { escapeHtml, printDocument } from "@/lib/print-sheet";
 import { useLedger } from "@/lib/store";
 
@@ -27,6 +27,7 @@ function InvoicePage() {
   const [month, setMonth] = useState(date.slice(0, 7));
   const [nameQ, setNameQ] = useState("");
   const [sourceQ, setSourceQ] = useState("");
+  const [otaQ, setOtaQ] = useState("");
   const monthStart = `${month}-01`;
   const monthEnd = format(endOfMonth(parseISO(monthStart)), "yyyy-MM-dd");
   const inMonth = (row: GstStayBill) => row.checkIn <= monthEnd && row.checkOut >= monthStart;
@@ -46,8 +47,23 @@ function InvoicePage() {
     () => filterBills(registerRows, nameQ, sourceQ),
     [registerRows, nameQ, sourceQ],
   );
+  const otaRows = useMemo(
+    () => buildOtaStays(guests, receipts).filter(inMonth),
+    [guests, receipts, monthStart, monthEnd],
+  );
+  const otaFiltered = useMemo(() => {
+    const q = otaQ.trim().toLowerCase();
+    const named = filterBills(otaRows, nameQ, sourceQ);
+    if (!q) return named;
+    return named.filter(
+      (row) =>
+        row.otaName.toLowerCase().includes(q) ||
+        row.name.toLowerCase().includes(q),
+    );
+  }, [otaRows, nameQ, sourceQ, otaQ]);
   const gstTotal = gstFiltered.reduce((s, b) => s + b.amount, 0);
   const registerTotal = registerFiltered.reduce((s, b) => s + b.amount, 0);
+  const otaTotal = otaFiltered.reduce((s, b) => s + b.amount, 0);
 
   function saveField(id: string, field: "gstInvoiceNo" | "payRefNo", value: string) {
     const row = gstRows.find((b) => b.id === id);
@@ -126,6 +142,7 @@ function InvoicePage() {
         <TabsList>
           <TabsTrigger value="gst">GST invoice</TabsTrigger>
           <TabsTrigger value="register">Register</TabsTrigger>
+          <TabsTrigger value="ota">OTA guests</TabsTrigger>
         </TabsList>
 
         <TabsContent value="gst" className="flex flex-col gap-5">
@@ -182,6 +199,65 @@ function InvoicePage() {
             onSource={setSourceQ}
             onPrint={printRegister}
           />
+        </TabsContent>
+
+        <TabsContent value="ota" className="flex flex-col gap-5">
+          <p className="text-sm text-muted">
+            FAB and BraveStay guests, listed separately by OTA name.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <Card className="p-4">
+              <div className="text-xs font-medium text-muted">OTA stays</div>
+              <div className="mt-1 font-display text-2xl font-semibold tabular">{otaFiltered.length}</div>
+            </Card>
+            <Card className="p-4">
+              <div className="text-xs font-medium text-muted">OTA total</div>
+              <div className="mt-1 font-display text-2xl font-semibold tabular">{money(otaTotal)}</div>
+            </Card>
+          </div>
+          <Card>
+            <CardHeader className="gap-3 md:flex-row md:items-center md:justify-between">
+              <CardTitle>OTA guest list</CardTitle>
+              <Input
+                className="md:w-64"
+                placeholder="Filter FAB or BraveStay"
+                value={otaQ}
+                onChange={(e) => setOtaQ(e.target.value)}
+                aria-label="Filter by OTA name"
+              />
+            </CardHeader>
+            <CardContent className="overflow-x-auto p-0">
+              <table className="w-full min-w-[40rem] text-left text-sm">
+                <thead className="text-xs uppercase tracking-wide text-muted">
+                  <tr className="border-y border-border">
+                    <th className="px-5 py-2 font-medium">OTA</th>
+                    <th className="px-3 py-2 font-medium">Name</th>
+                    <th className="px-3 py-2 font-medium">Room</th>
+                    <th className="px-3 py-2 font-medium">Check-in</th>
+                    <th className="px-3 py-2 font-medium">Check-out</th>
+                    <th className="px-3 py-2 text-right font-medium">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {otaFiltered.map((b) => (
+                    <tr key={b.id} className="border-b border-border/70">
+                      <td className="px-5 py-2.5 font-medium">{b.otaName}</td>
+                      <td className="px-3 py-2.5">{b.name}</td>
+                      <td className="px-3 py-2.5 tabular">{b.roomNo}</td>
+                      <td className="px-3 py-2.5 tabular text-muted">{formatDayShort(b.checkIn)}</td>
+                      <td className="px-3 py-2.5 tabular text-muted">{formatDayShort(b.checkOut)}</td>
+                      <td className="px-3 py-2.5 text-right tabular">{money(b.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {otaFiltered.length === 0 ? (
+                <p className="py-10 text-center text-sm text-muted">
+                  No FAB or BraveStay guests this month.
+                </p>
+              ) : null}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

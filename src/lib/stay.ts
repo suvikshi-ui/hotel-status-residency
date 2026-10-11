@@ -149,6 +149,8 @@ export function applyGuestPatch(
   const shareGst = Object.prototype.hasOwnProperty.call(patch, "gst");
   const shareInv = Object.prototype.hasOwnProperty.call(patch, "gstInvoiceNo");
   const shareRef = Object.prototype.hasOwnProperty.call(patch, "payRefNo");
+  const shareOta = Object.prototype.hasOwnProperty.call(patch, "ota") ||
+    Object.prototype.hasOwnProperty.call(patch, "otaChannel");
   const chunkIds = stayChunkIds(guests, id);
   return guests.map((g) => {
     if (g.id === id) return { ...g, ...patch };
@@ -161,6 +163,12 @@ export function applyGuestPatch(
       ...(sameChunk && shareGst ? { gst: Boolean(patch.gst) } : {}),
       ...(sameChunk && shareInv ? { gstInvoiceNo: patch.gstInvoiceNo ?? null } : {}),
       ...(sameChunk && shareRef ? { payRefNo: patch.payRefNo ?? null } : {}),
+      ...(sameChunk && shareOta
+        ? {
+            ota: Boolean(patch.ota),
+            otaChannel: patch.otaChannel ?? null,
+          }
+        : {}),
     };
   });
 }

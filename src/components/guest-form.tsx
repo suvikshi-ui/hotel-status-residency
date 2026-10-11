@@ -26,7 +26,7 @@ import { findDuplicateOnDate } from "@/lib/stay";
 import { useLedger } from "@/lib/store";
 import { isDayLocked } from "@/lib/register-lock";
 import { useGate } from "@/components/security-gate";
-import type { GuestEntry, PayMode } from "@/lib/types";
+import type { GuestEntry, OtaChannel, PayMode } from "@/lib/types";
 
 type PendingPost = {
   name: string;
@@ -36,6 +36,7 @@ type PendingPost = {
   amount: number;
   gst: boolean;
   ota: boolean;
+  otaChannel: OtaChannel | null;
   gstInvoiceNo: string | null;
   payRefNo: string | null;
 };
@@ -63,7 +64,8 @@ export function GuestForm({
   const [amount, setAmount] = useState("1500");
   const [source, setSource] = useState("");
   const [gst, setGst] = useState(false);
-  const [ota, setOta] = useState(false);
+  const [channel, setChannel] = useState<OtaChannel | "">("");
+  const [otaTouched, setOtaTouched] = useState(false);
   const [gstInvoiceNo, setGstInvoiceNo] = useState("");
   const [payRefNo, setPayRefNo] = useState("");
   const [dup, setDup] = useState<GuestEntry | null>(null);
@@ -78,7 +80,8 @@ export function GuestForm({
     setAmount(String(editing.amount));
     setSource(editing.source ?? "");
     setGst(Boolean(editing.gst));
-    setOta(Boolean(editing.ota));
+    setChannel(editing.otaChannel === "FAB" || editing.otaChannel === "BRAVE" ? editing.otaChannel : "");
+    setOtaTouched(false);
     setGstInvoiceNo(editing.gstInvoiceNo ?? "");
     setPayRefNo(editing.payRefNo ?? "");
     cardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -89,7 +92,8 @@ export function GuestForm({
     setName("");
     setSource("");
     setGst(false);
-    setOta(false);
+    setChannel("");
+    setOtaTouched(false);
     setGstInvoiceNo("");
     setPayRefNo("");
     setAmount("1500");
@@ -105,7 +109,8 @@ export function GuestForm({
     setName("");
     setSource("");
     setGst(false);
-    setOta(false);
+    setChannel("");
+    setOtaTouched(false);
     setGstInvoiceNo("");
     setPayRefNo("");
     pending.current = null;
@@ -155,7 +160,8 @@ export function GuestForm({
       source: source.trim() || null,
       amount: amt,
       gst,
-      ota,
+      ota: channel ? true : otaTouched ? false : Boolean(editing?.ota),
+      otaChannel: channel ? channel : otaTouched ? null : editing?.otaChannel ?? null,
       gstInvoiceNo: gst ? gstInvoiceNo.trim() || null : null,
       payRefNo:
         gst || mode === "QRPK" ? payRefNo.trim() || null : null,
@@ -302,21 +308,34 @@ export function GuestForm({
                 GST
               </label>
             </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="g-ota">OTA guest</Label>
-              <label
-                htmlFor="g-ota"
-                className="flex h-11 cursor-pointer items-center gap-2 rounded-md border border-border bg-card px-3 text-sm"
-              >
-                <input
-                  id="g-ota"
-                  type="checkbox"
-                  className="size-4 accent-primary"
-                  checked={ota}
-                  onChange={(e) => setOta(e.target.checked)}
-                />
-                OTA
-              </label>
+            <div className="grid gap-1.5 sm:col-span-2">
+              <Label>OTA</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="flex h-11 cursor-pointer items-center gap-2 rounded-md border border-border bg-card px-3 text-sm">
+                  <input
+                    type="checkbox"
+                    className="size-4 accent-primary"
+                    checked={channel === "FAB"}
+                    onChange={() => {
+                      setOtaTouched(true);
+                      setChannel((cur) => (cur === "FAB" ? "" : "FAB"));
+                    }}
+                  />
+                  FAB
+                </label>
+                <label className="flex h-11 cursor-pointer items-center gap-2 rounded-md border border-border bg-card px-3 text-sm">
+                  <input
+                    type="checkbox"
+                    className="size-4 accent-primary"
+                    checked={channel === "BRAVE"}
+                    onChange={() => {
+                      setOtaTouched(true);
+                      setChannel((cur) => (cur === "BRAVE" ? "" : "BRAVE"));
+                    }}
+                  />
+                  BraveStay
+                </label>
+              </div>
             </div>
           </div>
           {gst || mode === "QRPK" ? (
