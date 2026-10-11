@@ -36,7 +36,6 @@ import { useLedger, useDayBooks } from "@/lib/store";
 import { useGate } from "@/components/security-gate";
 import { SaveCube, useAccountSave } from "@/components/save-cube";
 import { canWrite } from "@/lib/roles";
-import { isSealed, sealKey } from "@/lib/sheet-seal";
 import type { PayMode } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -54,7 +53,6 @@ function BalancePage() {
   const date = useLedger((s) => s.selectedDate);
   const addBalReceived = useLedger((s) => s.addBalReceived);
   const removeBalReceived = useLedger((s) => s.removeBalReceived);
-  const sealedIds = useLedger((s) => s.sealedIds);
   const { busy: saving, saveToServer } = useAccountSave();
   const write = canWrite(useLedger((s) => s.appRole));
   const { gate } = useGate();
@@ -93,6 +91,20 @@ function BalancePage() {
     () => uniqueSources(guests, receipts),
     [guests, receipts],
   );
+  const settled = useMemo(() => {
+    const t = q.trim().toLowerCase();
+    return accounts.filter((a) => {
+      if (a.remaining > 0 && !a.settled) return false;
+      if (a.billed <= 0 && a.receipts.length === 0) return false;
+      if (!t) return true;
+      if (a.key.toLowerCase().includes(t)) return true;
+      return a.guests.some(
+        (g) =>
+          g.name.toLowerCase().includes(t) ||
+          g.roomNo.toLowerCase().includes(t),
+      );
+    });
+  }, [accounts, q]);
   const listed = useMemo(
     () =>
       searchHit
@@ -140,20 +152,26 @@ function BalancePage() {
   }
 
   function removeReceipt(id: string) {
-    if (isSealed(sealedIds, sealKey.balance(id))) {
-      toast.message("Saved — this collection will not change");
-      return;
-    }
+    const receipt = receipts.find((r) => r.id === id);
     gate(
       () => {
-        removeBalReceived(id);
-        toast.success("Collection removed");
+        const ok = removeBalReceived(id, { bypass: true });
+        if (!ok) {
+          toast.error("This receipt could not be deleted");
+          return;
+        }
+        const name = (receipt?.forKey || receipt?.particular || "This source").trim();
+        toast.success(
+          `Receipt deleted. ${name} is back on the Balance list if any amount is still due.`,
+        );
       },
       {
-        title: "Are you sure?",
-        message: "Delete this collection?",
+        title: "Delete this receipt?",
+        message:
+          "The amount will leave Cash, Santosh QR or P.K. QR, and the balance will show again if it is not fully received.",
         confirmLabel: "Delete",
         danger: true,
+        requireCode: true,
       },
     );
   }
@@ -317,6 +335,40 @@ function BalancePage() {
               </Card>
             ) : null}
           </div>
+
+          {settled.length > 0 ? (
+            <div className="flex flex-col gap-2">
+              <div>
+                <p className="font-display text-lg font-semibold tracking-tight">
+                  Received
+                </p>
+                <p className="text-sm text-muted">
+                  These are fully received. Delete a receipt and the balance
+                  comes back on the list above if any amount is still due.
+                </p>
+              </div>
+              {settled.map((account) => (
+                <SourceCard
+                  key={account.key}
+                  account={account}
+                  open={openKey === account.key}
+                  month={date.slice(0, 7)}
+                  onToggle={() =>
+                    setOpenKey((k) => (k === account.key ? null : account.key))
+                  }
+                  onCollect={(mode, amount, payRef) =>
+                    collectFrom(account, mode, amount, payRef)
+                  }
+                  onRemoveReceipt={removeReceipt}
+                  onPrintGuests={() => {
+                    toast.message("Opening guest print…");
+                    printSourceGuests(account, hotel.name, hotel.place);
+                  }}
+                  write={write}
+                />
+              ))}
+            </div>
+          ) : null}
         </TabsContent>
 
         <TabsContent value="other" className="flex flex-col gap-5">

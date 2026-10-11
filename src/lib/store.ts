@@ -158,7 +158,7 @@ export interface LedgerState {
   addExpense: (row: Omit<NamedAmount, "id" | "date"> & { date?: string }) => void;
   removeExpense: (id: string, opts?: BypassGuard) => void;
   addBalReceived: (row: Omit<NamedAmount, "id" | "date"> & { date?: string }) => void;
-  removeBalReceived: (id: string, opts?: BypassGuard) => void;
+  removeBalReceived: (id: string, opts?: BypassGuard) => boolean;
   setLineRef: (
     kind: "guest" | "food" | "wholesale" | "expense" | "receipt",
     id: string,
@@ -849,7 +849,7 @@ export const useLedger = create<LedgerState>()(
       removeBalReceived: (id, opts) => {
         const row = get().balReceived.find((x) => x.id === id);
         const key = sealKey.balance(id);
-        if (blockedRow(get(), row?.date, key, opts)) return;
+        if (blockedRow(get(), row?.date, key, opts)) return false;
         const balReceived = get().balReceived.filter((x) => x.id !== id);
         const next = { ...get(), balReceived };
         save({
@@ -858,6 +858,7 @@ export const useLedger = create<LedgerState>()(
           deletedIds: withSealed(get().deletedIds, [key]),
           ...rebuildFrom(next, row?.date ?? get().selectedDate),
         });
+        return true;
       },
       setLineRef: (kind, id, ref, opts) => {
         const value = ref.trim() || null;

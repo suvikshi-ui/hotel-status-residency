@@ -622,9 +622,18 @@ export function RegisterLines() {
               rows={dueRows}
               locked={locked}
               onRemove={(id) =>
-                gate(() => removeBal(id, { bypass: true }), {
+                gate(() => {
+                  const ok = removeBal(id, { bypass: true });
+                  if (!ok) {
+                    toast.error("This receipt could not be deleted");
+                    return;
+                  }
+                  toast.success(
+                    "Receipt deleted. The balance is back on the list if any amount is still due.",
+                  );
+                }, {
                   title: "Delete this collection?",
-                  message: "Enter the security code, then press Save.",
+                  message: "Enter the security code. The open balance will show again if it is not fully received.",
                   confirmLabel: "Delete",
                   danger: true,
                   requireCode: true,
