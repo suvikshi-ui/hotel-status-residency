@@ -78,9 +78,36 @@ export function receiptMatches(particular: string, key: string): boolean {
   if (p === k) return true;
   const pc = canonName(p);
   const kc = canonName(k);
-  if (pc && kc && (pc === kc || pc.includes(kc) || kc.includes(pc))) return true;
+  if (pc && kc && pc === kc) return true;
   const escaped = k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`(^|[^A-Z0-9])${escaped}([^A-Z0-9]|$)`).test(p);
+}
+
+function accountForReceipt(
+  particular: string,
+  map: Map<string, DueAccount>,
+): string | null {
+  const p = particular.trim().toUpperCase();
+  const pc = canonName(p);
+  if (!p) return null;
+  if (map.has(p)) return p;
+  if (pc) {
+    for (const key of map.keys()) {
+      if (canonName(key) === pc) return key;
+    }
+  }
+  const guestHits: string[] = [];
+  for (const [key, row] of map) {
+    const hit = row.guests.some((g) => {
+      const name = g.name.trim().toUpperCase();
+      return name === p || (pc !== "" && canonName(name) === pc);
+    });
+    if (hit) guestHits.push(key);
+  }
+  if (guestHits.length === 1) return guestHits[0] ?? null;
+  const keys = [...map.keys()].sort((a, b) => b.length - a.length);
+  const wordHits = keys.filter((key) => receiptMatches(p, key));
+  return wordHits.length === 1 ? (wordHits[0] ?? null) : null;
 }
 
 function personKey(g: { name: string; roomNo: string }) {
@@ -256,10 +283,9 @@ export function buildDueAccounts(
     if (!row.lastDate || r.date > row.lastDate) row.lastDate = r.date;
   }
 
-  const keys = [...map.keys()].sort((a, b) => b.length - a.length);
   for (const r of receipts) {
     if (r.kind === "ota" || r.kind === "other" || r.kind === "list") continue;
-    const hit = keys.find((k) => receiptMatches(r.particular, k));
+    const hit = accountForReceipt(r.particular, map);
     if (!hit) continue;
     const row = map.get(hit)!;
     row.collected += r.amount;

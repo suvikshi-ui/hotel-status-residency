@@ -309,4 +309,62 @@ describe("buildDueAccounts stays", () => {
     assert.equal(fly!.remaining, 0);
     assert.equal(fly!.settled, true);
   });
+
+  it("does not give Arif's receipt to a longer name", () => {
+    const accounts = buildDueAccounts(
+      [
+        guest({
+          id: "a1",
+          date: "2026-09-01",
+          name: "ARIF",
+          source: "Arif",
+          amount: 3000,
+          stay: "out",
+        }),
+        guest({
+          id: "a2",
+          date: "2026-09-02",
+          name: "ARIF KHAN",
+          source: "Arif Khan",
+          amount: 4000,
+          stay: "out",
+        }),
+      ],
+      [
+        receipt({ id: "r1", amount: 3000, particular: "Arif" }),
+        receipt({ id: "r2", amount: 3000, particular: "ARIF" }),
+        receipt({ id: "r3", amount: 3000, particular: "arif" }),
+      ],
+    );
+    const arif = accounts.find((a) => a.key === "ARIF");
+    const khan = accounts.find((a) => a.key === "ARIF KHAN");
+    assert.ok(arif);
+    assert.ok(khan);
+    assert.equal(arif!.collected, 9000);
+    assert.equal(arif!.remaining, -6000);
+    assert.equal(arif!.settled, true);
+    assert.equal(khan!.collected, 0);
+    assert.equal(khan!.remaining, 4000);
+  });
+
+  it("cuts the company balance when the receipt uses the guest name", () => {
+    const accounts = buildDueAccounts(
+      [
+        guest({
+          id: "a1",
+          date: "2026-09-01",
+          name: "ARIF",
+          source: "Flysky",
+          amount: 2000,
+          stay: "out",
+        }),
+      ],
+      [receipt({ id: "r1", amount: 2000, particular: "Arif" })],
+    );
+    const fly = accounts.find((a) => a.key === "FLYSKY");
+    assert.ok(fly);
+    assert.equal(fly!.collected, 2000);
+    assert.equal(fly!.remaining, 0);
+    assert.equal(fly!.settled, true);
+  });
 });
