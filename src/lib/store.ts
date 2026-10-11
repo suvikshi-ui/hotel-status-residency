@@ -136,6 +136,8 @@ export interface LedgerState {
   openMonths: string[];
   sealedIds: SealedIds;
   deletedIds: SealedIds;
+  /** After Reset, saved rows stay empty. Demo guests must not come back. */
+  booksCleared: boolean;
   savedAt: number;
   setDate: (date: string) => void;
   setOpening: (date: string, opening: OpeningBalances) => void;
@@ -281,6 +283,7 @@ function seedState(): Omit<
     openMonths: [],
     sealedIds: {},
     deletedIds: {},
+    booksCleared: false,
     savedAt: 0,
   };
 }
@@ -1154,14 +1157,13 @@ export const useLedger = create<LedgerState>()(
           openMonths: [],
           sealedIds: {},
           deletedIds: {},
+          booksCleared: true,
           opening: { cash: 0, santosh: 0, pk: 0, online: 0, outstanding: 0 },
           selectedDate: todayIso(),
-          savedAt: Date.now(),
         };
-        set({
+        save({
           ...blank,
           ...rebuildFrom(blank, blank.openingDate || BASE_OPENING_DATE),
-          savedAt: Date.now(),
         });
       },
     };
@@ -1205,11 +1207,19 @@ export const useLedger = create<LedgerState>()(
         guestCards: s.guestCards,
         bankRows: s.bankRows,
         appRole: s.appRole,
+        booksCleared: s.booksCleared,
         savedAt: s.savedAt,
       }),
       merge: (persisted, current) => {
         const disk = { ...((persisted ?? {}) as Partial<LedgerState>) };
-        return withBooks(mergeSnapshot(disk, current));
+        const cleared = Boolean(disk.booksCleared);
+        return withBooks(
+          mergeSnapshot(
+            disk,
+            current,
+            cleared ? { skipSeedFill: true, replace: true } : undefined,
+          ),
+        );
       },
     },
   ),
@@ -1260,6 +1270,7 @@ export function adoptLegacyLedger(userId: string | null): boolean {
   }
   if (!donor) return false;
   const v6 = persistState(v6raw);
+  if (v6?.booksCleared) return false;
   if (!v6) {
     const wrap = JSON.stringify({ state: donor, version: 0 });
     localStorage.setItem(v6key, wrap);

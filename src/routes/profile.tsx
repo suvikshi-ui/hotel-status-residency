@@ -341,31 +341,31 @@ function clearedSnapshot(base: LedgerSnapshot): LedgerSnapshot {
 }
 
 function EmptyBooksCard() {
-  const restore = useLedger((s) => s.restoreSeed);
+  const clearBooks = useLedger((s) => s.clearBooks);
   const { gate } = useGate();
   return (
     <Card>
       <CardHeader>
         <CardTitle>Empty books</CardTitle>
         <p className="text-sm text-muted">
-          Reset all books to empty and start from today. Local entries on this
-          desk will be cleared.
+          Reset makes the live book zero. Guests, balance, expenses and every
+          other entry are removed. A JSON file imported after this stays saved.
         </p>
       </CardHeader>
       <CardContent>
         <Button
           variant="outline"
           onClick={() =>
-            gate(() => restore(), {
+            gate(() => clearBooks(), {
               title: "Are you sure?",
               message:
-                "Reset all books to empty and start from today? Local entries will be cleared.",
-              confirmLabel: "Restore",
+                "Reset the live book to zero? Every entry on this desk will be removed. Import your JSON after this.",
+              confirmLabel: "Reset to zero",
               danger: true,
             })
           }
         >
-          Reset empty books
+          Reset to zero
         </Button>
       </CardContent>
     </Card>
