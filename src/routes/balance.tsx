@@ -59,7 +59,6 @@ function BalancePage() {
   const write = canWrite(useLedger((s) => s.appRole));
   const { gate } = useGate();
   const [q, setQ] = useState("");
-  const [onlyOpen, setOnlyOpen] = useState(true);
   const [openKey, setOpenKey] = useState<string | null>(null);
 
   const accounts = useMemo(
@@ -70,7 +69,7 @@ function BalancePage() {
   const filtered = useMemo(() => {
     const t = q.trim().toLowerCase();
     return accounts.filter((a) => {
-      if (onlyOpen && a.settled) return false;
+      if (a.remaining <= 0 || a.settled) return false;
       if (!t) return true;
       if (a.key.toLowerCase().includes(t)) return true;
       return a.guests.some(
@@ -79,7 +78,7 @@ function BalancePage() {
           g.roomNo.toLowerCase().includes(t),
       );
     });
-  }, [accounts, onlyOpen, q]);
+  }, [accounts, q]);
 
   const openDue = accounts.reduce(
     (s, a) => s + Math.max(0, a.billed - a.collected),
@@ -230,12 +229,6 @@ function BalancePage() {
               </datalist>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button
-                variant={onlyOpen ? "default" : "outline"}
-                onClick={() => setOnlyOpen((v) => !v)}
-              >
-                {onlyOpen ? "Open dues" : "All sources"}
-              </Button>
               <Button
                 variant="outline"
                 onClick={() => {
@@ -913,7 +906,7 @@ function SourceCard({
                 </tr>
               </thead>
               <tbody>
-                {account.stays.map((stay) => (
+                {account.stays.filter((stay) => stay.status !== "paid").map((stay) => (
                   <tr
                     key={stay.id}
                     className={cn(

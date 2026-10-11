@@ -519,6 +519,7 @@ export function RegisterLines() {
                     payRef: dueMode === "QRPK" ? dueRef.trim() || null : null,
                   });
                   toast.success(`Collected ${money(n)} from ${dueAccount?.key ?? t}`);
+                  setSource("");
                   setDueAmt("");
                   setDueRef("");
                 },
