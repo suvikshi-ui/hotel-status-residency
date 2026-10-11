@@ -48,6 +48,20 @@ function roomsFor(
   return out.length ? ` (${out.join(",")})` : "";
 }
 
+function receivedNames(
+  recs: { particular: string; kind?: string | null }[],
+) {
+  const names = [
+    ...new Set(
+      recs
+        .filter((r) => r.kind !== "ota" && r.kind !== "list")
+        .map((r) => r.particular.trim().toUpperCase())
+        .filter(Boolean),
+    ),
+  ];
+  return names.length ? ` ${names.join(", ")}` : "";
+}
+
 const SIZE = { fs: 12.5, pad: "5px 8px", head: 13, title: 34, date: 16 };
 
 const B = "1px solid #1a1a1a";
@@ -214,9 +228,9 @@ export function DailyA4({
   const pkExp = expenses.filter((e) => e.mode === "QRPK");
   const rooms = take.balanceRooms.join(",");
   const balTag = rooms ? `BAL (${rooms})` : "BAL";
-  const cashRooms = roomsFor(cashRec, guests);
-  const qrRooms = roomsFor(qrRec, guests);
-  const pkRooms = roomsFor(pkRec, guests);
+  const cashRooms = receivedNames(cashRec) || roomsFor(cashRec, guests);
+  const qrRooms = receivedNames(qrRec) || roomsFor(qrRec, guests);
+  const pkRooms = receivedNames(pkRec.filter((r) => r.kind !== "ota")) || roomsFor(pkRec, guests);
   const onRooms = roomsFor(onRec, guests);
   const dueRooms = roomsFor([...qrRec, ...cashRec, ...pkRec], guests);
   const santoshSub =

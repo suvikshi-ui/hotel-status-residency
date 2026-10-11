@@ -36,6 +36,8 @@ export interface NamedAmount extends ModeAmount {
   particular: string;
   kind?: "due" | "ota" | "other" | "list";
   payRef?: string | null;
+  /** Exact balance-list key this receipt must cut. */
+  forKey?: string | null;
 }
 
 export interface MixSlice {

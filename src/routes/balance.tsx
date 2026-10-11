@@ -123,6 +123,7 @@ function BalancePage() {
       () => {
         addBalReceived({
           particular: account.key,
+          forKey: account.key,
           mode,
           amount,
           kind: "due",
@@ -346,22 +347,25 @@ function BalancePage() {
             }}
             onReceive={(source, mode, amount, payRef) => {
               const account = lookupDueAccount(accounts, source);
+              if (!account || account.remaining <= 0) {
+                toast.error("Is naam ka open balance nahi mila");
+                return;
+              }
               gate(
                 () => {
                   addBalReceived({
-                    particular: (account?.key ?? source).trim(),
+                    particular: account.key,
+                    forKey: account.key,
                     mode,
                     amount,
                     kind: "due",
                     payRef: payRef?.trim() || null,
                   });
-                  toast.success(
-                    `Received ${money(amount)} from ${account?.key ?? source}`,
-                  );
+                  toast.success(`Received ${money(amount)} from ${account.key}`);
                 },
                 {
                   title: "Receive this amount?",
-                  message: `Cut ${money(amount)} from ${account?.key ?? source} as a normal collection.`,
+                  message: `Cut ${money(amount)} from ${account.key}. Cash, Santosh QR or P.K. QR — it will show in that book.`,
                   confirmLabel: "Receive",
                 },
               );

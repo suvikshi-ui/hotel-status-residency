@@ -67,6 +67,20 @@ function roomsFor(recs: { particular: string }[], guests: GuestEntry[]) {
   return out.length ? ` (${out.join(",")})` : "";
 }
 
+function receivedNames(
+  recs: { particular: string; kind?: string | null }[],
+) {
+  const names = [
+    ...new Set(
+      recs
+        .filter((r) => r.kind !== "ota" && r.kind !== "list")
+        .map((r) => r.particular.trim().toUpperCase())
+        .filter(Boolean),
+    ),
+  ];
+  return names.length ? ` ${names.join(", ")}` : "";
+}
+
 function blocksOf(input: DailyPdfInput) {
   const c = input.books?.cashBook;
   const s = input.books?.santosh;
@@ -82,9 +96,11 @@ function blocksOf(input: DailyPdfInput) {
   const pkExp = input.expenses.filter((e) => e.mode === "QRPK");
   const rooms = input.take.balanceRooms.join(",");
   const balTag = rooms ? `BAL (${rooms})` : "BAL";
-  const cashRooms = roomsFor(cashRec, input.guests);
-  const qrRooms = roomsFor(qrRec, input.guests);
-  const pkRooms = roomsFor(pkRec, input.guests);
+  const cashRooms = receivedNames(cashRec) || roomsFor(cashRec, input.guests);
+  const qrRooms = receivedNames(qrRec) || roomsFor(qrRec, input.guests);
+  const pkRooms =
+    receivedNames(pkRec.filter((r) => r.kind !== "ota")) ||
+    roomsFor(pkRec, input.guests);
   const onRooms = roomsFor(onRec, input.guests);
   const dueRooms = roomsFor([...qrRec, ...cashRec, ...pkRec], input.guests);
   const santoshSub =

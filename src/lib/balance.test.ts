@@ -392,4 +392,34 @@ describe("buildDueAccounts stays", () => {
     assert.equal(arif!.remaining, -12000);
     assert.equal(arif!.settled, true);
   });
+
+  it("cuts the stamped source even if the typed name is different", () => {
+    const accounts = buildDueAccounts(
+      [
+        guest({
+          id: "a1",
+          date: "2026-09-01",
+          name: "ARIF",
+          source: "Arif",
+          amount: 6000,
+          stay: "out",
+        }),
+      ],
+      [
+        receipt({
+          id: "r1",
+          amount: 6000,
+          particular: "misc",
+          forKey: "ARIF",
+          mode: "QRS",
+        }),
+      ],
+    );
+    const arif = accounts.find((a) => a.key === "ARIF");
+    assert.ok(arif);
+    assert.equal(arif!.collected, 6000);
+    assert.equal(arif!.remaining, 0);
+    assert.equal(arif!.settled, true);
+    assert.equal(arif!.receipts[0]!.mode, "QRS");
+  });
 });

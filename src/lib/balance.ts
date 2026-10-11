@@ -86,7 +86,10 @@ export function receiptMatches(particular: string, key: string): boolean {
 function accountForReceipt(
   particular: string,
   map: Map<string, DueAccount>,
+  forKey?: string | null,
 ): string | null {
+  const stamped = (forKey ?? "").trim().toUpperCase();
+  if (stamped && map.has(stamped)) return stamped;
   const p = particular.trim().toUpperCase();
   const pc = canonName(p);
   if (!p) return null;
@@ -297,7 +300,7 @@ export function buildDueAccounts(
 
   for (const r of receipts) {
     if (r.kind === "ota" || r.kind === "other" || r.kind === "list") continue;
-    const hit = accountForReceipt(r.particular, map);
+    const hit = accountForReceipt(r.particular, map, r.forKey);
     if (!hit) continue;
     const row = map.get(hit)!;
     row.collected += r.amount;

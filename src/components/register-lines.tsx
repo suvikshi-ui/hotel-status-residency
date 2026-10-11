@@ -500,8 +500,8 @@ export function RegisterLines() {
             onSubmit={(e) => {
               e.preventDefault();
               const t = source.trim();
-              if (!t) {
-                toast.error("Enter the source or company name");
+              if (!dueAccount || dueLeft <= 0) {
+                toast.error("Is naam ka open balance nahi mila");
                 return;
               }
               const n = Number(dueAmt || dueLeft);
@@ -512,13 +512,14 @@ export function RegisterLines() {
               gate(
                 () => {
                   addBal({
-                    particular: dueAccount?.key ?? t,
+                    particular: dueAccount.key,
+                    forKey: dueAccount.key,
                     mode: dueMode,
                     amount: n,
                     kind: "due",
                     payRef: dueMode === "QRPK" ? dueRef.trim() || null : null,
                   });
-                  toast.success(`Collected ${money(n)} from ${dueAccount?.key ?? t}`);
+                  toast.success(`Collected ${money(n)} from ${dueAccount.key}`);
                   setSource("");
                   setDueAmt("");
                   setDueRef("");
