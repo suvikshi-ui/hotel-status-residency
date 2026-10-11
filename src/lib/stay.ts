@@ -79,10 +79,30 @@ export function stayDates(guests: GuestEntry[], g: GuestEntry) {
   };
 }
 
+/** A new stay starts on a real gap, not when a checkout is continued the next day. */
+export function stayBreaks(
+  prev: { date: string; stay?: string | null },
+  next: { date: string },
+) {
+  let days = 99;
+  try {
+    days = differenceInCalendarDays(parseISO(next.date), parseISO(prev.date));
+  } catch {
+    return next.date !== prev.date;
+  }
+  if (days > 1) return true;
+  if (prev.stay === "out" && days <= 0) return true;
+  return false;
+}
+
 export function consecutiveStayNights(guests: GuestEntry[]): GuestEntry[][] {
   const groups = new Map<string, GuestEntry[]>();
   for (const g of guests) {
-    const k = stayKey(g);
+    const k = [
+      g.name.trim().toUpperCase(),
+      normRoom(g.roomNo),
+      g.mode,
+    ].join("|");
     const list = groups.get(k) ?? [];
     list.push(g);
     groups.set(k, list);
@@ -95,17 +115,9 @@ export function consecutiveStayNights(guests: GuestEntry[]): GuestEntry[][] {
     let cur: GuestEntry[] = [];
     for (const n of sorted) {
       const prev = cur[cur.length - 1];
-      if (prev) {
-        let gap = true;
-        try {
-          gap = differenceInCalendarDays(parseISO(n.date), parseISO(prev.date)) > 1;
-        } catch {
-          gap = n.date !== prev.date;
-        }
-        if (gap || prev.stay === "out") {
-          chunks.push(cur);
-          cur = [];
-        }
+      if (prev && stayBreaks(prev, n)) {
+        chunks.push(cur);
+        cur = [];
       }
       cur.push(n);
     }
@@ -187,9 +199,24 @@ export function applyStay(
       });
   }
 
+  const who = `${row.name.trim().toUpperCase()}|${normRoom(row.roomNo)}`;
   let nextGuests = guests.map((g) => {
-    if (stayKey(g) !== key) return g;
-    if (g.id === id) {
+    const person = `${g.name.trim().toUpperCase()}|${normRoom(g.roomNo)}`;
+    const samePersonNight =
+      person === who && (g.date === row.date || g.date === addDaysIso(row.date, 1));
+    if (stayKey(g) !== key && !samePersonNight) return g;
+    if (person === who && g.date === addDaysIso(row.date, 1)) {
+      return {
+        ...g,
+        source: row.source ?? g.source ?? null,
+        mode: row.mode,
+        stay: "continue" as const,
+        checkIn,
+        checkOut: null,
+        outTime: null,
+      };
+    }
+    if (g.id === id || g.stay === "out" || g.checkOut) {
       return {
         ...g,
         stay: "continue" as const,
@@ -202,12 +229,15 @@ export function applyStay(
       ...g,
       checkIn,
       checkOut: null,
-      stay: g.stay === "out" ? "continue" : g.stay,
     };
   });
 
   const next = addDaysIso(row.date, 1);
-  const exists = nextGuests.some((g) => stayKey(g) === key && g.date === next);
+  const exists = nextGuests.some((g) => {
+    if (g.date !== next) return false;
+    const person = `${g.name.trim().toUpperCase()}|${normRoom(g.roomNo)}`;
+    return stayKey(g) === key || person === who;
+  });
   if (!exists) {
     const slNo =
       nextGuests.filter((g) => g.date === next).reduce((m, x) => Math.max(m, x.slNo), 0) +

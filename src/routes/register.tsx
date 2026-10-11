@@ -370,7 +370,28 @@ function RegisterPage() {
                   </td>
                   <td className="px-3 py-2">
                     {g.stay === "out" ? (
-                      <Badge variant="muted">Out</Badge>
+                      sealed ? (
+                        <Badge variant="muted">Out</Badge>
+                      ) : (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            gate(
+                              () => setStay(g.id, "continue", { bypass: true }),
+                              {
+                                title: "Continue this stay?",
+                                message: `${g.name} was checked out by mistake. Put the stay back on continue. The name will stay one stay in Balance and Invoice.`,
+                                confirmLabel: "Continue",
+                                requireCode: true,
+                              },
+                            )
+                          }
+                        >
+                          Continue
+                        </Button>
+                      )
                     ) : sealed ? (
                       <Badge variant="muted">Continue</Badge>
                     ) : (

@@ -135,6 +135,56 @@ describe("stay grouping", () => {
     assert.equal(left.days, 2);
   });
 
+  it("keeps a mistaken checkout as one stay when the next day continues", () => {
+    const stays = splitStayNights([
+      night({
+        id: "1",
+        date: "2026-09-09",
+        name: "PRASAD",
+        roomNo: "210",
+        stay: "out",
+        checkOut: "2026-09-10",
+      }),
+      night({
+        id: "2",
+        date: "2026-09-10",
+        name: "PRASAD",
+        roomNo: "210",
+        stay: "continue",
+        checkIn: "2026-09-09",
+      }),
+    ]);
+    assert.equal(stays.length, 1);
+    const accounts = buildDueAccounts(
+      [
+        guest({
+          id: "1",
+          date: "2026-09-09",
+          name: "PRASAD",
+          roomNo: "210",
+          source: "MOT",
+          stay: "out",
+          checkOut: "2026-09-10",
+          amount: 2000,
+        }),
+        guest({
+          id: "2",
+          date: "2026-09-10",
+          name: "PRASAD",
+          roomNo: "210",
+          source: "",
+          stay: "continue",
+          amount: 2000,
+        }),
+      ],
+      [],
+    );
+    assert.equal(accounts.length, 1);
+    assert.equal(accounts[0]!.key, "MOT");
+    assert.equal(accounts[0]!.stays.length, 1);
+    assert.equal(accounts[0]!.billed, 4000);
+  });
+
   it("splits a return visit after checkout", () => {
     const stays = splitStayNights([
       night({ id: "1", date: "2026-09-01", name: "RAMESH", stay: "out" }),

@@ -132,7 +132,7 @@ describe("duplicate posting key", () => {
 });
 
 describe("undo checkout", () => {
-  it("puts a mistaken checkout back on continue and opens the next night", () => {
+  it("does not add a second name when continue follows a checkout", () => {
     const guests = [
       g({
         id: "a",
@@ -141,16 +141,25 @@ describe("undo checkout", () => {
         roomNo: "210",
         mode: "BALANCE",
         source: "MOT",
-        checkIn: "2026-09-01",
         stay: "out",
         checkOut: "2026-09-10",
       }),
+      g({
+        id: "b",
+        date: "2026-09-10",
+        name: "PRASAD",
+        roomNo: "210",
+        mode: "BALANCE",
+        source: "",
+        stay: "continue",
+      }),
     ];
     const next = applyStay(guests, "a", "continue");
-    const row = next.find((x) => x.id === "a");
-    assert.equal(row?.stay, "continue");
-    assert.equal(row?.checkOut ?? null, null);
-    assert.ok(next.some((x) => x.date === "2026-09-10" && x.name === "PRASAD"));
+    const today = next.filter((x) => x.date === "2026-09-10" && x.name === "PRASAD");
+    assert.equal(today.length, 1);
+    assert.equal(next.find((x) => x.id === "a")?.stay, "continue");
+    assert.equal(next.find((x) => x.id === "a")?.checkOut ?? null, null);
+    assert.equal(today[0]?.source, "MOT");
   });
 
   it("lets yesterday roll re-tick a guest who was checked out by mistake", () => {

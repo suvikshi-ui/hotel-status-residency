@@ -26,10 +26,9 @@ export const SUPABASE_URL =
   (SUPABASE_PROJECT_ID ? `https://${SUPABASE_PROJECT_ID}.supabase.co` : "");
 
 /**
- * Supabase free egress is blocked (402). Books stay on this computer.
- * Set this back to false when the account opens again.
+ * Cloud books and staff login. The site stays closed until sign-in.
  */
-export const OFFLINE_BOOKS = true;
+export const OFFLINE_BOOKS = false;
 
 export function isSupabaseConfigured() {
   if (OFFLINE_BOOKS) return false;

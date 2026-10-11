@@ -1,7 +1,7 @@
-import { differenceInCalendarDays, parseISO } from "date-fns";
 import {
   checkoutFromLastNight,
   nightsFromDates,
+  stayBreaks,
 } from "./stay";
 import type { GuestEntry, NamedAmount, PayMode } from "./types";
 
@@ -67,6 +67,31 @@ export function sourceKey(g: GuestEntry): string {
   return (g.name ?? "").trim().toUpperCase() || "UNKNOWN";
 }
 
+function visitKey(g: GuestEntry) {
+  return `${g.name.trim().toUpperCase()}|${g.roomNo.trim()}|${g.mode}`;
+}
+
+/** Mistaken checkout then continue stays on the original source, one name. */
+function continuedSource(g: GuestEntry, guests: GuestEntry[]): string {
+  const mine = guests
+    .filter((x) => visitKey(x) === visitKey(g))
+    .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+  const chunks: GuestEntry[][] = [];
+  let cur: GuestEntry[] = [];
+  for (const n of mine) {
+    const prev = cur[cur.length - 1];
+    if (prev && stayBreaks(prev, n)) {
+      chunks.push(cur);
+      cur = [];
+    }
+    cur.push(n);
+  }
+  if (cur.length) chunks.push(cur);
+  const chunk = chunks.find((nights) => nights.some((n) => n.id === g.id)) ?? [g];
+  const named = chunk.find((n) => (n.source ?? "").trim());
+  return sourceKey(named ?? g);
+}
+
 function canonName(s: string) {
   return s.trim().toUpperCase().replace(/[^A-Z0-9]+/g, "");
 }
@@ -123,17 +148,9 @@ export function splitStayNights(nights: DueLine[]): DueLine[][] {
   let cur: DueLine[] = [];
   for (const n of sorted) {
     const prev = cur[cur.length - 1];
-    if (prev) {
-      let gap = true;
-      try {
-        gap = differenceInCalendarDays(parseISO(n.date), parseISO(prev.date)) > 1;
-      } catch {
-        gap = n.date !== prev.date;
-      }
-      if (gap || prev.stay === "out") {
-        chunks.push(cur);
-        cur = [];
-      }
+    if (prev && stayBreaks(prev, n)) {
+      chunks.push(cur);
+      cur = [];
     }
     cur.push(n);
   }
@@ -254,7 +271,7 @@ export function buildDueAccounts(
 
   for (const g of guests) {
     if (g.mode !== "BALANCE") continue;
-    const key = sourceKey(g);
+    const key = continuedSource(g, guests);
     const row = ensure(key);
     row.billed += g.amount;
     row.guests.push({

@@ -51,6 +51,34 @@ describe("invoice gst flag", () => {
     assert.equal(next[0]?.payRefNo, "REF123456");
   });
 
+  it("does not list a continued guest twice after a mistaken checkout", () => {
+    const bills = buildGstStayBills([
+      g("n1", {
+        date: "2026-09-09",
+        name: "PRASAD",
+        roomNo: "210",
+        gst: true,
+        checkIn: "2026-09-09",
+        stay: "out",
+        checkOut: "2026-09-10",
+        amount: 2000,
+      }),
+      g("n2", {
+        date: "2026-09-10",
+        name: "PRASAD",
+        roomNo: "210",
+        gst: true,
+        checkIn: "2026-09-09",
+        stay: "continue",
+        amount: 2000,
+      }),
+    ]);
+    assert.equal(bills.length, 1);
+    assert.equal(bills[0]?.name, "PRASAD");
+    assert.equal(bills[0]?.nights, 2);
+    assert.equal(bills[0]?.amount, 4000);
+  });
+
   it("groups check-in to check-out as one GST invoice", () => {
     const bills = buildGstStayBills([
       g("n1", { date: "2026-09-01", gst: true, checkIn: "2026-09-01", stay: "continue", amount: 2000 }),
