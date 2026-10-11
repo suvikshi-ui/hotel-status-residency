@@ -188,6 +188,7 @@ export interface LedgerState {
   replaceSnapshot: (p: Partial<LedgerState>) => void;
   adoptLiveSnapshot: (p: Partial<LedgerState>) => void;
   applyCloudBooks: (p: Partial<LedgerState>) => void;
+  clearBooks: () => void;
 }
 
 function seedState(): Omit<
@@ -238,6 +239,7 @@ function seedState(): Omit<
   | "replaceSnapshot"
   | "adoptLiveSnapshot"
   | "applyCloudBooks"
+  | "clearBooks"
 > {
   return {
     hotel: seed.hotel,
@@ -1116,6 +1118,50 @@ export const useLedger = create<LedgerState>()(
           appRole: role,
           ...rebuildFrom(merged, merged.openingDate || BASE_OPENING_DATE),
           savedAt: p.savedAt ?? merged.savedAt ?? Date.now(),
+        });
+      },
+      clearBooks: () => {
+        const cur = get();
+        const blank: LedgerState = {
+          ...cur,
+          guests: [],
+          food: [],
+          wholesale: [],
+          expenses: [],
+          balReceived: [],
+          staff: [],
+          staffRegister: [],
+          payrollFiles: [],
+          advances: [],
+          inventory: [],
+          inventoryFiles: [],
+          complaints: [],
+          reminders: [],
+          contacts: [],
+          corporates: [],
+          agents: [],
+          monthDraws: [],
+          monthOpenings: [],
+          monthArchives: [],
+          guestCards: [],
+          bankRows: [],
+          ota: [],
+          janSales: [],
+          janFood: [],
+          creditGuests: [],
+          lockedDates: {},
+          lockRev: {},
+          openMonths: [],
+          sealedIds: {},
+          deletedIds: {},
+          opening: { cash: 0, santosh: 0, pk: 0, online: 0, outstanding: 0 },
+          selectedDate: todayIso(),
+          savedAt: Date.now(),
+        };
+        set({
+          ...blank,
+          ...rebuildFrom(blank, blank.openingDate || BASE_OPENING_DATE),
+          savedAt: Date.now(),
         });
       },
     };

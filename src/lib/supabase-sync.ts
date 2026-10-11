@@ -151,6 +151,33 @@ function armRetry(userId: string) {
   }, 8000);
 }
 
+const BOOK_WIPE = "2026-10-11-empty";
+
+function wipeMark() {
+  return `hsr-book-wipe:${BOOK_WIPE}`;
+}
+
+/** One empty book, then the server copy is replaced. A later JSON import is kept. */
+async function wipeBooksOnce(userId: string): Promise<boolean> {
+  if (typeof localStorage === "undefined") return false;
+  if (localStorage.getItem(wipeMark()) === "1") return false;
+  useLedger.getState().clearBooks();
+  writeStoredLocks(ledgerOwnerKey(), {});
+  writeHouseFiles(ledgerOwnerKey(), []);
+  const pushed = await pushLedger(
+    userId,
+    { ...snapshotFromStore(), savedAt: Date.now() },
+    "book-wipe",
+    useLedger.getState().appRole,
+  );
+  if (!pushed.ok) return false;
+  localStorage.setItem(wipeMark(), "1");
+  rememberPulled(snapshotFromStore(), new Date().toISOString());
+  lastHash = hashOf(snapshotFromStore());
+  openOnToday();
+  return true;
+}
+
 function rememberPulled(snap: LedgerSnapshot, stamp?: string) {
   lastPulled = snap;
   if (stamp) lastCloudStamp = stamp;
@@ -585,6 +612,10 @@ export async function hydrateFromCloud(userId: string): Promise<CloudPhase> {
       useLedger.setState({ inventoryFiles: restored.inventoryFiles ?? [] });
     }
     const local = snapshotFromStore();
+    if (await wipeBooksOnce(userId)) {
+      setPhase("synced");
+      return "synced";
+    }
     const localScore = ledgerActivityScore(local);
 
     if (!pulled.ok) {
