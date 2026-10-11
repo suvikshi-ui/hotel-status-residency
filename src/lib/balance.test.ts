@@ -368,7 +368,7 @@ describe("buildDueAccounts stays", () => {
     assert.equal(fly!.settled, true);
   });
 
-  it("clears a short name when that source is the only match", () => {
+  it("does not clear Arif when the receipt only says Rif", () => {
     const accounts = buildDueAccounts(
       [
         guest({
@@ -379,6 +379,14 @@ describe("buildDueAccounts stays", () => {
           amount: 6000,
           stay: "out",
         }),
+        guest({
+          id: "a2",
+          date: "2026-09-02",
+          name: "MOTOR",
+          source: "Motor",
+          amount: 4000,
+          stay: "out",
+        }),
       ],
       [
         receipt({ id: "r1", amount: 6000, particular: "RIF" }),
@@ -387,10 +395,13 @@ describe("buildDueAccounts stays", () => {
       ],
     );
     const arif = accounts.find((a) => a.key === "ARIF");
+    const motor = accounts.find((a) => a.key === "MOTOR");
     assert.ok(arif);
-    assert.equal(arif!.collected, 18000);
-    assert.equal(arif!.remaining, -12000);
-    assert.equal(arif!.settled, true);
+    assert.ok(motor);
+    assert.equal(arif!.collected, 0);
+    assert.equal(arif!.remaining, 6000);
+    assert.equal(arif!.settled, false);
+    assert.equal(motor!.remaining, 4000);
   });
 
   it("cuts the stamped source even if the typed name is different", () => {

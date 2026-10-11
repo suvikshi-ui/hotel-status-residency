@@ -108,21 +108,7 @@ function accountForReceipt(
     if (hit) guestHits.push(key);
   }
   if (guestHits.length === 1) return guestHits[0] ?? null;
-  const keys = [...map.keys()].sort((a, b) => b.length - a.length);
-  const wordHits = keys.filter((key) => receiptMatches(p, key));
-  if (wordHits.length === 1) return wordHits[0] ?? null;
-  if (pc.length < 3) return null;
-  const fuzzy: string[] = [];
-  for (const [key, row] of map) {
-    const names = [key, ...row.guests.map((g) => g.name)];
-    const hit = names.some((name) => {
-      const nc = canonName(name);
-      if (!nc || nc.length < 3) return false;
-      return nc.includes(pc) || pc.includes(nc);
-    });
-    if (hit) fuzzy.push(key);
-  }
-  return fuzzy.length === 1 ? (fuzzy[0] ?? null) : null;
+  return null;
 }
 
 function personKey(g: { name: string; roomNo: string }) {

@@ -254,7 +254,7 @@ function BalancePage() {
                 variant="outline"
                 onClick={() => {
                   if (filtered.length === 0) {
-                    toast.error("No sources to print");
+                    toast.error("No open sources to print");
                     return;
                   }
                   toast.message("Opening source print…");
@@ -265,13 +265,18 @@ function BalancePage() {
                 Print sources
               </Button>
             </div>
-            <p className="text-xs text-muted">
-              <span className="font-medium text-fg">Print sources</span> — Flysky,
-              Motor, remaining only, no guest names.{" "}
-              <span className="font-medium text-fg">Print guests</span> on a
-              source — that company, then each guest stay.
-            </p>
           </div>
+
+          <div className="flex flex-col gap-2">
+            <div>
+              <p className="font-display text-lg font-semibold tracking-tight">
+                Open sources
+              </p>
+              <p className="text-sm text-muted">
+                {listed.length} live balance
+                {listed.length === 1 ? "" : "s"} · due {money(openDue)}
+              </p>
+            </div>
 
           {searchHit ? (
             <p className="text-sm text-muted">
@@ -334,6 +339,7 @@ function BalancePage() {
                 No source dues match this filter.
               </Card>
             ) : null}
+          </div>
           </div>
 
           {settled.length > 0 ? (
