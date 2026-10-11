@@ -136,8 +136,8 @@ function accountForReceipt(
   return null;
 }
 
-function personKey(g: { name: string; roomNo: string }) {
-  return `${g.name.trim().toUpperCase()}|${g.roomNo.trim()}`;
+function personKey(g: { name: string }) {
+  return g.name.trim().toUpperCase();
 }
 
 export function splitStayNights(nights: DueLine[]): DueLine[][] {
@@ -158,30 +158,27 @@ export function splitStayNights(nights: DueLine[]): DueLine[][] {
   return chunks;
 }
 
-export function stayFromNights(nights: DueLine[], asOf?: string): DueStay {
+export function stayFromNights(nights: DueLine[], _asOf?: string): DueStay {
   const dates = nights.map((n) => n.date).sort();
   const first = dates[0] ?? "";
   const lastNight = dates[dates.length - 1] ?? first;
   const lastRow =
     [...nights].reverse().find((n) => n.date === lastNight) ?? nights[nights.length - 1];
-  const out = [...nights].reverse().find((n) => n.stay === "out" || Boolean(n.checkOut));
   const checkIn =
     nights.reduce((m, n) => {
       const v = n.checkIn || n.date;
       return m && m < v ? m : v;
     }, first) || first;
   const morning = checkoutFromLastNight(lastNight);
-  const explicitOut = out?.checkOut || lastRow?.checkOut || null;
   const markedOut = lastRow?.stay === "out";
-  const nextChartExists = Boolean(asOf && asOf > lastNight);
-  const left = markedOut || nextChartExists;
-  const checkOut = left
+  const explicitOut = markedOut ? lastRow?.checkOut || null : null;
+  const checkOut = markedOut
     ? explicitOut && explicitOut > lastNight
       ? explicitOut
       : morning
     : null;
   const billed = nights.reduce((s, n) => s + n.amount, 0);
-  const days = nightsFromDates(checkIn, checkOut || morning);
+  const days = nightsFromDates(checkIn, checkOut || morning) || nights.length;
   const same = nights.length > 0 && nights.every((n) => n.amount === nights[0]!.amount);
   const perDay = nights.length
     ? same
@@ -194,7 +191,7 @@ export function stayFromNights(nights: DueLine[], asOf?: string): DueStay {
     roomNo: nights[0]?.roomNo ?? "",
     checkIn,
     checkOut,
-    inHouse: !left,
+    inHouse: !markedOut,
     days,
     perDay,
     billed,
@@ -338,20 +335,15 @@ export function buildDueAccounts(
       );
       const chunks = splitStayNights(list);
       for (const chunk of chunks) {
-        const out = chunk.find((g) => g.stay === "out");
         const chunkIn = chunk.reduce(
           (m, g) => (m < (g.checkIn || g.date) ? m : g.checkIn || g.date),
           chunk[0]!.date,
         );
-        const lastNight = chunk.reduce(
-          (m, g) => (m > g.date ? m : g.date),
-          chunk[0]!.date,
-        );
+        const last = [...chunk].sort((a, b) => a.date.localeCompare(b.date)).at(-1);
+        const ended = last?.stay === "out";
         for (const g of chunk) {
           g.checkIn = g.checkIn || chunkIn || inDate;
-          g.checkOut =
-            out?.checkOut ||
-            checkoutFromLastNight(out?.date || lastNight);
+          if (!ended) g.checkOut = null;
         }
       }
     }

@@ -152,7 +152,8 @@ function stayBill(
   const first = chunk[0]!;
   const last = chunk[chunk.length - 1]!;
   const checkIn = first.checkIn || first.date;
-  const checkOut = last.checkOut || checkoutFromLastNight(last.date);
+  const stillIn = last.stay !== "out";
+  const checkOut = stillIn ? "" : last.checkOut || checkoutFromLastNight(last.date);
   const billed = gstOnly ? chunk.filter((g) => g.gst) : chunk;
   const fromGuest = billed.map((g) => g.payRefNo?.trim() || "").find(Boolean) || "";
   const fromRecv = payRefsForSource(receipts, sourceKey(first));
@@ -165,7 +166,7 @@ function stayBill(
     mode: first.mode,
     checkIn,
     checkOut,
-    nights: nightsFromDates(checkIn, checkOut) || billed.length,
+    nights: nightsFromDates(checkIn, checkOut || checkoutFromLastNight(last.date)) || billed.length,
     amount: billed.reduce((s, g) => s + g.amount, 0),
     gstInvoiceNo: billed.map((g) => g.gstInvoiceNo?.trim() || "").find(Boolean) || "",
     payRefNo: fromGuest || fromRecv.join(" · "),

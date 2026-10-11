@@ -30,7 +30,8 @@ function InvoicePage() {
   const [otaQ, setOtaQ] = useState("");
   const monthStart = `${month}-01`;
   const monthEnd = format(endOfMonth(parseISO(monthStart)), "yyyy-MM-dd");
-  const inMonth = (row: GstStayBill) => row.checkIn <= monthEnd && row.checkOut >= monthStart;
+  const inMonth = (row: GstStayBill) =>
+    row.checkIn <= monthEnd && (!row.checkOut || row.checkOut >= monthStart);
   const gstRows = useMemo(
     () => buildGstStayBills(guests, receipts).filter(inMonth),
     [guests, receipts, monthStart, monthEnd],
@@ -96,7 +97,7 @@ function InvoicePage() {
           .map(
             (b) => `<tr>
               <td>${escapeHtml(formatDayShort(b.checkIn))}</td>
-              <td>${escapeHtml(formatDayShort(b.checkOut))}</td>
+              <td>${escapeHtml(b.checkOut ? formatDayShort(b.checkOut) : "Continue")}</td>
               <td>${escapeHtml(b.name)}</td>
               <td>${escapeHtml(b.source || "—")}</td>
               <td>${escapeHtml(b.roomNo)}</td>
@@ -245,7 +246,7 @@ function InvoicePage() {
                       <td className="px-3 py-2.5">{b.name}</td>
                       <td className="px-3 py-2.5 tabular">{b.roomNo}</td>
                       <td className="px-3 py-2.5 tabular text-muted">{formatDayShort(b.checkIn)}</td>
-                      <td className="px-3 py-2.5 tabular text-muted">{formatDayShort(b.checkOut)}</td>
+                      <td className="px-3 py-2.5 tabular text-muted">{b.checkOut ? formatDayShort(b.checkOut) : "Continue"}</td>
                       <td className="px-3 py-2.5 text-right tabular">{money(b.amount)}</td>
                     </tr>
                   ))}
@@ -361,7 +362,7 @@ function BillCard({
             {rows.map((b) => (
               <tr key={b.id} className="border-b border-border/70">
                 <td className="px-5 py-2.5 tabular text-muted">{formatDayShort(b.checkIn)}</td>
-                <td className="px-3 py-2.5 tabular text-muted">{formatDayShort(b.checkOut)}</td>
+                <td className="px-3 py-2.5 tabular text-muted">{b.checkOut ? formatDayShort(b.checkOut) : "Continue"}</td>
                 <td className="px-3 py-2.5 font-medium">{b.name}</td>
                 <td className="px-3 py-2.5 text-muted">{b.source || "—"}</td>
                 <td className="px-3 py-2.5 tabular">{b.roomNo}</td>

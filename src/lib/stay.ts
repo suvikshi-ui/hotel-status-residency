@@ -59,31 +59,36 @@ export function nightsFromDates(checkIn: string, checkOut: string) {
 }
 
 export function stayDates(guests: GuestEntry[], g: GuestEntry) {
-  const nights = guests.filter((x) => stayKey(x) === stayKey(g));
+  const nights = guests
+    .filter((x) => stayKey(x) === stayKey(g))
+    .sort((a, b) => a.date.localeCompare(b.date));
   const checkIn =
     g.checkIn ||
     nights.reduce((m, x) => (m && m < x.date ? m : x.date), g.date);
-  const out = nights.find((x) => x.stay === "out" || Boolean(x.checkOut));
-  const lastNight = nights.reduce(
-    (m, x) => (m > x.date ? m : x.date),
-    g.date,
-  );
-  const checkOut =
-    g.checkOut ||
-    out?.checkOut ||
-    checkoutFromLastNight(out?.stay === "out" ? out.date : lastNight);
+  const last = nights[nights.length - 1] ?? g;
+  const lastNight = last.date || g.date;
+  const stillIn = last.stay !== "out";
+  const checkOut = stillIn
+    ? ""
+    : last.checkOut || checkoutFromLastNight(lastNight);
   return {
     checkIn,
     checkOut,
-    nights: nightsFromDates(checkIn, checkOut),
+    nights: stillIn
+      ? Math.max(nights.length, nightsFromDates(checkIn, checkoutFromLastNight(lastNight)))
+      : nightsFromDates(checkIn, checkOut),
   };
 }
 
-/** A new stay starts on a real gap, not when a checkout is continued the next day. */
+/** A new stay starts only when the guest actually left and came again. */
 export function stayBreaks(
-  prev: { date: string; stay?: string | null },
-  next: { date: string },
+  prev: { date: string; stay?: string | null; checkIn?: string | null },
+  next: { date: string; stay?: string | null; checkIn?: string | null },
 ) {
+  const prevIn = (prev.checkIn || prev.date).slice(0, 10);
+  const nextIn = (next.checkIn || next.date).slice(0, 10);
+  if (prevIn && nextIn && prevIn === nextIn) return false;
+  if (prev.stay === "out" && nextIn && prevIn && nextIn !== prevIn) return true;
   let days = 99;
   try {
     days = differenceInCalendarDays(parseISO(next.date), parseISO(prev.date));
@@ -98,11 +103,7 @@ export function stayBreaks(
 export function consecutiveStayNights(guests: GuestEntry[]): GuestEntry[][] {
   const groups = new Map<string, GuestEntry[]>();
   for (const g of guests) {
-    const k = [
-      g.name.trim().toUpperCase(),
-      normRoom(g.roomNo),
-      g.mode,
-    ].join("|");
+    const k = [g.name.trim().toUpperCase(), g.mode].join("|");
     const list = groups.get(k) ?? [];
     list.push(g);
     groups.set(k, list);

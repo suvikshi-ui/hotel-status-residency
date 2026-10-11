@@ -110,29 +110,21 @@ describe("stay grouping", () => {
     assert.equal(row.billed, 8000);
   });
 
-  it("keeps Continue until the next chart is made without ticking them", () => {
+  it("keeps a continued guest as one stay even when later dates exist", () => {
     const nights = [
-      night({
-        id: "1",
-        date: "2026-09-08",
-        name: "PANKAJ",
-        checkIn: "2026-09-08",
-      }),
-      night({
-        id: "2",
-        date: "2026-09-09",
-        name: "PANKAJ",
-        checkIn: "2026-09-08",
-      }),
+      night({ id: "1", date: "2026-09-01", name: "ABDUL", checkIn: "2026-09-01" }),
+      night({ id: "2", date: "2026-09-02", name: "ABDUL", checkIn: "2026-09-01" }),
+      night({ id: "3", date: "2026-09-04", name: "ABDUL", checkIn: "2026-09-01" }),
+      night({ id: "4", date: "2026-09-11", name: "ABDUL", checkIn: "2026-09-01", roomNo: "204" }),
+      night({ id: "5", date: "2026-09-14", name: "ABDUL", checkIn: "2026-09-01" }),
+      night({ id: "6", date: "2026-09-30", name: "ABDUL", checkIn: "2026-09-01", stay: "continue" }),
     ];
-    const open = stayFromNights(nights, "2026-09-09");
-    assert.equal(open.checkOut, null);
-    assert.equal(open.inHouse, true);
-    assert.equal(open.days, 2);
-    const left = stayFromNights(nights, "2026-09-10");
-    assert.equal(left.checkOut, "2026-09-10");
-    assert.equal(left.inHouse, false);
-    assert.equal(left.days, 2);
+    assert.equal(splitStayNights(nights).length, 1);
+    const row = stayFromNights(nights, "2026-10-11");
+    assert.equal(row.checkIn, "2026-09-01");
+    assert.equal(row.checkOut, null);
+    assert.equal(row.inHouse, true);
+    assert.equal(row.billed, 12000);
   });
 
   it("keeps a mistaken checkout as one stay when the next day continues", () => {
