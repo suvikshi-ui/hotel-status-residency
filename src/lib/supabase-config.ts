@@ -26,9 +26,10 @@ export const SUPABASE_URL =
   (SUPABASE_PROJECT_ID ? `https://${SUPABASE_PROJECT_ID}.supabase.co` : "");
 
 /**
- * Cloud books and staff login. The site stays closed until sign-in.
+ * Offline books. The site does not sign in or talk to Supabase.
+ * Local data on this computer is left as it is.
  */
-export const OFFLINE_BOOKS = false;
+export const OFFLINE_BOOKS = true;
 
 export function isSupabaseConfigured() {
   if (OFFLINE_BOOKS) return false;

@@ -1092,7 +1092,7 @@ export async function pushLedger(
     ? (priorMeta.data as { hotel?: unknown }).hotel
     : undefined;
   const priorBooks = booksFromHotel(priorHotel);
-  const monthImport = migratedFrom === "month-import" || migratedFrom === "book-wipe";
+  const monthImport = migratedFrom === "month-import";
   // A month import already merged every other month into `snap`. Do not pull
   // the previous cloud copy back in — that would resurrect a month the desk emptied.
   if (!monthImport) {
