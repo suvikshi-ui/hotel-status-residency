@@ -86,7 +86,9 @@ function BalancePage() {
   );
   const collected = accounts.reduce((s, a) => s + a.collected, 0);
   const billed = accounts.reduce((s, a) => s + (a.billed - a.listBilled), 0);
-  const searchHit = lookupDueAccount(accounts, q);
+  const searchHitRaw = lookupDueAccount(accounts, q);
+  const searchHit =
+    searchHitRaw && searchHitRaw.remaining > 0 ? searchHitRaw : null;
   const sourceHints = useMemo(
     () => uniqueSources(guests, receipts),
     [guests, receipts],
@@ -932,7 +934,7 @@ function SourceCard({
                       {money(stay.perDay)}
                     </td>
                     <td className="px-3 py-2.5 text-right tabular font-medium">
-                      {money(stay.billed)}
+                      {money(stay.remaining)}
                     </td>
                     <td className="px-5 py-2.5">
                       <StayStatus stay={stay} />

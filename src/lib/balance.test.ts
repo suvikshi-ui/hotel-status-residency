@@ -367,4 +367,29 @@ describe("buildDueAccounts stays", () => {
     assert.equal(fly!.remaining, 0);
     assert.equal(fly!.settled, true);
   });
+
+  it("clears a short name when that source is the only match", () => {
+    const accounts = buildDueAccounts(
+      [
+        guest({
+          id: "a1",
+          date: "2026-09-01",
+          name: "ARIF",
+          source: "Arif",
+          amount: 6000,
+          stay: "out",
+        }),
+      ],
+      [
+        receipt({ id: "r1", amount: 6000, particular: "RIF" }),
+        receipt({ id: "r2", amount: 6000, particular: "RIF" }),
+        receipt({ id: "r3", amount: 6000, particular: "RIF" }),
+      ],
+    );
+    const arif = accounts.find((a) => a.key === "ARIF");
+    assert.ok(arif);
+    assert.equal(arif!.collected, 18000);
+    assert.equal(arif!.remaining, -12000);
+    assert.equal(arif!.settled, true);
+  });
 });
