@@ -747,39 +747,44 @@ function CashCountPanel() {
               </div>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+          <div className="overflow-hidden rounded-lg border border-border">
             {CASH_NOTES.map((note) => {
               const count = notes[String(note)] ?? 0;
               return (
-                <label key={note} className="flex flex-col gap-1 text-sm">
-                  <span className="text-xs font-medium text-muted">₹{note}</span>
+                <div
+                  key={note}
+                  className="grid grid-cols-[5.5rem_1fr_6.5rem] items-center gap-3 border-b border-border px-3 py-2 last:border-b-0"
+                >
+                  <span className="font-display text-lg font-semibold tabular">₹{note}</span>
                   <Input
                     inputMode="numeric"
                     className="tabular"
                     value={count ? String(count) : ""}
                     disabled={!write}
                     aria-label={`${note} notes`}
+                    placeholder="How many"
                     onChange={(event) => {
                       const next = Math.max(0, Math.round(Number(event.target.value) || 0));
                       setNotes((prev) => ({ ...prev, [String(note)]: next }));
                     }}
                   />
-                  <span className="text-xs tabular text-muted">{money(note * count)}</span>
-                </label>
+                  <span className="text-right text-sm font-medium tabular">{money(note * count)}</span>
+                </div>
               );
             })}
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="text-xs font-medium text-muted">Coins</span>
+            <div className="grid grid-cols-[5.5rem_1fr_6.5rem] items-center gap-3 px-3 py-2">
+              <span className="font-display text-lg font-semibold">Coins</span>
               <Input
                 inputMode="numeric"
                 className="tabular"
                 value={coins ? String(coins) : ""}
                 disabled={!write}
                 aria-label="Coins"
+                placeholder="Amount"
                 onChange={(event) => setCoins(Math.max(0, Math.round(Number(event.target.value) || 0)))}
               />
-              <span className="text-xs tabular text-muted">{money(coins)}</span>
-            </label>
+              <span className="text-right text-sm font-medium tabular">{money(coins)}</span>
+            </div>
           </div>
           {write ? (
             <div>
