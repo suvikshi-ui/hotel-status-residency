@@ -126,6 +126,7 @@ function snapshotFromStore(): LedgerSnapshot {
     openMonths: s.openMonths,
     guestCards: s.guestCards,
     bankRows: s.bankRows,
+    cashCounts: s.cashCounts,
     savedAt: s.savedAt,
   };
 }

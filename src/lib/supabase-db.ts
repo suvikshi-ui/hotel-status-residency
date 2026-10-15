@@ -82,6 +82,7 @@ import type {
   StaffProfile,
 } from "./types";
 import { normalizeStaffProfiles } from "./types";
+import { normalizeCashCounts, type CashCount } from "./cash-count";
 import { normalizePayrollFiles, type PayrollFile } from "./payroll-files";
 
 export const LEDGER_TABLES = [
@@ -137,6 +138,7 @@ export type LedgerSnapshot = {
   openMonths?: string[];
   guestCards?: GuestCard[];
   bankRows?: BankRow[];
+  cashCounts?: CashCount[];
   savedAt?: number;
   cloudUpdatedAt?: string;
 };
@@ -345,6 +347,9 @@ export function snapshotFromUnknown(
       : bankRowsFromHotel(p.hotel).length
         ? bankRowsFromHotel(p.hotel)
         : normalizeBankRows(fallback.bankRows),
+    cashCounts: normalizeCashCounts(
+      (p as { cashCounts?: CashCount[] }).cashCounts ?? fallback.cashCounts,
+    ),
     savedAt: num((p as { savedAt?: unknown }).savedAt) || fallback.savedAt,
   };
 }

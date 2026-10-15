@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   Bar,
@@ -17,12 +17,19 @@ import { DailyA4 } from "@/components/daily-a4";
 import { DayChart } from "@/components/day-chart";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  CASH_NOTES,
+  cashCountTotal,
+  emptyCashNotes,
+} from "@/lib/cash-count";
 import { buildDayTake } from "@/lib/day-report";
 import { sumByBucket, expenseBucket } from "@/lib/expense-tally";
 import { formatDay, formatDayShort, money, moneyCompact } from "@/lib/format";
 import { printHtmlDocument } from "@/lib/print-sheet";
 import { REPORT_TAB, parseReportView } from "@/lib/report-views";
+import { canWrite } from "@/lib/roles";
 import { useLedger, useDayBooks } from "@/lib/store";
 import { isPriorMonthClosed } from "@/lib/register-lock";
 import type { DayBooks } from "@/lib/types";
@@ -145,6 +152,10 @@ function ReportsPage() {
 
       <TabsContent value="month" className="flex flex-col gap-5">
         <MonthlyReportPanel />
+      </TabsContent>
+
+      <TabsContent value="cash" className="flex flex-col gap-5">
+        <CashCountPanel />
       </TabsContent>
     </Tabs>
   );
@@ -610,5 +621,181 @@ function Mix({ label, value, total }: { label: string; value: number; total: num
       </div>
       <div className="mt-1 text-xs text-muted">{pct}% of room sales</div>
     </Card>
+  );
+}
+
+function CashCountPanel() {
+  const selected = useLedger((s) => s.selectedDate);
+  const days = useLedger((s) => s.days);
+  const counts = useLedger((s) => s.cashCounts);
+  const saveCashCount = useLedger((s) => s.saveCashCount);
+  const write = canWrite(useLedger((s) => s.appRole));
+  const [year, setYear] = useState(selected.slice(0, 4));
+  const [month, setMonth] = useState(selected.slice(0, 7));
+  const [day, setDay] = useState(selected.slice(0, 10));
+  const [notes, setNotes] = useState(emptyCashNotes);
+  const [coins, setCoins] = useState(0);
+
+  const years = useMemo(() => {
+    const found = new Set(days.map((row) => row.date.slice(0, 4)).filter((value) => value.length === 4));
+    if (selected.slice(0, 4)) found.add(selected.slice(0, 4));
+    return [...found].sort();
+  }, [days, selected]);
+  const months = useMemo(() => {
+    const found = new Set(
+      days.filter((row) => row.date.startsWith(`${year}-`)).map((row) => row.date.slice(0, 7)),
+    );
+    if (selected.startsWith(`${year}-`)) found.add(selected.slice(0, 7));
+    return [...found].sort();
+  }, [days, selected, year]);
+  const dayList = useMemo(() => {
+    const found = new Set(
+      days.filter((row) => row.date.startsWith(`${month}-`)).map((row) => row.date),
+    );
+    if (selected.startsWith(`${month}-`)) found.add(selected);
+    return [...found].sort();
+  }, [days, month, selected]);
+  const books = useDayBooks(day);
+  const bookCash = books?.cashBook.cb ?? 0;
+  const counted = cashCountTotal({ notes, coins });
+  const gap = counted - bookCash;
+
+  useEffect(() => {
+    const saved = counts.find((row) => row.date === day);
+    setNotes(saved ? { ...emptyCashNotes(), ...saved.notes } : emptyCashNotes());
+    setCoins(saved?.coins ?? 0);
+  }, [counts, day]);
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div>
+        <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">Year</p>
+        <div className="flex flex-wrap gap-2">
+          {years.map((value) => (
+            <Button
+              key={value}
+              type="button"
+              size="sm"
+              variant={year === value ? "default" : "outline"}
+              onClick={() => setYear(value)}
+            >
+              {value}
+            </Button>
+          ))}
+        </div>
+      </div>
+      <div>
+        <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">Month</p>
+        <div className="flex flex-wrap gap-2">
+          {months.map((value) => (
+            <Button
+              key={value}
+              type="button"
+              size="sm"
+              variant={month === value ? "default" : "outline"}
+              onClick={() => {
+                setMonth(value);
+                const first = days.find((row) => row.date.startsWith(value))?.date;
+                if (first) setDay(first);
+              }}
+            >
+              {monthTitle(value, false)}
+            </Button>
+          ))}
+        </div>
+      </div>
+      <div>
+        <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">Day</p>
+        <div className="flex flex-wrap gap-2">
+          {dayList.map((value) => (
+            <Button
+              key={value}
+              type="button"
+              size="sm"
+              variant={day === value ? "default" : "outline"}
+              onClick={() => setDay(value)}
+            >
+              {Number(value.slice(8, 10))}
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Cash count · {formatDay(day)}</CardTitle>
+          <p className="text-sm text-muted">
+            Book cash left this day is the closing balance. Count the notes and save.
+          </p>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+            <div className="rounded-lg bg-bg-warm px-3 py-3">
+              <div className="text-xs font-medium text-muted">Cash in book</div>
+              <div className="mt-1 font-display text-xl font-semibold tabular">{money(bookCash)}</div>
+            </div>
+            <div className="rounded-lg bg-bg-warm px-3 py-3">
+              <div className="text-xs font-medium text-muted">Counted</div>
+              <div className="mt-1 font-display text-xl font-semibold tabular">{money(counted)}</div>
+            </div>
+            <div className="rounded-lg bg-bg-warm px-3 py-3">
+              <div className="text-xs font-medium text-muted">
+                {gap === 0 ? "Match" : gap < 0 ? "Short" : "Extra"}
+              </div>
+              <div className={`mt-1 font-display text-xl font-semibold tabular ${gap === 0 ? "text-ok" : "text-due"}`}>
+                {money(Math.abs(gap))}
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+            {CASH_NOTES.map((note) => {
+              const count = notes[String(note)] ?? 0;
+              return (
+                <label key={note} className="flex flex-col gap-1 text-sm">
+                  <span className="text-xs font-medium text-muted">₹{note}</span>
+                  <Input
+                    inputMode="numeric"
+                    className="tabular"
+                    value={count ? String(count) : ""}
+                    disabled={!write}
+                    aria-label={`${note} notes`}
+                    onChange={(event) => {
+                      const next = Math.max(0, Math.round(Number(event.target.value) || 0));
+                      setNotes((prev) => ({ ...prev, [String(note)]: next }));
+                    }}
+                  />
+                  <span className="text-xs tabular text-muted">{money(note * count)}</span>
+                </label>
+              );
+            })}
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="text-xs font-medium text-muted">Coins</span>
+              <Input
+                inputMode="numeric"
+                className="tabular"
+                value={coins ? String(coins) : ""}
+                disabled={!write}
+                aria-label="Coins"
+                onChange={(event) => setCoins(Math.max(0, Math.round(Number(event.target.value) || 0)))}
+              />
+              <span className="text-xs tabular text-muted">{money(coins)}</span>
+            </label>
+          </div>
+          {write ? (
+            <div>
+              <Button
+                type="button"
+                onClick={() => {
+                  saveCashCount({ id: `cc-${day}`, date: day, notes, coins });
+                  toast.success(`${formatDay(day)} cash count saved`);
+                }}
+              >
+                Save count
+              </Button>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+    </div>
   );
 }

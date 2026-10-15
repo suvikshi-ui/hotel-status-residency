@@ -65,6 +65,7 @@ import { contactsFromHotel, normalizeContacts, type HotelContact } from "./conta
 import { corporatesFromHotel, normalizeCorporates, type CorporateCompany } from "./corporates";
 import { agentsFromHotel, normalizeAgents, type TravelAgent } from "./agents";
 import { monthDrawsFromHotel, normalizeMonthDraws, type MonthDraw } from "./month-draw";
+import { normalizeCashCounts, type CashCount } from "./cash-count";
 import { monthOpeningsFromHotel, normalizeMonthOpenings, type MonthOpening } from "./month-opening";
 import {
   keepMonthArchives,
@@ -126,6 +127,7 @@ export interface LedgerState {
   monthArchives: MonthArchive[];
   guestCards: GuestCard[];
   bankRows: BankRow[];
+  cashCounts: CashCount[];
   selectedDate: string;
   dirty: Record<string, true>;
   openingDate: string;
@@ -186,6 +188,7 @@ export interface LedgerState {
   setMonthOpenings: (rows: MonthOpening[]) => void;
   saveGuestCard: (card: GuestCard) => void;
   setBankRows: (bankRows: BankRow[]) => void;
+  saveCashCount: (row: CashCount) => void;
   applySnapshot: (p: Partial<LedgerState>) => void;
   replaceSnapshot: (p: Partial<LedgerState>) => void;
   adoptLiveSnapshot: (p: Partial<LedgerState>) => void;
@@ -237,6 +240,7 @@ function seedState(): Omit<
   | "setMonthOpenings"
   | "saveGuestCard"
   | "setBankRows"
+  | "saveCashCount"
   | "applySnapshot"
   | "replaceSnapshot"
   | "adoptLiveSnapshot"
@@ -273,6 +277,7 @@ function seedState(): Omit<
     monthArchives: [],
     guestCards: [],
     bankRows: [],
+    cashCounts: [],
     selectedDate: DEFAULT_DATE,
     dirty: {},
     openingDate: BASE_OPENING_DATE,
@@ -404,6 +409,9 @@ function mergeSnapshot(
           ? fromHotel
           : normalizeBankRows(current.bankRows);
       })();
+  const cashCounts = Array.isArray(persisted.cashCounts)
+    ? normalizeCashCounts(persisted.cashCounts)
+    : normalizeCashCounts(current.cashCounts);
   const appRole = parseAppRole(persisted.appRole ?? current.appRole);
   const fromHotel = hotelFromCloud(persisted.hotel, current.hotel);
   const lockedDates = pickLockedDates(
@@ -493,6 +501,7 @@ function mergeSnapshot(
     monthArchives,
     guestCards,
     bankRows,
+    cashCounts,
     guests,
     food,
     wholesale,
@@ -1021,6 +1030,13 @@ export const useLedger = create<LedgerState>()(
       },
       setBankRows: (bankRows) =>
         save({ bankRows: normalizeBankRows(bankRows) }),
+      saveCashCount: (row) => {
+        const next = normalizeCashCounts([
+          row,
+          ...get().cashCounts.filter((item) => item.date !== row.date),
+        ]);
+        save({ cashCounts: next });
+      },
       applySnapshot: (p) => {
         const merged = mergeSnapshot(p, get(), { skipSeedFill: true });
         set({
@@ -1148,6 +1164,7 @@ export const useLedger = create<LedgerState>()(
           monthArchives: [],
           guestCards: [],
           bankRows: [],
+          cashCounts: [],
           ota: [],
           janSales: [],
           janFood: [],
@@ -1206,6 +1223,7 @@ export const useLedger = create<LedgerState>()(
         monthArchives: s.monthArchives,
         guestCards: s.guestCards,
         bankRows: s.bankRows,
+        cashCounts: s.cashCounts,
         appRole: s.appRole,
         booksCleared: s.booksCleared,
         savedAt: s.savedAt,

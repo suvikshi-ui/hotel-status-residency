@@ -38,6 +38,7 @@ export type BackupTables = {
   monthArchives?: unknown[];
   openMonths?: string[];
   bankRows?: unknown[];
+  cashCounts?: unknown[];
   sealedIds?: unknown;
   deletedIds?: unknown;
   savedAt?: number;
@@ -282,6 +283,7 @@ export function monthsInTables(tables: BackupTables): string[] {
     listFrom(tables, "payrollFiles"),
     listFrom(tables, "inventoryFiles"),
     listFrom(tables, "bankRows", "_bankRows"),
+    listFrom(tables, "cashCounts"),
     listFrom(tables, "guestCards", "_guestCards"),
     listFrom(tables, "complaints"),
     listFrom(tables, "monthOpenings", "_monthOpenings"),
@@ -347,6 +349,7 @@ export function sliceBackupTables(tables: BackupTables, month: string): BackupTa
     monthArchives: filterMonth(listFrom(tables, "monthArchives", "_monthArchives"), month),
     openMonths: open.includes(month) ? [month] : [],
     bankRows: filterMonth(listFrom(tables, "bankRows", "_bankRows"), month),
+    cashCounts: filterMonth(listFrom(tables, "cashCounts"), month),
     sealedIds: tables.sealedIds,
     deletedIds: tables.deletedIds,
     savedAt: tables.savedAt,
@@ -376,6 +379,7 @@ export type MonthBookShape = {
   complaints?: IdRow[];
   guestCards?: IdRow[];
   bankRows?: IdRow[];
+  cashCounts?: IdRow[];
   monthDraws?: IdRow[];
   monthOpenings?: IdRow[];
   monthArchives?: { month?: string }[];
@@ -486,6 +490,7 @@ export function mergeMonthBooks<T extends MonthBookShape>(
   const complaints = replaceMonthRows(base.complaints, incoming.complaints, month);
   const guestCards = replaceMonthRows(base.guestCards, incoming.guestCards, month);
   const bankRows = replaceMonthRows(base.bankRows, incoming.bankRows, month);
+  const cashCounts = replaceMonthRows(base.cashCounts, incoming.cashCounts, month);
   const monthDraws = replaceMonthRows(base.monthDraws, incoming.monthDraws, month);
   const monthOpenings = replaceMonthRows(base.monthOpenings, incoming.monthOpenings, month);
   const monthArchives = replaceMonthRows(base.monthArchives, incoming.monthArchives, month);
@@ -561,6 +566,7 @@ export function mergeMonthBooks<T extends MonthBookShape>(
     complaints,
     guestCards,
     bankRows,
+    cashCounts,
     monthDraws,
     monthOpenings,
     monthArchives,
