@@ -1,48 +1,22 @@
 /**
- * Hotel Status Residency — Supabase Auth
- *
- * Dashboard → Settings → General → Reference ID  → project id
- * Dashboard → Settings → API → publishable / anon key
- *
- * URL is always https://<project-id>.supabase.co
+ * Completely offline. The live site does not sign in and does not call Supabase.
+ * Keys stay empty so a build cannot open the old project by accident.
  */
-const env = (key: string) => {
-  const value = (import.meta.env as Record<string, string | undefined>)[key];
-  return typeof value === "string" ? value.trim() : "";
-};
+export const SUPABASE_PROJECT_ID = "";
 
-/** Project ref. Fill this if it was not injected as VITE_SUPABASE_PROJECT_ID. */
-export const SUPABASE_PROJECT_ID =
-  env("VITE_SUPABASE_PROJECT_ID") || "pptxeqcjecnwppftvjhc";
+export const SUPABASE_PUBLISHABLE_KEY = "";
 
-/** Publishable (anon) key — browser-safe. */
-export const SUPABASE_PUBLISHABLE_KEY =
-  env("VITE_SUPABASE_ANON_KEY") ||
-  env("VITE_SUPABASE_PUBLISHABLE_KEY") ||
-  "sb_publishable_BFw-cgR_HVOBK8xnEY3jYw_3ee7N-v1";
+export const SUPABASE_URL = "";
 
-export const SUPABASE_URL =
-  env("VITE_SUPABASE_URL") ||
-  (SUPABASE_PROJECT_ID ? `https://${SUPABASE_PROJECT_ID}.supabase.co` : "");
-
-/**
- * Offline books. The site does not sign in or talk to Supabase.
- * Local data on this computer is left as it is.
- */
 export const OFFLINE_BOOKS = true;
 
 export function isSupabaseConfigured() {
-  if (OFFLINE_BOOKS) return false;
-  return Boolean(SUPABASE_URL && SUPABASE_PUBLISHABLE_KEY);
+  return false;
 }
 
-export const SUPABASE_SQL_EDITOR = SUPABASE_PROJECT_ID
-  ? `https://supabase.com/dashboard/project/${SUPABASE_PROJECT_ID}/sql/new`
-  : "https://supabase.com/dashboard";
+export const SUPABASE_SQL_EDITOR = "https://supabase.com/dashboard";
 
 export const DESK_SAVE_SQL_FILE =
   "https://github.com/suvikshi-ui/hotel-status-residency/blob/main/supabase/migrations/0009_desk_can_save.sql";
 
-export const SUPABASE_TABLE_EDITOR = SUPABASE_PROJECT_ID
-  ? `https://supabase.com/dashboard/project/${SUPABASE_PROJECT_ID}/editor`
-  : "https://supabase.com/dashboard";
+export const SUPABASE_TABLE_EDITOR = "https://supabase.com/dashboard";
