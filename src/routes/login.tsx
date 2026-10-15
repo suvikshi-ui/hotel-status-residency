@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,13 +7,18 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { HotelLogo } from "@/components/hotel-logo";
 import { CloudSchemaSetup } from "@/components/cloud-schema-setup";
-import { SUPABASE_URL } from "@/lib/supabase-config";
+import { isSupabaseConfigured, SUPABASE_URL } from "@/lib/supabase-config";
 import { useStaffSession } from "@/lib/supabase-auth";
 import { getSupabase } from "@/lib/supabase";
 import { isMissingSchema } from "@/lib/supabase-db";
 
 export const Route = createFileRoute("/login")({
   ssr: false,
+  beforeLoad: () => {
+    if (!isSupabaseConfigured()) {
+      throw redirect({ to: "/" });
+    }
+  },
   component: LoginPage,
 });
 

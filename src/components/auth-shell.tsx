@@ -24,7 +24,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
   const onLogin = pathname === "/login";
 
   if (!configured) {
-    if (onLogin) return <>{children}</>;
+    if (onLogin) return <Navigate to="/" />;
     return <AppShell>{children}</AppShell>;
   }
 
