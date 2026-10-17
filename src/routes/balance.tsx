@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { format, parseISO } from "date-fns";
 import {
   Check,
   ChevronDown,
@@ -26,6 +27,7 @@ import {
   buildDueAccounts,
   dueStatusLabel,
   lookupDueAccount,
+  sourceKey,
   uniqueSources,
   type DueAccount,
   type DueStay,
@@ -62,6 +64,7 @@ function BalancePage() {
   const [q, setQ] = useState("");
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [asOn, setAsOn] = useState("");
+  const [sheet, setSheet] = useState<"billed" | "collected" | null>(null);
   const guestsAsOf = useMemo(
     () => (asOn ? guests.filter((g) => g.date <= asOn) : guests),
     [guests, asOn],
@@ -94,8 +97,6 @@ function BalancePage() {
     (s, a) => s + Math.max(0, a.billed - a.collected),
     0,
   );
-  const collected = accounts.reduce((s, a) => s + a.collected, 0);
-  const billed = accounts.reduce((s, a) => s + (a.billed - a.listBilled), 0);
   const searchHitRaw = lookupDueAccount(accounts, q);
   const searchHit =
     searchHitRaw && searchHitRaw.remaining > 0 ? searchHitRaw : null;
@@ -136,6 +137,46 @@ function BalancePage() {
     .filter((r) => r.date === date)
     .reduce((s, r) => s + r.amount, 0);
   const otherTotal = otherRows.reduce((s, r) => s + r.amount, 0);
+  const monthKey = (asOn || date).slice(0, 7);
+  const monthName = /^\d{4}-\d{2}$/.test(monthKey)
+    ? format(parseISO(`${monthKey}-01`), "MMMM yyyy")
+    : monthKey;
+  const monthBills = useMemo(
+    () =>
+      guestsAsOf
+        .filter((g) => g.mode === "BALANCE" && g.date.startsWith(monthKey))
+        .map((g) => ({
+          id: g.id,
+          date: g.date,
+          source: sourceKey(g),
+          name: g.name,
+          roomNo: g.roomNo,
+          amount: g.amount,
+        }))
+        .sort(
+          (a, b) =>
+            a.date.localeCompare(b.date) ||
+            a.source.localeCompare(b.source) ||
+            a.name.localeCompare(b.name),
+        ),
+    [guestsAsOf, monthKey],
+  );
+  const monthReceipts = useMemo(
+    () =>
+      receiptsAsOf
+        .filter(
+          (r) =>
+            r.date.startsWith(monthKey) &&
+            r.kind !== "ota" &&
+            r.kind !== "other" &&
+            r.kind !== "list",
+        )
+        .slice()
+        .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id)),
+    [receiptsAsOf, monthKey],
+  );
+  const monthBilled = monthBills.reduce((s, row) => s + row.amount, 0);
+  const monthCollected = monthReceipts.reduce((s, row) => s + row.amount, 0);
 
   function refuseLocked(day: string) {
     if (!isDayLocked(lockedDates, day)) return false;
@@ -253,19 +294,133 @@ function BalancePage() {
             {money(openDue)}
           </div>
         </Card>
-        <Card className="p-4">
-          <div className="text-xs font-medium text-muted">Billed</div>
+        <Card
+          className={cn(
+            "cursor-pointer p-4 text-left",
+            sheet === "billed" && "ring-1 ring-primary",
+          )}
+          role="button"
+          tabIndex={0}
+          onClick={() => setSheet((open) => (open === "billed" ? null : "billed"))}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter" && event.key !== " ") return;
+            event.preventDefault();
+            setSheet((open) => (open === "billed" ? null : "billed"));
+          }}
+        >
+          <div className="text-xs font-medium text-muted">{monthName} billed</div>
           <div className="mt-1 font-display text-2xl font-semibold tabular">
-            {money(billed)}
+            {money(monthBilled)}
+          </div>
+          <div className="mt-1 text-[11px] text-muted">
+            {monthBills.length} bill{monthBills.length === 1 ? "" : "s"} · tap for the list
           </div>
         </Card>
-        <Card className="p-4">
-          <div className="text-xs font-medium text-muted">Collected</div>
+        <Card
+          className={cn(
+            "cursor-pointer p-4 text-left",
+            sheet === "collected" && "ring-1 ring-primary",
+          )}
+          role="button"
+          tabIndex={0}
+          onClick={() => setSheet((open) => (open === "collected" ? null : "collected"))}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter" && event.key !== " ") return;
+            event.preventDefault();
+            setSheet((open) => (open === "collected" ? null : "collected"));
+          }}
+        >
+          <div className="text-xs font-medium text-muted">{monthName} collected</div>
           <div className="mt-1 font-display text-2xl font-semibold tabular text-ok">
-            {money(collected)}
+            {money(monthCollected)}
+          </div>
+          <div className="mt-1 text-[11px] text-muted">
+            {monthReceipts.length} receipt{monthReceipts.length === 1 ? "" : "s"} · tap for the list
           </div>
         </Card>
       </div>
+
+      {sheet === "billed" ? (
+        <Card className="overflow-x-auto">
+          <div className="flex items-end justify-between gap-3 px-4 pt-4">
+            <div>
+              <p className="font-display text-lg font-semibold">{monthName} bills</p>
+              <p className="text-sm text-muted">
+                Who was billed on balance this month · {money(monthBilled)}
+              </p>
+            </div>
+            <Button type="button" variant="outline" size="sm" onClick={() => setSheet(null)}>
+              Close
+            </Button>
+          </div>
+          <table className="mt-3 w-full min-w-[36rem] text-left text-sm">
+            <thead className="text-[11px] uppercase tracking-wide text-muted">
+              <tr className="border-y border-border">
+                <th className="px-4 py-2 font-medium">Date</th>
+                <th className="px-3 py-2 font-medium">Source</th>
+                <th className="px-3 py-2 font-medium">Guest</th>
+                <th className="px-3 py-2 font-medium">Room</th>
+                <th className="px-4 py-2 text-right font-medium">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {monthBills.map((row) => (
+                <tr key={row.id} className="border-b border-border/70">
+                  <td className="px-4 py-2.5 tabular">{formatDayShort(row.date)}</td>
+                  <td className="px-3 py-2.5 font-medium">{row.source}</td>
+                  <td className="px-3 py-2.5">{row.name}</td>
+                  <td className="px-3 py-2.5 tabular">{row.roomNo}</td>
+                  <td className="px-4 py-2.5 text-right tabular">{money(row.amount)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {monthBills.length === 0 ? (
+            <p className="px-4 py-8 text-center text-sm text-muted">No balance bills this month.</p>
+          ) : null}
+        </Card>
+      ) : null}
+
+      {sheet === "collected" ? (
+        <Card className="overflow-x-auto">
+          <div className="flex items-end justify-between gap-3 px-4 pt-4">
+            <div>
+              <p className="font-display text-lg font-semibold">{monthName} collected</p>
+              <p className="text-sm text-muted">
+                Who paid this month, and how much · {money(monthCollected)}
+              </p>
+            </div>
+            <Button type="button" variant="outline" size="sm" onClick={() => setSheet(null)}>
+              Close
+            </Button>
+          </div>
+          <table className="mt-3 w-full min-w-[36rem] text-left text-sm">
+            <thead className="text-[11px] uppercase tracking-wide text-muted">
+              <tr className="border-y border-border">
+                <th className="px-4 py-2 font-medium">Date</th>
+                <th className="px-3 py-2 font-medium">Source</th>
+                <th className="px-3 py-2 font-medium">Paid by</th>
+                <th className="px-3 py-2 font-medium">Reference</th>
+                <th className="px-4 py-2 text-right font-medium">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {monthReceipts.map((row) => (
+                <tr key={row.id} className="border-b border-border/70">
+                  <td className="px-4 py-2.5 tabular">{formatDayShort(row.date)}</td>
+                  <td className="px-3 py-2.5 font-medium">{(row.forKey || row.particular).trim()}</td>
+                  <td className="px-3 py-2.5">{MODE_LABEL[row.mode]}</td>
+                  <td className="px-3 py-2.5 font-mono text-xs">{row.payRef || "—"}</td>
+                  <td className="px-4 py-2.5 text-right tabular text-ok">{money(row.amount)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {monthReceipts.length === 0 ? (
+            <p className="px-4 py-8 text-center text-sm text-muted">Nothing collected this month.</p>
+          ) : null}
+        </Card>
+      ) : null}
 
       <Tabs defaultValue="balance">
         <TabsList aria-label="Balance sections">
