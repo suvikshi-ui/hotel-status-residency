@@ -352,7 +352,7 @@ export function DailyA4({
           <Block>
             <MiniTable>
             <BlockTitle>CASH BALANCE</BlockTitle>
-            <Row label="O/B" value={c?.ob ?? 0} tone="ob" />
+            <Row label="O/B" value={Math.abs(c?.ob ?? 0)} tone="ob" />
             <Row label="SALES" sign="+" value={c?.sales ?? 0} />
             <Row label="FOOD" sign="+" value={c?.food ?? 0} />
             <Row label="WS" sign="+" value={c?.ws ?? 0} />
@@ -367,7 +367,7 @@ export function DailyA4({
             <Row label="P.K. QR" sign="−" value={c?.pk ?? 0} />
             <Row label="ONLINE" sign="−" value={c?.online ?? 0} />
             <Row label={balTag} sign="−" value={c?.balance ?? 0} />
-            <Row label="TOTAL" value={c?.cb ?? 0} tone="ok" />
+            <Row label="TOTAL" value={Math.abs(c?.cb ?? 0)} tone="ok" />
             </MiniTable>
           </Block>
 
@@ -392,7 +392,7 @@ export function DailyA4({
           <Block last>
             <MiniTable>
             <BlockTitle>BALANCE AMOUNT</BlockTitle>
-            <Row label="O/B" value={b?.ob ?? 0} tone="ob" />
+            <Row label="O/B" value={Math.abs(b?.ob ?? 0)} tone="ob" />
             <Row
               label={`BAL RECEI${dueRooms}`}
               sign="−"
@@ -400,7 +400,7 @@ export function DailyA4({
             />
             <Row label="TOTAL" value={dueAfterRecv} tone="sub" />
             <Row label={balTag} sign="+" value={b?.sales ?? 0} />
-            <Row label="TOTAL" value={b?.cb ?? 0} tone="ok" />
+            <Row label="TOTAL" value={Math.abs(b?.cb ?? 0)} tone="ok" />
             <tr>
               <td
                 colSpan={3}

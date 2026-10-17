@@ -143,6 +143,7 @@ export function computeBooks(input: {
     (cashBook.pk ?? 0) -
     cashBook.online -
     cashBook.balance;
+  if (cashBook.cb < 0) cashBook.cb = -cashBook.cb;
 
   const santosh: QrLedger = {
     ob: input.prev.santosh,
@@ -284,30 +285,21 @@ export function rebuildDayBooks(input: {
   const last = markers.reduce((m, d) => (d > m ? d : m), epoch);
   const filled = eachIsoDay(epoch, last);
   const rebuilt: DayBooks[] = [];
-  const earlier = new Map((input.previous ?? []).map((day) => [day.date, day]));
   let prev = openingAsPrev(input.opening);
 
   for (const date of filled) {
     if (date === epoch) prev = openingAsPrev(input.opening);
-    const frozen = input.lockedDates?.[date] ? earlier.get(date) : undefined;
-    const built =
-      frozen ??
-      computeBooks({
-        date,
-        guests: byDate(input.guests, date),
-        food: byDate(input.food, date),
-        wholesale: byDate(input.wholesale, date),
-        expenses: byDate(input.expenses, date),
-        balReceived: byDate(input.balReceived, date),
-        prev,
-      });
-    const books =
-      built.outstanding.cb < 0
-        ? {
-            ...built,
-            outstanding: { ...built.outstanding, cb: -built.outstanding.cb },
-          }
-        : built;
+    if (prev.cash < 0) prev = { ...prev, cash: -prev.cash };
+    if (prev.outstanding < 0) prev = { ...prev, outstanding: -prev.outstanding };
+    const books = computeBooks({
+      date,
+      guests: byDate(input.guests, date),
+      food: byDate(input.food, date),
+      wholesale: byDate(input.wholesale, date),
+      expenses: byDate(input.expenses, date),
+      balReceived: byDate(input.balReceived, date),
+      prev,
+    });
     rebuilt.push(books);
     prev = closeAsPrev(books);
     const nextDate = addDaysIso(date, 1);

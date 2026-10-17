@@ -152,7 +152,7 @@ describe("balance carry-forward", () => {
     assert.equal(byDay.get("2026-10-01")?.cashBook.ob, 10500);
   });
 
-  it("a locked September does not move when October changes", () => {
+  it("a locked day still follows the register, and a minus does not carry", () => {
     const first = rebuildDayBooks({
       openingDate: "2026-09-01",
       opening: { cash: 500, santosh: 200, pk: 100, online: 50, outstanding: 0 },
@@ -174,25 +174,30 @@ describe("balance carry-forward", () => {
       openingDate: "2026-09-01",
       opening: { cash: 500, santosh: 200, pk: 100, online: 50, outstanding: 0 },
       guests: [
-        guest("2026-09-30", 99999, "CASH"),
+        guest("2026-09-30", 10000, "CASH"),
         guest("2026-10-01", 4000, "CASH"),
       ],
       food: [],
       wholesale: [],
-      expenses: [],
+      expenses: [
+        {
+          id: "e-big",
+          date: "2026-09-30",
+          mode: "CASH",
+          amount: 20000,
+          particular: "OLD",
+        },
+      ],
       balReceived: [],
-      throughDates: ["2026-10-01"],
+      throughDates: ["2026-10-02"],
       openings: [{ month: "2026-10", cash: 9000, santosh: 1500, pk: 800 }],
       lockedDates: locked,
       previous: first,
     });
-    const before = new Map(first.map((day) => [day.date, day]));
     const after = new Map(second.map((day) => [day.date, day]));
-    assert.equal(after.get("2026-09-30")?.cashBook.cb, before.get("2026-09-30")?.cashBook.cb);
-    assert.equal(after.get("2026-09-01")?.cashBook.ob, before.get("2026-09-01")?.cashBook.ob);
+    assert.equal(after.get("2026-09-30")?.cashBook.cb, 20000 - (500 + 10000));
     assert.equal(after.get("2026-10-01")?.cashBook.ob, 9000);
-    assert.equal(after.get("2026-10-01")?.online.ob, before.get("2026-09-30")?.online.cb);
-    assert.equal(after.get("2026-10-01")?.outstanding.ob, before.get("2026-09-30")?.outstanding.cb);
+    assert.equal(after.get("2026-10-01")?.cashBook.cb, 13000);
   });
 
   it("Santosh QR and P.K. QR carry independently", () => {

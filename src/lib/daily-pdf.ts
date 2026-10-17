@@ -116,7 +116,7 @@ function blocksOf(input: DailyPdfInput) {
     {
       title: "CASH BALANCE",
       rows: [
-        { label: "O/B", value: c?.ob ?? 0, tone: "ob" },
+        { label: "O/B", value: Math.abs(c?.ob ?? 0), tone: "ob" },
         { label: "SALES", sign: "+", value: c?.sales ?? 0 },
         { label: "FOOD", sign: "+", value: c?.food ?? 0 },
         { label: "WS", sign: "+", value: c?.ws ?? 0 },
@@ -127,7 +127,7 @@ function blocksOf(input: DailyPdfInput) {
         { label: "P.K. QR", sign: "−", value: c?.pk ?? 0 },
         { label: "ONLINE", sign: "−", value: c?.online ?? 0 },
         { label: balTag, sign: "−", value: c?.balance ?? 0 },
-        { label: "TOTAL", value: c?.cb ?? 0, tone: "ok" },
+        { label: "TOTAL", value: Math.abs(c?.cb ?? 0), tone: "ok" },
       ],
     },
     {
@@ -147,11 +147,11 @@ function blocksOf(input: DailyPdfInput) {
     {
       title: "BALANCE AMOUNT",
       rows: [
-        { label: "O/B", value: b?.ob ?? 0, tone: "ob" },
+        { label: "O/B", value: Math.abs(b?.ob ?? 0), tone: "ob" },
         { label: `BAL RECEI${dueRooms}`, sign: "−", value: b?.balReceived ?? 0 },
         { label: "TOTAL", value: dueAfterRecv, tone: "sub" },
         { label: balTag, sign: "+", value: b?.sales ?? 0 },
-        { label: "TOTAL", value: b?.cb ?? 0, tone: "ok" },
+        { label: "TOTAL", value: Math.abs(b?.cb ?? 0), tone: "ok" },
         { label: rooms ? `BAL (${rooms})` : "", span: true },
       ],
     },
