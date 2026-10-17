@@ -2,6 +2,7 @@ import { format, parseISO } from "date-fns";
 import type { CSSProperties, ReactNode } from "react";
 import { buildDayTake } from "@/lib/day-report";
 import { otaChannelLabel } from "@/lib/ota-label";
+import { englishNarration } from "@/lib/english-narration";
 import { publicUrl } from "@/lib/public-url";
 import { addDaysIso, stayDates } from "@/lib/stay";
 import type {
@@ -491,7 +492,7 @@ export function DayChart({
               key={e.id}
               left={
                 <>
-                  <span style={{ fontWeight: 600 }}>{e.particular}</span>
+                  <span style={{ fontWeight: 600 }}>{englishNarration(e.particular)}</span>
                   <Pill mode={e.mode} />
                 </>
               }

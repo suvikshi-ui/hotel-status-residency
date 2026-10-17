@@ -26,6 +26,7 @@ import {
 import { useLedger } from "@/lib/store";
 import { isDayLocked, isPriorMonthClosed } from "@/lib/register-lock";
 import { tellDateLocked } from "@/lib/locked-notice";
+import { englishNarration } from "@/lib/english-narration";
 import type { ModeAmount, NamedAmount, PayMode } from "@/lib/types";
 
 function ModeLineCard({
@@ -269,7 +270,7 @@ function ExpenseLineCard({
           {rows.map((r) => (
             <li key={r.id} className="flex items-center justify-between gap-2 py-2">
               <div className="min-w-0">
-                <div className="truncate text-sm font-medium">{r.particular}</div>
+                <div className="truncate text-sm font-medium">{englishNarration(r.particular)}</div>
                 <ModeBadge mode={r.mode} />
                 {r.mode === "QRPK" ? (
                   <GuardedPkRef

@@ -4,6 +4,7 @@ import type { DayTake } from "./day-report";
 import { publicUrl } from "./public-url";
 import type { DayBooks, GuestEntry, NamedAmount } from "./types";
 import { joinRecvTags, otaReceivedTag } from "./ota-label";
+import { englishNarration } from "./english-narration";
 
 export type DailyPdfInput = {
   hotel: string;
@@ -133,7 +134,7 @@ function blocksOf(input: DailyPdfInput) {
       title: "EXPENSES",
       rows: [
         ...cashExp.map((e) => ({
-          label: e.particular.toUpperCase(),
+          label: englishNarration(e.particular).toUpperCase(),
           value: e.amount,
         })),
         {
@@ -159,7 +160,7 @@ function blocksOf(input: DailyPdfInput) {
   const qrRows = (book: typeof s, exp: NamedAmount[], recvLabel: string, recv: number, sub: number) => {
     const expRows = exp.length
       ? exp.map((e) => ({
-          label: e.particular.toUpperCase(),
+          label: englishNarration(e.particular).toUpperCase(),
           sign: "−",
           value: e.amount,
         }))

@@ -4,6 +4,7 @@ import type { DayBooks, GuestEntry, NamedAmount } from "@/lib/types";
 import type { DayTake } from "@/lib/day-report";
 import { publicUrl } from "@/lib/public-url";
 import { joinRecvTags, otaReceivedTag } from "@/lib/ota-label";
+import { englishNarration } from "@/lib/english-narration";
 
 function n(v: number) {
   return Math.round(v).toLocaleString("en-IN");
@@ -376,7 +377,7 @@ export function DailyA4({
             {cashExp.map((e) => (
               <Row
                 key={e.id}
-                label={e.particular.toUpperCase()}
+                label={englishNarration(e.particular).toUpperCase()}
                 value={e.amount}
               />
             ))}
@@ -436,7 +437,7 @@ export function DailyA4({
               ? qrExp.map((e) => (
                   <Row
                     key={e.id}
-                    label={e.particular.toUpperCase()}
+                    label={englishNarration(e.particular).toUpperCase()}
                     sign="−"
                     value={e.amount}
                   />
@@ -464,7 +465,7 @@ export function DailyA4({
               ? pkExp.map((e) => (
                   <Row
                     key={e.id}
-                    label={e.particular.toUpperCase()}
+                    label={englishNarration(e.particular).toUpperCase()}
                     sign="−"
                     value={e.amount}
                   />

@@ -7,6 +7,7 @@ import { ModeBadge } from "@/components/mode-badge";
 import { GuardedPkRef } from "@/components/pk-ref";
 import { EXPENSE_DESKS, expenseDesk, sumByDay, sumByHead, sumByMode } from "@/lib/expense-tally";
 import { formatDayShort, money } from "@/lib/format";
+import { englishNarration } from "@/lib/english-narration";
 import { isDayLocked } from "@/lib/register-lock";
 import { useLedger } from "@/lib/store";
 import { canWrite } from "@/lib/roles";
@@ -226,7 +227,7 @@ function ExpensesPage() {
                   <td className="px-5 py-2.5 tabular text-muted">
                     {formatDayShort(e.date)}
                   </td>
-                  <td className="px-3 py-2.5 font-medium">{e.particular}</td>
+                  <td className="px-3 py-2.5 font-medium">{englishNarration(e.particular)}</td>
                   <td className="px-3 py-2.5">
                     <ModeBadge mode={e.mode} />
                   </td>

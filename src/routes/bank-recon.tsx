@@ -17,6 +17,7 @@ import {
   type BankRow,
 } from "@/lib/bank-recon";
 import { formatDayShort, money } from "@/lib/format";
+import { englishNarration } from "@/lib/english-narration";
 import { useLedger } from "@/lib/store";
 import { canWrite } from "@/lib/roles";
 
@@ -122,7 +123,7 @@ function BankReconPage() {
       fileName: `bank-statement-${month}.pdf`,
       lines: lines.map((line) => ({
         date: line.bank.dateRaw || "—",
-        narration: line.bank.particular || "—",
+        narration: englishNarration(line.bank.particular) || "—",
         ref: line.bank.ref || "—",
         withdrawal: line.bank.debit
           ? Math.round(line.bank.debit).toLocaleString("en-IN")
@@ -132,7 +133,7 @@ function BankReconPage() {
           : "—",
         officeDate: line.office ? formatDayShort(line.office.date) : "—",
         name: line.office?.name || "—",
-        reason: line.office?.reason || "—",
+        reason: line.office?.reason ? englishNarration(line.office.reason) : "—",
       })),
     });
   }
@@ -268,7 +269,9 @@ function BankReconPage() {
                   <td className="px-5 py-2.5 tabular">
                     {line.bank.dateRaw || "—"}
                   </td>
-                  <td className="px-3 py-2.5">{line.bank.particular || "—"}</td>
+                  <td className="px-3 py-2.5">
+                    {englishNarration(line.bank.particular) || "—"}
+                  </td>
                   <td className="px-3 py-2.5 font-mono text-xs">
                     {line.bank.ref || "—"}
                   </td>
@@ -287,7 +290,7 @@ function BankReconPage() {
                         {line.office.name}
                       </td>
                       <td className="px-3 py-2.5 text-muted">
-                        {line.office.reason || "—"}
+                        {line.office.reason ? englishNarration(line.office.reason) : "—"}
                       </td>
                     </>
                   ) : (
