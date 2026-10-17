@@ -143,7 +143,6 @@ export function computeBooks(input: {
     (cashBook.pk ?? 0) -
     cashBook.online -
     cashBook.balance;
-  if (cashBook.cb < 0) cashBook.cb = -cashBook.cb;
 
   const santosh: QrLedger = {
     ob: input.prev.santosh,
@@ -186,18 +185,13 @@ export function computeBooks(input: {
   };
   online.cb = online.ob + online.sales - online.balReceived;
 
-  const balanceBilled =
-    mix.balance.sale + mix.balance.food + mix.balance.ws;
   const outstanding: OutstandingLedger = {
     ob: input.prev.outstanding,
-    sales: balanceBilled,
+    sales: mix.balance.sale,
     balReceived: dueCash + dueQr + duePk,
     cb: 0,
   };
-  const rawOutstanding =
-    outstanding.ob - outstanding.balReceived + outstanding.sales;
-  // A due is still to collect. A minus here is the sign turned around, not a credit.
-  outstanding.cb = rawOutstanding < 0 ? -rawOutstanding : rawOutstanding;
+  outstanding.cb = outstanding.ob - outstanding.balReceived + outstanding.sales;
 
   return {
     date: input.date,
@@ -285,21 +279,23 @@ export function rebuildDayBooks(input: {
   const last = markers.reduce((m, d) => (d > m ? d : m), epoch);
   const filled = eachIsoDay(epoch, last);
   const rebuilt: DayBooks[] = [];
+  const earlier = new Map((input.previous ?? []).map((day) => [day.date, day]));
   let prev = openingAsPrev(input.opening);
 
   for (const date of filled) {
     if (date === epoch) prev = openingAsPrev(input.opening);
-    if (prev.cash < 0) prev = { ...prev, cash: -prev.cash };
-    if (prev.outstanding < 0) prev = { ...prev, outstanding: -prev.outstanding };
-    const books = computeBooks({
-      date,
-      guests: byDate(input.guests, date),
-      food: byDate(input.food, date),
-      wholesale: byDate(input.wholesale, date),
-      expenses: byDate(input.expenses, date),
-      balReceived: byDate(input.balReceived, date),
-      prev,
-    });
+    const frozen = input.lockedDates?.[date] ? earlier.get(date) : undefined;
+    const books =
+      frozen ??
+      computeBooks({
+        date,
+        guests: byDate(input.guests, date),
+        food: byDate(input.food, date),
+        wholesale: byDate(input.wholesale, date),
+        expenses: byDate(input.expenses, date),
+        balReceived: byDate(input.balReceived, date),
+        prev,
+      });
     rebuilt.push(books);
     prev = closeAsPrev(books);
     const nextDate = addDaysIso(date, 1);
