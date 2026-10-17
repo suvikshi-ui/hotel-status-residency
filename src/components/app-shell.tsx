@@ -114,7 +114,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const cloud = useCloudSync();
   const [leaving, setLeaving] = useState(false);
   const saved = !isSupabaseConfigured()
-    ? "Is computer par"
+    ? "On this computer"
     : cloud.phase === "saving"
       ? "Saving…"
       : cloud.phase === "error"

@@ -243,8 +243,8 @@ function SalesChart({
             fontSize: 12,
           }}
         />
-        <Area type="monotone" dataKey="target" stroke="#c4b8a1" strokeDasharray="4 4" fill="none" name="Target" />
-        <Area type="monotone" dataKey="sales" stroke="#1f4a3c" strokeWidth={2} fill="url(#salesFill)" name="Sales" />
+        <Area type="monotone" dataKey="target" stroke="#c4b8a1" strokeDasharray="4 4" fill="none" name="Daily target" />
+        <Area type="monotone" dataKey="sales" stroke="#1f4a3c" strokeWidth={2} fill="url(#salesFill)" name="Room sales" />
       </AreaChart>
     </ResponsiveContainer>
   );

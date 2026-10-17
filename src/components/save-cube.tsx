@@ -4,9 +4,9 @@ import { Button } from "@/components/ui/button";
 import { saveAccountNow } from "@/lib/supabase-sync";
 import { isSupabaseConfigured } from "@/lib/supabase-config";
 
-const OK_MSG = "Server पर डेटा चला गया · Data is on the server.";
-const LOCAL_MSG = "Is computer par save ho gaya. Doosra desk alag hai.";
-const FAIL_MSG = "Server पर नहीं गया। इस कंप्यूटर का डेटा वैसा का वैसा है।";
+const OK_MSG = "Saved on the server.";
+const LOCAL_MSG = "Saved on this computer. The other desk is separate.";
+const FAIL_MSG = "Not saved on the server. This computer's data is unchanged.";
 
 export function SaveCube({
   busy,

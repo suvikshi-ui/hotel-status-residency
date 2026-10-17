@@ -507,7 +507,7 @@ export function RegisterLines() {
               }
               const t = source.trim();
               if (!dueAccount || dueLeft <= 0) {
-                toast.error("Is naam ka open balance nahi mila");
+                toast.error("No open balance found for this name");
                 return;
               }
               const n = Number(dueAmt || dueLeft);

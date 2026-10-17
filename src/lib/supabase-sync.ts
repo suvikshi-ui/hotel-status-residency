@@ -780,7 +780,7 @@ export async function importBackupAndRefresh(
     return {
       ok: true,
       cloud: false,
-      message: "Is computer par save ho gaya. Server band hai.",
+      message: "Saved on this computer. The server is off.",
     };
   }
   hydrating = true;
@@ -811,10 +811,10 @@ export async function importBackupAndRefresh(
     }
     const pulled = await pullLedger(userId);
     if (!pulled.ok || pulled.kind !== "data") {
-      setPhase("error", pushed.ok ? "Server ने JSON वापस नहीं दिया।" : "Save failed");
+      setPhase("error", pushed.ok ? "The server did not return the file." : "Save failed");
       return {
         ok: false,
-        message: `JSON server पर confirm नहीं हुआ. File में ${local.guests.length} guests.`,
+        message: `The server did not confirm the file. This computer has ${local.guests.length} guests.`,
       };
     }
     const serverGuests = pulled.snapshot.guests.length;
@@ -822,7 +822,7 @@ export async function importBackupAndRefresh(
       setPhase("error", "Server copy is thinner than the JSON file");
       return {
         ok: false,
-        message: `Server पर ${serverGuests} guests, file में ${local.guests.length}. Account में सेव नहीं हुआ.`,
+        message: `The server has ${serverGuests} guests. This file has ${local.guests.length}. It was not saved to the account.`,
       };
     }
     const wantedMonths = new Set(
@@ -845,7 +845,7 @@ export async function importBackupAndRefresh(
       setPhase("error", "Server still has another month");
       return {
         ok: false,
-        message: `Yeh desk par sirf chosen months hain. Server par ${extraMonths.join(", ")} abhi bhi hai. Save ek baar aur dabao.`,
+        message: `This desk has only the chosen months. The server still has ${extraMonths.join(", ")}. Press Save once more.`,
       };
     }
     useLedger.getState().applyCloudBooks({

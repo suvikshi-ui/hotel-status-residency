@@ -462,7 +462,7 @@ function BalancePage() {
               if (refuseLocked(date)) return;
               const account = lookupDueAccount(accounts, source);
               if (!account || account.remaining <= 0) {
-                toast.error("Is naam ka open balance nahi mila");
+                toast.error("No open balance found for this name");
                 return;
               }
               gate(

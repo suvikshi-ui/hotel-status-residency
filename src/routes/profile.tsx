@@ -122,13 +122,13 @@ function BackupCard() {
         : buildBackupFile(snap);
       downloadBackupJson(file, month ? backupFilename(month) : backupFilename());
       const n = backupCounts(month ? sliceBackupTables(snap, month) : snap);
-      const label = month ? monthLabel(month) : "Saare months";
+      const label = month ? monthLabel(month) : "All months";
       if (account.ok) {
         toast.success(
-          `${label} file save ho gayi · ${n.guests} guests · ${n.dates.length || 0} days`,
+          `${label} file saved · ${n.guests} guests · ${n.dates.length || 0} days`,
         );
       } else {
-        toast.error(`File is computer par save ho gayi. Account: ${account.message}`);
+        toast.error(`File saved on this computer. Account: ${account.message}`);
       }
       setExportOpen(false);
     } finally {
@@ -138,7 +138,7 @@ function BackupCard() {
 
   function confirmImport(month: string) {
     if (!pendingTables) {
-      toast.error("Backup file pehle choose karo.");
+      toast.error("Choose a backup file first.");
       return;
     }
     const deskId = ownerId || "offline";
@@ -154,15 +154,15 @@ function BackupCard() {
         void importBackupAndRefresh(deskId, merged)
           .then((result) => {
             if (!result.ok) {
-              toast.error(result.message || "JSON account में सेव नहीं हुआ");
+              toast.error(result.message || "The backup was not saved to the account");
               return;
             }
             toast.success(
               result.cloud
-                ? `${monthLabel(month)} import ho gaya · ${n.guests} guests. ${
-                    other.length ? `${other.map(monthLabel).join(", ")} delete nahi hua.` : "Doosra koi month books mein nahi tha."
+                ? `${monthLabel(month)} imported · ${n.guests} guests. ${
+                    other.length ? `${other.map(monthLabel).join(", ")} was not deleted.` : "No other month was in the books."
                   }`
-                : `${monthLabel(month)} is computer par save ho gaya · ${n.guests} guests. Server band hai.`,
+                : `${monthLabel(month)} saved on this computer · ${n.guests} guests. The server is off.`,
             );
             setPendingTables(null);
             setImportMonths([]);
@@ -173,9 +173,9 @@ function BackupCard() {
           .finally(() => setBusy(null));
       },
       {
-        title: `${monthLabel(month)} import karein?`,
-        message: `Sirf ${monthLabel(month)} replace hoga (${n.guests} guests). ${
-          other.length ? `${other.map(monthLabel).join(", ")} waise ka waisa rahega.` : "Baaki months khali rahenge jab tak unki file import na karo."
+        title: `Import ${monthLabel(month)}?`,
+        message: `Only ${monthLabel(month)} will be replaced (${n.guests} guests). ${
+          other.length ? `${other.map(monthLabel).join(", ")} stays as it is.` : "Other months stay empty until you import their file."
         }`,
         confirmLabel: "Import",
       },
@@ -189,7 +189,7 @@ function BackupCard() {
         const parsed = parseBackupFile(JSON.parse(String(reader.result)));
         const months = monthsInTables(parsed.tables);
         if (!months.length) {
-          toast.error("Is file mein koi month nahi mila.");
+          toast.error("No month was found in this file.");
           return;
         }
         setPendingTables(parsed.tables);
@@ -208,9 +208,7 @@ function BackupCard() {
       <CardHeader>
         <CardTitle>Backup</CardTitle>
         <p className="text-sm text-muted">
-          Abhi server band hai. Import isi computer par rehta hai. September ki
-          file, phir October ki file, dono alag se import karo. Doosra desk khud
-          import karega.
+          The server is off. Import stays on this computer. Import September, then October, each as its own file. The other desk imports on its own.
         </p>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
@@ -248,7 +246,7 @@ function BackupCard() {
         </div>
         {exportOpen ? (
           <div className="flex flex-col gap-2">
-            <p className="text-sm font-medium">Kaun se month ka backup?</p>
+            <p className="text-sm font-medium">Which month's backup?</p>
             <div className="flex flex-wrap gap-2">
               {exportMonths.map((month) => (
                 <Button
@@ -267,14 +265,14 @@ function BackupCard() {
                 disabled={Boolean(busy)}
                 onClick={() => void downloadMonth(null)}
               >
-                Saare months
+                All months
               </Button>
             </div>
           </div>
         ) : null}
         {importMonths.length ? (
           <div className="flex flex-col gap-2">
-            <p className="text-sm font-medium">Kaun sa month import karein? Doosra month delete nahi hoga.</p>
+            <p className="text-sm font-medium">Which month should be imported? The other month will not be deleted.</p>
             <div className="flex flex-wrap gap-2">
               {importMonths.map((month) => (
                 <Button
