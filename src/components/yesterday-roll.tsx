@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
+import { tellDateLocked } from "@/lib/locked-notice";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useGate } from "@/components/security-gate";
@@ -65,7 +66,7 @@ export function YesterdayRoll() {
 
   function apply() {
     if (locked) {
-      toast.error("This day's register is locked");
+      tellDateLocked(date);
       return;
     }
     const namesIn = rows.filter((g) => ticked.has(g.id)).map((g) => g.name);

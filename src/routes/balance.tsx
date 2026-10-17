@@ -36,6 +36,8 @@ import { useLedger, useDayBooks } from "@/lib/store";
 import { useGate } from "@/components/security-gate";
 import { SaveCube, useAccountSave } from "@/components/save-cube";
 import { canWrite } from "@/lib/roles";
+import { isDayLocked } from "@/lib/register-lock";
+import { tellDateLocked } from "@/lib/locked-notice";
 import type { PayMode } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -50,6 +52,7 @@ function BalancePage() {
   const hotel = useLedger((s) => s.hotel);
   const guests = useLedger((s) => s.guests);
   const receipts = useLedger((s) => s.balReceived);
+  const lockedDates = useLedger((s) => s.lockedDates);
   const date = useLedger((s) => s.selectedDate);
   const addBalReceived = useLedger((s) => s.addBalReceived);
   const removeBalReceived = useLedger((s) => s.removeBalReceived);
@@ -134,15 +137,22 @@ function BalancePage() {
     .reduce((s, r) => s + r.amount, 0);
   const otherTotal = otherRows.reduce((s, r) => s + r.amount, 0);
 
+  function refuseLocked(day: string) {
+    if (!isDayLocked(lockedDates, day)) return false;
+    tellDateLocked(day);
+    return true;
+  }
+
   function collectFrom(
     account: DueAccount,
     mode: PayMode,
     amount: number,
     payRef?: string,
   ) {
+    if (refuseLocked(date)) return;
     gate(
       () => {
-        addBalReceived({
+        const ok = addBalReceived({
           particular: account.key,
           forKey: account.key,
           mode,
@@ -150,6 +160,10 @@ function BalancePage() {
           kind: "due",
           payRef: payRef?.trim() || null,
         });
+        if (!ok) {
+          tellDateLocked(date);
+          return;
+        }
         toast.success(`Collected ${money(amount)} from ${account.key}`);
       },
       {
@@ -162,6 +176,7 @@ function BalancePage() {
 
   function removeReceipt(id: string) {
     const receipt = receipts.find((r) => r.id === id);
+    if (receipt && refuseLocked(receipt.date)) return;
     gate(
       () => {
         const ok = removeBalReceived(id, { bypass: true });
@@ -337,6 +352,7 @@ function BalancePage() {
                 collectFrom(searchHit, mode, amount, payRef)
               }
               onRemoveReceipt={removeReceipt}
+              lockedDates={lockedDates}
               onPrintGuests={() => {
                 toast.message("Opening guest print…");
                 printSourceGuests(searchHit, hotel.name, hotel.place);
@@ -359,6 +375,7 @@ function BalancePage() {
                   collectFrom(account, mode, amount, payRef)
                 }
                 onRemoveReceipt={removeReceipt}
+                lockedDates={lockedDates}
                 onPrintGuests={() => {
                   toast.message("Opening guest print…");
                   printSourceGuests(account, hotel.name, hotel.place);
@@ -398,6 +415,7 @@ function BalancePage() {
                     collectFrom(account, mode, amount, payRef)
                   }
                   onRemoveReceipt={removeReceipt}
+                  lockedDates={lockedDates}
                   onPrintGuests={() => {
                     toast.message("Opening guest print…");
                     printSourceGuests(account, hotel.name, hotel.place);
@@ -418,14 +436,19 @@ function BalancePage() {
             listRows={listRows}
             rows={otherRows}
             onAddList={(source, amount) => {
+              if (refuseLocked(date)) return;
               gate(
                 () => {
-                  addBalReceived({
+                  const ok = addBalReceived({
                     particular: source.trim(),
                     mode: "BALANCE",
                     amount,
                     kind: "list",
                   });
+                  if (!ok) {
+                    tellDateLocked(date);
+                    return;
+                  }
                   toast.success(`${source.trim()} added to the Balance list`);
                 },
                 {
@@ -436,6 +459,7 @@ function BalancePage() {
               );
             }}
             onReceive={(source, mode, amount, payRef) => {
+              if (refuseLocked(date)) return;
               const account = lookupDueAccount(accounts, source);
               if (!account || account.remaining <= 0) {
                 toast.error("Is naam ka open balance nahi mila");
@@ -443,7 +467,7 @@ function BalancePage() {
               }
               gate(
                 () => {
-                  addBalReceived({
+                  const ok = addBalReceived({
                     particular: account.key,
                     forKey: account.key,
                     mode,
@@ -451,6 +475,10 @@ function BalancePage() {
                     kind: "due",
                     payRef: payRef?.trim() || null,
                   });
+                  if (!ok) {
+                    tellDateLocked(date);
+                    return;
+                  }
                   toast.success(`Received ${money(amount)} from ${account.key}`);
                 },
                 {
@@ -461,15 +489,20 @@ function BalancePage() {
               );
             }}
             onAdd={(mode, amount, note, payRef) => {
+              if (refuseLocked(date)) return;
               gate(
                 () => {
-                  addBalReceived({
+                  const ok = addBalReceived({
                     particular: note.trim() ? `Other · ${note.trim()}` : "Other",
                     mode,
                     amount,
                     kind: "other",
                     payRef: payRef?.trim() || null,
                   });
+                  if (!ok) {
+                    tellDateLocked(date);
+                    return;
+                  }
                   toast.success(`Other ${money(amount)} saved`);
                 },
                 {
@@ -480,6 +513,8 @@ function BalancePage() {
               );
             }}
             onRemove={(id) => {
+              const row = receipts.find((r) => r.id === id);
+              if (row && refuseLocked(row.date)) return;
               gate(
                 () => {
                   removeBalReceived(id);
@@ -494,6 +529,7 @@ function BalancePage() {
               );
             }}
             write={write}
+            lockedDates={lockedDates}
           />
         </TabsContent>
       </Tabs>
@@ -513,6 +549,7 @@ function OtherTab({
   onAdd,
   onRemove,
   write = true,
+  lockedDates,
 }: {
   booksCb: number;
   today: number;
@@ -525,6 +562,7 @@ function OtherTab({
   onAdd: (mode: PayMode, amount: number, note: string, payRef?: string) => void;
   onRemove: (id: string) => void;
   write?: boolean;
+  lockedDates: Record<string, true>;
 }) {
   const [listSource, setListSource] = useState("");
   const [listAmount, setListAmount] = useState("");
@@ -651,7 +689,7 @@ function OtherTab({
                       {money(r.amount)}
                     </td>
                     <td className="px-3 py-2.5 text-right">
-                      {write ? (
+                      {write && !isDayLocked(lockedDates, r.date) ? (
                       <Button
                         variant="ghost"
                         size="icon"
@@ -875,7 +913,7 @@ function OtherTab({
                     {money(r.amount)}
                   </td>
                   <td className="px-3 py-2.5 text-right">
-                    {write ? (
+                    {write && !isDayLocked(lockedDates, r.date) ? (
                     <Button
                       variant="ghost"
                       size="icon"
@@ -912,6 +950,7 @@ function SourceCard({
   onRemoveReceipt,
   onPrintGuests,
   write = true,
+  lockedDates,
 }: {
   account: DueAccount;
   open: boolean;
@@ -922,6 +961,7 @@ function SourceCard({
   onRemoveReceipt: (id: string) => void;
   onPrintGuests: () => void;
   write?: boolean;
+  lockedDates: Record<string, true>;
 }) {
   const [mode, setMode] = useState<PayMode>("CASH");
   const [amount, setAmount] = useState("");
@@ -1078,7 +1118,7 @@ function SourceCard({
                     <span className="tabular text-sm font-medium text-ok">
                       {money(r.amount)}
                     </span>
-                    {write ? (
+                    {write && !isDayLocked(lockedDates, r.date) ? (
                     <Button
                       variant="ghost"
                       size="icon"

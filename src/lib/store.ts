@@ -161,7 +161,7 @@ export interface LedgerState {
   removeWholesale: (id: string, opts?: BypassGuard) => void;
   addExpense: (row: Omit<NamedAmount, "id" | "date"> & { date?: string }) => void;
   removeExpense: (id: string, opts?: BypassGuard) => void;
-  addBalReceived: (row: Omit<NamedAmount, "id" | "date"> & { date?: string }) => void;
+  addBalReceived: (row: Omit<NamedAmount, "id" | "date"> & { date?: string }) => boolean;
   removeBalReceived: (id: string, opts?: BypassGuard) => boolean;
   setLineRef: (
     kind: "guest" | "food" | "wholesale" | "expense" | "receipt",
@@ -531,8 +531,8 @@ function blockedRow(
   key: string | undefined,
   opts?: BypassGuard,
 ) {
-  if (opts?.bypass) return false;
   if (date && dayIsLocked(state, date)) return true;
+  if (opts?.bypass) return false;
   if (key && isSealed(state.sealedIds, key)) return true;
   return false;
 }
@@ -853,12 +853,14 @@ export const useLedger = create<LedgerState>()(
       },
       addBalReceived: (row) => {
         const date = row.date ?? get().selectedDate;
+        if (dayIsLocked(get(), date)) return false;
         const balReceived = [
           ...get().balReceived,
           { ...row, id: uid("b"), date },
         ];
         const next = { ...get(), balReceived };
         save({ balReceived, ...rebuildFrom(next, date) });
+        return true;
       },
       removeBalReceived: (id, opts) => {
         const row = get().balReceived.find((x) => x.id === id);

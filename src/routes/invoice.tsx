@@ -14,6 +14,8 @@ import { formatDayShort, money } from "@/lib/format";
 import { buildGstStayBills, buildOtaStays, buildRegisterStays, type GstStayBill } from "@/lib/invoice";
 import { escapeHtml, printDocument } from "@/lib/print-sheet";
 import { useLedger } from "@/lib/store";
+import { isDayLocked } from "@/lib/register-lock";
+import { tellDateLocked } from "@/lib/locked-notice";
 
 export const Route = createFileRoute("/invoice")({ component: InvoicePage });
 
@@ -21,6 +23,7 @@ function InvoicePage() {
   const date = useLedger((s) => s.selectedDate);
   const hotel = useLedger((s) => s.hotel);
   const guests = useLedger((s) => s.guests);
+  const lockedDates = useLedger((s) => s.lockedDates);
   const receipts = useLedger((s) => s.balReceived);
   const updateGuest = useLedger((s) => s.updateGuest);
   const { gate } = useGate();
@@ -68,6 +71,11 @@ function InvoicePage() {
 
   function saveField(id: string, field: "gstInvoiceNo" | "payRefNo", value: string) {
     const row = gstRows.find((b) => b.id === id);
+    const guest = guests.find((g) => g.id === id);
+    if (guest && isDayLocked(lockedDates, guest.date)) {
+      tellDateLocked(guest.date);
+      return;
+    }
     const next = value.trim() || null;
     const prev = (row?.[field] ?? "") || null;
     if (next === prev) return;

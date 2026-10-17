@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { toast } from "sonner";
+import { tellDateLocked } from "@/lib/locked-notice";
 import { DateNav } from "@/components/date-nav";
 import { ModeBadge } from "@/components/mode-badge";
 import { Button } from "@/components/ui/button";
@@ -139,8 +140,8 @@ export function GuestForm({
 
   function submit(e: FormEvent) {
     e.preventDefault();
-    if (locked && !editing) {
-      toast.error("This day's register is locked. Use Edit + security code to change an old entry.");
+    if (locked) {
+      tellDateLocked(date);
       return;
     }
     if (!name.trim()) {

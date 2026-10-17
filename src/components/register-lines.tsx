@@ -25,6 +25,7 @@ import {
 } from "@/lib/format";
 import { useLedger } from "@/lib/store";
 import { isDayLocked, isPriorMonthClosed } from "@/lib/register-lock";
+import { tellDateLocked } from "@/lib/locked-notice";
 import type { ModeAmount, NamedAmount, PayMode } from "@/lib/types";
 
 function ModeLineCard({
@@ -499,6 +500,10 @@ export function RegisterLines() {
             className="flex flex-col gap-3"
             onSubmit={(e) => {
               e.preventDefault();
+              if (locked) {
+                tellDateLocked(date);
+                return;
+              }
               const t = source.trim();
               if (!dueAccount || dueLeft <= 0) {
                 toast.error("Is naam ka open balance nahi mila");
@@ -511,7 +516,7 @@ export function RegisterLines() {
               }
               gate(
                 () => {
-                  addBal({
+                  const ok = addBal({
                     particular: dueAccount.key,
                     forKey: dueAccount.key,
                     mode: dueMode,
@@ -519,6 +524,10 @@ export function RegisterLines() {
                     kind: "due",
                     payRef: dueMode === "QRPK" ? dueRef.trim() || null : null,
                   });
+                  if (!ok) {
+                    tellDateLocked(date);
+                    return;
+                  }
                   toast.success(`Collected ${money(n)} from ${dueAccount.key}`);
                   setSource("");
                   setDueAmt("");
@@ -625,7 +634,7 @@ export function RegisterLines() {
                 gate(() => {
                   const ok = removeBal(id, { bypass: true });
                   if (!ok) {
-                    toast.error("This receipt could not be deleted");
+                    tellDateLocked(date);
                     return;
                   }
                   toast.success(
@@ -646,6 +655,10 @@ export function RegisterLines() {
             className="flex flex-col gap-3"
             onSubmit={(e) => {
               e.preventDefault();
+              if (locked) {
+                tellDateLocked(date);
+                return;
+              }
               const n = Number(otaAmt);
               if (!Number.isFinite(n) || n <= 0) {
                 toast.error("Enter an amount");
@@ -653,13 +666,17 @@ export function RegisterLines() {
               }
               gate(
                 () => {
-                  addBal({
+                  const ok = addBal({
                     particular: ota,
                     mode: "QRPK",
                     amount: n,
                     kind: "ota",
                     payRef: otaRef.trim() || null,
                   });
+                  if (!ok) {
+                    tellDateLocked(date);
+                    return;
+                  }
                   toast.success(`${ota} ${money(n)} → P.K. QR`);
                   setOtaAmt("");
                   setOtaRef("");
