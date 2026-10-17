@@ -287,4 +287,25 @@ describe("balance carry-forward", () => {
     assert.equal(map.get("2026-09-02")!.cashBook.cb, 0);
     assert.equal(map.get("2026-09-03")!.outstanding.ob, 5000);
   });
+
+  it("drops a minus from the balance total and carries that amount", () => {
+    const { map } = booksFor(
+      [guest("2026-09-01", 1000, "BALANCE")],
+      "2026-09-02",
+      {
+        balReceived: [
+          {
+            id: "r-over",
+            date: "2026-09-01",
+            mode: "CASH",
+            amount: 87661,
+            particular: "OLD DUE",
+            kind: "due",
+          },
+        ],
+      },
+    );
+    assert.equal(map.get("2026-09-01")!.outstanding.cb, 86661);
+    assert.equal(map.get("2026-09-02")!.outstanding.ob, 86661);
+  });
 });

@@ -185,13 +185,18 @@ export function computeBooks(input: {
   };
   online.cb = online.ob + online.sales - online.balReceived;
 
+  const balanceBilled =
+    mix.balance.sale + mix.balance.food + mix.balance.ws;
   const outstanding: OutstandingLedger = {
     ob: input.prev.outstanding,
-    sales: mix.balance.sale,
+    sales: balanceBilled,
     balReceived: dueCash + dueQr + duePk,
     cb: 0,
   };
-  outstanding.cb = outstanding.ob - outstanding.balReceived + outstanding.sales;
+  const rawOutstanding =
+    outstanding.ob - outstanding.balReceived + outstanding.sales;
+  // A due is still to collect. A minus here is the sign turned around, not a credit.
+  outstanding.cb = rawOutstanding < 0 ? -rawOutstanding : rawOutstanding;
 
   return {
     date: input.date,
@@ -285,7 +290,7 @@ export function rebuildDayBooks(input: {
   for (const date of filled) {
     if (date === epoch) prev = openingAsPrev(input.opening);
     const frozen = input.lockedDates?.[date] ? earlier.get(date) : undefined;
-    const books =
+    const built =
       frozen ??
       computeBooks({
         date,
@@ -296,6 +301,13 @@ export function rebuildDayBooks(input: {
         balReceived: byDate(input.balReceived, date),
         prev,
       });
+    const books =
+      built.outstanding.cb < 0
+        ? {
+            ...built,
+            outstanding: { ...built.outstanding, cb: -built.outstanding.cb },
+          }
+        : built;
     rebuilt.push(books);
     prev = closeAsPrev(books);
     const nextDate = addDaysIso(date, 1);

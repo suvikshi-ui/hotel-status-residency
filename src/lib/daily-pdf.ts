@@ -110,7 +110,7 @@ function blocksOf(input: DailyPdfInput) {
     (s?.ob ?? 0) + (s?.salesQr ?? 0) + (s?.foodQr ?? 0) + (s?.other ?? 0);
   const pkSub =
     (pk?.ob ?? 0) + (pk?.salesQr ?? 0) + (pk?.foodQr ?? 0) + (pk?.other ?? 0);
-  const dueAfterRecv = (b?.ob ?? 0) - (b?.balReceived ?? 0);
+  const dueAfterRecv = Math.abs((b?.ob ?? 0) - (b?.balReceived ?? 0));
 
   const left: { title: string; rows: Row[] }[] = [
     {
