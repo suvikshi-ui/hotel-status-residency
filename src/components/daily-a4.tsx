@@ -3,6 +3,7 @@ import { format, parseISO } from "date-fns";
 import type { DayBooks, GuestEntry, NamedAmount } from "@/lib/types";
 import type { DayTake } from "@/lib/day-report";
 import { publicUrl } from "@/lib/public-url";
+import { joinRecvTags, otaReceivedTag } from "@/lib/ota-label";
 
 function n(v: number) {
   return Math.round(v).toLocaleString("en-IN");
@@ -222,7 +223,6 @@ export function DailyA4({
   const cashRec = receipts.filter((r) => r.mode === "CASH");
   const qrRec = receipts.filter((r) => r.mode === "QRS");
   const pkRec = receipts.filter((r) => r.mode === "QRPK");
-  const onRec = receipts.filter((r) => r.mode === "ONLINE");
   const cashExp = expenses.filter((e) => e.mode === "CASH");
   const qrExp = expenses.filter((e) => e.mode === "QRS");
   const pkExp = expenses.filter((e) => e.mode === "QRPK");
@@ -230,8 +230,12 @@ export function DailyA4({
   const balTag = rooms ? `BAL (${rooms})` : "BAL";
   const cashRooms = receivedNames(cashRec) || roomsFor(cashRec, guests);
   const qrRooms = receivedNames(qrRec) || roomsFor(qrRec, guests);
-  const pkRooms = receivedNames(pkRec.filter((r) => r.kind !== "ota")) || roomsFor(pkRec, guests);
-  const onRooms = roomsFor(onRec, guests);
+  const pkRooms =
+    joinRecvTags(
+      receivedNames(pkRec.filter((r) => r.kind !== "ota")),
+      otaReceivedTag(receipts),
+    ) || roomsFor(pkRec, guests);
+  const onRooms = otaReceivedTag(receipts);
   const dueRooms = roomsFor([...qrRec, ...cashRec, ...pkRec], guests);
   const santoshSub =
     (s?.ob ?? 0) + (s?.salesQr ?? 0) + (s?.foodQr ?? 0) + (s?.other ?? 0);

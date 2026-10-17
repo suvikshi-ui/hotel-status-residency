@@ -1,6 +1,7 @@
 import { format, parseISO } from "date-fns";
 import type { CSSProperties, ReactNode } from "react";
 import { buildDayTake } from "@/lib/day-report";
+import { otaChannelLabel } from "@/lib/ota-label";
 import { publicUrl } from "@/lib/public-url";
 import { addDaysIso, stayDates } from "@/lib/stay";
 import type {
@@ -208,17 +209,51 @@ export function DayChart({
   const take = buildDayTake(guests, food, ws);
   const due = receipts.filter((r) => r.kind !== "ota" && r.kind !== "list");
   const ota = receipts.filter((r) => r.kind === "ota");
-  const cashRecv = byMode(receipts, "CASH");
-  const qrsRecv = byMode(receipts, "QRS");
-  const pkRecv = byMode(receipts, "QRPK");
-  const onRecv = byMode(receipts, "ONLINE");
+  const plain = receipts.filter((r) => r.kind !== "ota");
+  const cashRecv = byMode(plain, "CASH");
+  const qrsRecv = byMode(plain, "QRS");
+  const pkRecv = byMode(plain, "QRPK");
+  const onRecv = byMode(plain, "ONLINE");
+  const otaRows = [...new Set(ota.map((r) => otaChannelLabel(r.particular)))]
+    .sort((a, b) => {
+      const rank = (name: string) => (name === "FAB" ? 0 : name === "BRAVESTAY" ? 1 : 2);
+      return rank(a) - rank(b) || a.localeCompare(b);
+    })
+    .map((name) => {
+      const rows = ota.filter((r) => otaChannelLabel(r.particular) === name);
+      return {
+        label: `Balance received · ${name}`,
+        cash: byMode(rows, "CASH"),
+        qrs: byMode(rows, "QRS"),
+        pk: byMode(rows, "QRPK"),
+        online: byMode(rows, "ONLINE"),
+      };
+    })
+    .filter((row) => row.cash || row.qrs || row.pk || row.online);
   const qrsIn =
-    take.santosh.rooms + take.santosh.food + take.santosh.ws + qrsRecv;
-  const pkIn = take.pk.rooms + take.pk.food + take.pk.ws + pkRecv;
+    take.santosh.rooms +
+    take.santosh.food +
+    take.santosh.ws +
+    qrsRecv +
+    otaRows.reduce((s, row) => s + row.qrs, 0);
+  const pkIn =
+    take.pk.rooms +
+    take.pk.food +
+    take.pk.ws +
+    pkRecv +
+    otaRows.reduce((s, row) => s + row.pk, 0);
   const cashIn =
-    take.cash.rooms + take.cash.food + take.cash.ws + cashRecv;
+    take.cash.rooms +
+    take.cash.food +
+    take.cash.ws +
+    cashRecv +
+    otaRows.reduce((s, row) => s + row.cash, 0);
   const onIn =
-    take.online.rooms + take.online.food + take.online.ws + onRecv;
+    take.online.rooms +
+    take.online.food +
+    take.online.ws +
+    onRecv +
+    otaRows.reduce((s, row) => s + row.online, 0);
   const payRows: {
     label: string;
     cash: number;
@@ -247,13 +282,18 @@ export function DayChart({
       pk: take.pk.ws,
       online: take.online.ws,
     },
-    {
-      label: "Balance received",
-      cash: cashRecv,
-      qrs: qrsRecv,
-      pk: pkRecv,
-      online: onRecv,
-    },
+    ...(cashRecv || qrsRecv || pkRecv || onRecv
+      ? [
+          {
+            label: "Balance received",
+            cash: cashRecv,
+            qrs: qrsRecv,
+            pk: pkRecv,
+            online: onRecv,
+          },
+        ]
+      : []),
+    ...otaRows,
   ];
   const payTotal = {
     cash: cashIn,
@@ -541,7 +581,7 @@ export function DayChart({
         </table>
         <p style={{ fontSize: 11, color: "#6f675c", marginTop: 8 }}>
           Cash in today {rupee(payTotal.cash)} · Santosh QR and P.K. QR are separate ·
-          Fab / Bravistay sits in P.K. QR.
+          Fab and BraveStay are named on Balance received, and the amount sits in P.K. QR.
         </p>
       </Section>
     </div>

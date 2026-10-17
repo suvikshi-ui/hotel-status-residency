@@ -3,6 +3,7 @@ import type { jsPDF } from "jspdf";
 import type { DayTake } from "./day-report";
 import { publicUrl } from "./public-url";
 import type { DayBooks, GuestEntry, NamedAmount } from "./types";
+import { joinRecvTags, otaReceivedTag } from "./ota-label";
 
 export type DailyPdfInput = {
   hotel: string;
@@ -90,7 +91,6 @@ function blocksOf(input: DailyPdfInput) {
   const cashRec = input.receipts.filter((r) => r.mode === "CASH");
   const qrRec = input.receipts.filter((r) => r.mode === "QRS");
   const pkRec = input.receipts.filter((r) => r.mode === "QRPK");
-  const onRec = input.receipts.filter((r) => r.mode === "ONLINE");
   const cashExp = input.expenses.filter((e) => e.mode === "CASH");
   const qrExp = input.expenses.filter((e) => e.mode === "QRS");
   const pkExp = input.expenses.filter((e) => e.mode === "QRPK");
@@ -99,9 +99,11 @@ function blocksOf(input: DailyPdfInput) {
   const cashRooms = receivedNames(cashRec) || roomsFor(cashRec, input.guests);
   const qrRooms = receivedNames(qrRec) || roomsFor(qrRec, input.guests);
   const pkRooms =
-    receivedNames(pkRec.filter((r) => r.kind !== "ota")) ||
-    roomsFor(pkRec, input.guests);
-  const onRooms = roomsFor(onRec, input.guests);
+    joinRecvTags(
+      receivedNames(pkRec.filter((r) => r.kind !== "ota")),
+      otaReceivedTag(input.receipts),
+    ) || roomsFor(pkRec, input.guests);
+  const onRooms = otaReceivedTag(input.receipts);
   const dueRooms = roomsFor([...qrRec, ...cashRec, ...pkRec], input.guests);
   const santoshSub =
     (s?.ob ?? 0) + (s?.salesQr ?? 0) + (s?.foodQr ?? 0) + (s?.other ?? 0);
