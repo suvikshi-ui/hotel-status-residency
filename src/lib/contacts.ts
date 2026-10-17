@@ -22,7 +22,13 @@ export function normalizeContacts(raw: unknown): HotelContact[] {
     seen.add(id);
     out.push({ id, topic, name, phone, address });
   }
-  return out;
+  return out.sort((a, b) => addedOrder(a.id) - addedOrder(b.id) || a.id.localeCompare(b.id));
+}
+
+function addedOrder(id: string) {
+  const stamp = id.split("-")[1] ?? "";
+  const time = Number.parseInt(stamp, 36);
+  return Number.isFinite(time) ? time : 0;
 }
 
 export function contactsFromHotel(hotel: unknown): HotelContact[] {
