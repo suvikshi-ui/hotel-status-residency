@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
+  Banknote,
   BarChart3,
   Bell,
   BookOpen,
@@ -42,6 +43,7 @@ const NAV = [
   { to: "/reminders", label: "Reminder", icon: Bell, group: "Desk" },
   { to: "/contacts", label: "Contacts", icon: Phone, group: "Desk" },
   { to: "/reports", label: "Reports", icon: BarChart3, group: "Close" },
+  { to: "/cash-count", label: "Cash count", icon: Banknote, group: "Close" },
   { to: "/profile", label: "Profile", icon: CircleUser, group: "Close" },
 ] as const;
 

@@ -21,6 +21,7 @@ export const OWNER_PATHS = [
   "/contacts",
   "/reminders",
   "/reports",
+  "/cash-count",
   "/login",
 ] as const;
 
