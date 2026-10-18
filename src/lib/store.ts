@@ -23,7 +23,7 @@ import {
   type PayrollFile,
 } from "./payroll-files";
 import { uid } from "./format";
-import { applyGuestPatch, applyStay, applyYesterdayRoll } from "./stay";
+import { applyGuestPatch, applyStay, applyYesterdayRoll, stayChunkIds } from "./stay";
 import { eachIsoDay, closeAsPrev, rebuildDayBooks } from "./ledger";
 import { fillAllSeedDates } from "./seed-fill";
 import { earlierDate, mergeRowsByDate } from "./cloud-save";
@@ -879,11 +879,12 @@ export const useLedger = create<LedgerState>()(
       setLineRef: (kind, id, ref, opts) => {
         const value = ref.trim() || null;
         if (kind === "guest") {
-          const current = get().guests.find((g) => g.id === id);
-          if (current?.date && dayIsLocked(get(), current.date) && !opts?.bypass) return;
-          const guests = get().guests.map((g) =>
-            g.id === id ? { ...g, payRefNo: value } : g,
+          const chunk = stayChunkIds(get().guests, id);
+          const locked = get().guests.some(
+            (g) => chunk.has(g.id) && dayIsLocked(get(), g.date),
           );
+          if (locked && !opts?.bypass) return;
+          const guests = applyGuestPatch(get().guests, id, { payRefNo: value });
           const row = guests.find((g) => g.id === id);
           const next = { ...get(), guests };
           save({ guests, ...rebuildFrom(next, row?.date ?? get().selectedDate) });

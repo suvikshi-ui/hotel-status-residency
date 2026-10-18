@@ -438,6 +438,35 @@ describe("bank recon", () => {
     );
   });
 
+  it("keeps one room-rent row and one reference for a multi-night stay", () => {
+    const night = (id: string, date: string, amount: number, ref = "") => ({
+      id,
+      date,
+      slNo: 1,
+      name: "Ravi",
+      roomNo: "101",
+      mode: "QRPK" as const,
+      amount,
+      payRefNo: ref,
+      checkIn: "2026-10-13",
+      stay: date === "2026-10-16" ? ("out" as const) : ("continue" as const),
+    });
+    const moves = pkMovesForMonth({
+      month: "2026-10",
+      guests: [
+        night("a", "2026-10-13", 1000, "UPI-STAY"),
+        night("b", "2026-10-14", 1000),
+        night("c", "2026-10-15", 1000),
+        night("d", "2026-10-16", 1000),
+      ],
+    });
+    assert.equal(moves.length, 1);
+    assert.equal(moves[0]?.date, "2026-10-13");
+    assert.equal(moves[0]?.to, "2026-10-16");
+    assert.equal(moves[0]?.amount, 4000);
+    assert.equal(moves[0]?.ref, "UPI-STAY");
+  });
+
   it("pulls UPI/IMPS numbers out of narration", () => {
     assert.equal(extractRef("TO TRANSFER UPI/DR/412345678901/RAMESH/SBIN"), "412345678901");
   });

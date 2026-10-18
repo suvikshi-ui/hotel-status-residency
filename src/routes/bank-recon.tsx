@@ -20,6 +20,7 @@ import {
 import { formatDayShort, money } from "@/lib/format";
 import { englishNarration } from "@/lib/english-narration";
 import { isDayLocked } from "@/lib/register-lock";
+import { stayChunkIds } from "@/lib/stay";
 import { useLedger } from "@/lib/store";
 import { canWrite } from "@/lib/roles";
 import { GuardedPkRef } from "@/components/pk-ref";
@@ -271,7 +272,11 @@ function BankReconPage() {
             <tbody>
               {pkMoves.map((row) => (
                 <tr key={`${row.kind}-${row.id}`} className="border-b border-border/70">
-                  <td className="px-5 py-2.5 tabular">{formatDayShort(row.date)}</td>
+                  <td className="px-5 py-2.5 tabular">
+                    {row.to && row.to !== row.date
+                      ? `${formatDayShort(row.date)} – ${formatDayShort(row.to)}`
+                      : formatDayShort(row.date)}
+                  </td>
                   <td className="px-3 py-2.5 font-medium">{row.name || "—"}</td>
                   <td className="px-3 py-2.5">{englishNarration(row.reason) || row.reason}</td>
                   <td className="px-3 py-2.5 text-right tabular">
@@ -283,7 +288,15 @@ function BankReconPage() {
                   <td className="px-3 py-2.5">
                     {write ? (
                       <GuardedPkRef
-                        locked={isDayLocked(lockedDates, row.date)}
+                        locked={
+                          row.kind === "guest"
+                            ? guests.some(
+                                (g) =>
+                                  stayChunkIds(guests, row.id).has(g.id) &&
+                                  isDayLocked(lockedDates, g.date),
+                              )
+                            : isDayLocked(lockedDates, row.date)
+                        }
                         value={row.ref}
                         onSave={(ref, bypass) =>
                           setLineRef(row.kind, row.id, ref, bypass ? { bypass: true } : undefined)

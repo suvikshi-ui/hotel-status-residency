@@ -244,6 +244,57 @@ export interface PkMove {
   reason: string;
   amount: number;
   ref: string;
+  /** Last night, when a room stay covers more than one day. */
+  to?: string;
+}
+
+function nightsSplit(prev: GuestEntry, next: GuestEntry) {
+  const prevIn = (prev.checkIn || prev.date).slice(0, 10);
+  const nextIn = (next.checkIn || next.date).slice(0, 10);
+  if (prevIn && nextIn && prevIn === nextIn) return false;
+  if (prev.stay === "out" && nextIn && prevIn && nextIn !== prevIn) return true;
+  const left = Date.parse(`${prev.date}T00:00:00Z`);
+  const right = Date.parse(`${next.date}T00:00:00Z`);
+  const days =
+    Number.isFinite(left) && Number.isFinite(right)
+      ? Math.round((right - left) / 86_400_000)
+      : 99;
+  if (days > 1) return true;
+  if (prev.stay === "out" && days <= 0) return true;
+  return false;
+}
+
+function roomRentStays(guests: GuestEntry[]): GuestEntry[][] {
+  const groups = new Map<string, GuestEntry[]>();
+  for (const guest of guests) {
+    if (guest.mode !== "QRPK") continue;
+    const key = [
+      guest.name.trim().toUpperCase(),
+      guest.roomNo.trim(),
+      (guest.source ?? "").trim().toUpperCase(),
+      guest.mode,
+    ].join("|");
+    const list = groups.get(key) ?? [];
+    list.push(guest);
+    groups.set(key, list);
+  }
+  const chunks: GuestEntry[][] = [];
+  for (const list of groups.values()) {
+    const sorted = [...list].sort(
+      (a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id),
+    );
+    let current: GuestEntry[] = [];
+    for (const night of sorted) {
+      const prev = current[current.length - 1];
+      if (prev && nightsSplit(prev, night)) {
+        chunks.push(current);
+        current = [];
+      }
+      current.push(night);
+    }
+    if (current.length) chunks.push(current);
+  }
+  return chunks;
 }
 
 /** Every P.K. QR receipt and payment in one month. The list is only a view. */
@@ -258,17 +309,23 @@ export function pkMovesForMonth(input: {
   const month = input.month;
   const moves: PkMove[] = [];
   const inMonth = (date: string) => date.slice(0, 7) === month;
-  for (const guest of input.guests) {
-    if (guest.mode !== "QRPK" || !inMonth(guest.date)) continue;
+  for (const nights of roomRentStays(input.guests)) {
+    const sorted = [...nights].sort((a, b) => a.date.localeCompare(b.date));
+    if (!sorted.some((night) => inMonth(night.date))) continue;
+    const first = sorted[0];
+    const last = sorted[sorted.length - 1];
+    if (!first || !last) continue;
+    const ref = sorted.map((night) => asText(night.payRefNo)).find(Boolean) ?? "";
     moves.push({
-      id: guest.id,
-      date: guest.date,
+      id: first.id,
+      date: first.date,
+      to: last.date,
       side: "in",
       kind: "guest",
-      name: asText(guest.name),
+      name: asText(first.name),
       reason: "Room rent",
-      amount: guest.amount,
-      ref: asText(guest.payRefNo),
+      amount: sorted.reduce((sum, night) => sum + night.amount, 0),
+      ref,
     });
   }
   for (const row of input.food ?? []) {
