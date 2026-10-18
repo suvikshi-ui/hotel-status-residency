@@ -14,7 +14,7 @@ import {
 } from "@/lib/cash-count";
 import { formatDay, money } from "@/lib/format";
 import { canWrite } from "@/lib/roles";
-import { useLedger } from "@/lib/store";
+import { useDayBooks, useLedger } from "@/lib/store";
 
 export const Route = createFileRoute("/cash-count")({
   component: CashCountPage,
@@ -69,7 +69,7 @@ function CashCountPage() {
         <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">Cash</p>
         <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight">Cash count</h1>
         <p className="mt-1 max-w-xl text-sm text-muted">
-          A blank count for one day. It does not change the register or the daily report. The next day starts empty.
+          The day's cash closing from the report shows here. Counting or saving does not change the register or the report.
         </p>
       </div>
       <div>
@@ -121,6 +121,8 @@ function CashDaySheet({ day }: { day: string }) {
   const counts = useLedger((s) => s.cashCounts);
   const saveCashCount = useLedger((s) => s.saveCashCount);
   const write = canWrite(useLedger((s) => s.appRole));
+  const books = useDayBooks(day);
+  const closing = books?.cashBook.cb ?? 0;
   const saved = counts.find((row) => row.date === day);
   const loaded = useRef(Boolean(saved));
   const [notes, setNotes] = useState(saved ? { ...emptyCashNotes(), ...saved.notes } : emptyCashNotes);
@@ -142,12 +144,19 @@ function CashDaySheet({ day }: { day: string }) {
     <Card>
       <CardHeader>
         <CardTitle>{formatDay(day)}</CardTitle>
-        <p className="text-sm text-muted">Write the notes for this day and save. This page stands alone.</p>
+        <p className="text-sm text-muted">Count the notes for this day. Saving stays on this page only.</p>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        <div className="rounded-lg bg-bg-warm px-3 py-3">
-          <div className="text-xs font-medium text-muted">Counted</div>
-          <div className="mt-1 font-display text-xl font-semibold tabular">{money(counted)}</div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-lg bg-bg-warm px-3 py-3">
+            <div className="text-xs font-medium text-muted">Cash closing</div>
+            <div className="mt-1 font-display text-xl font-semibold tabular">{money(closing)}</div>
+            <p className="mt-1 text-xs text-muted">From the daily report. Not changed by this count.</p>
+          </div>
+          <div className="rounded-lg bg-bg-warm px-3 py-3">
+            <div className="text-xs font-medium text-muted">Counted</div>
+            <div className="mt-1 font-display text-xl font-semibold tabular">{money(counted)}</div>
+          </div>
         </div>
         <div className="overflow-hidden rounded-lg border border-border">
           {CASH_NOTES.map((note) => {
