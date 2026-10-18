@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { createFileRoute } from "@tanstack/react-router";
-import { Pencil, Search, Trash2, Lock, LockOpen, RefreshCw, Download } from "lucide-react";
+import { Pencil, Search, Trash2, Lock, LockOpen, Download } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,9 +30,7 @@ import { openingForMonth } from "@/lib/month-opening";
 import { buildBackupFile, downloadBackupJson } from "@/lib/backup";
 import { canWrite } from "@/lib/roles";
 import type { GuestEntry } from "@/lib/types";
-import { requestCloudPullNow } from "@/lib/supabase-sync";
 import { SaveCube, useAccountSave } from "@/components/save-cube";
-import { AccountWriteFix } from "@/components/account-write-fix";
 
 export const Route = createFileRoute("/register")({ component: RegisterPage });
 
@@ -113,7 +111,6 @@ function RegisterPage() {
 
   return (
     <div className="flex flex-col gap-5">
-        <AccountWriteFix />
         <MonthBooks />
         <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
@@ -228,17 +225,6 @@ function RegisterPage() {
               Lock
             </Button>
           )}
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => {
-              requestCloudPullNow();
-              toast.message("Checking the other desk…");
-            }}
-          >
-            <RefreshCw className="size-4" />
-            Refresh
-          </Button>
           <ReportsLink view="daily" label="Reports" />
         </div>
         </div>

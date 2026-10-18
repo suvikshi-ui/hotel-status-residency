@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   Banknote,
@@ -11,7 +11,6 @@ import {
   FileText,
   Landmark,
   Layers,
-  LogOut,
   MessageSquareWarning,
   Phone,
   Receipt,
@@ -19,14 +18,10 @@ import {
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 import { DateNav } from "@/components/date-nav";
 import { HotelLogo } from "@/components/hotel-logo";
 import { useLedger } from "@/lib/store";
 import { canOpenPath } from "@/lib/roles";
-import { useStaffSession } from "@/lib/supabase-auth";
-import { useCloudSync } from "@/lib/supabase-sync";
-import { isSupabaseConfigured } from "@/lib/supabase-config";
 import { ReminderPopup } from "@/components/reminder-popup";
 
 const NAV = [
@@ -49,11 +44,8 @@ const NAV = [
 
 function NavLinks({ onDark = false }: { onDark?: boolean }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const { user } = useStaffSession();
-  const role = user?.role ?? "admin";
-  const items = NAV.filter((item) => canOpenPath(role, item.to)).map((item) =>
-    role === "owner" ? { ...item, group: "Owner" } : item,
-  );
+  const role = "admin" as const;
+  const items = NAV.filter((item) => canOpenPath(role, item.to));
   return (
     <nav className="nav-scroll flex items-center gap-1" aria-label="Pages">
       {items.map((item, index) => {
@@ -112,25 +104,6 @@ function TopLink({
 
 export function AppShell({ children }: { children: ReactNode }) {
   const hotel = useLedger((s) => s.hotel);
-  const { user, signOut } = useStaffSession();
-  const cloud = useCloudSync();
-  const [leaving, setLeaving] = useState(false);
-  const saved = !isSupabaseConfigured()
-    ? "On this computer"
-    : cloud.phase === "saving"
-      ? "Saving…"
-      : cloud.phase === "error"
-        ? "Not saved"
-        : cloud.phase === "loading"
-          ? "Loading…"
-          : cloud.phase === "missing-schema"
-            ? "Not in account"
-            : "Saved";
-
-  function onSignOut() {
-    setLeaving(true);
-    void signOut().catch(() => setLeaving(false));
-  }
 
   return (
     <div className="min-h-dvh text-[#1b2e28]">
@@ -143,29 +116,12 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <div className="truncate font-display text-base font-semibold leading-tight">
                   {hotel.name}
                 </div>
-                <div
-                  className={cn(
-                    "truncate text-[11px] font-semibold uppercase tracking-[0.12em]",
-                    cloud.phase === "error" ? "text-[#ffd0c8]" : "text-[#d7efe4]",
-                  )}
-                >
-                  {saved}
+                <div className="truncate text-[11px] font-semibold uppercase tracking-[0.12em] text-[#d7efe4]">
+                  On this computer
                 </div>
               </div>
             </div>
             <DateNav light />
-            {user ? (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="shrink-0 !text-[#f4faf6] hover:!bg-white/12"
-                aria-label={leaving ? "Signing out" : "Sign out"}
-                onClick={onSignOut}
-                disabled={leaving}
-              >
-                <LogOut className="size-4" />
-              </Button>
-            ) : null}
           </div>
           <div className="border-t border-white/15 px-3 pb-2 md:px-6">
             <NavLinks onDark />

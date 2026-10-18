@@ -2,29 +2,10 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
-  useState,
   type ReactNode,
 } from "react";
-import type { Session, User } from "@supabase/supabase-js";
-import { roleFromUsersTable } from "./user-role";
-import { isSupabaseConfigured } from "./supabase-config";
-import { getSupabase } from "./supabase";
-import { setLedgerOwner } from "./store";
-import { stopCloudSync } from "./supabase-sync";
-import {
-  ensurePublicUser,
-  fetchHotelOwnerId,
-  fetchPublicUser,
-  loginHotelUser,
-} from "./hotel-users";
-import { loginIsEmail, normalizeUsername, usernameToEmail } from "./hotel-login";
-import {
-  authEventReloadsBooks,
-  sameStaffUser,
-  type StaffUser,
-} from "./staff-user";
+import type { StaffUser } from "./staff-user";
 
 export type { StaffUser } from "./staff-user";
 
@@ -42,183 +23,27 @@ type AuthCtx = {
 };
 
 const Ctx = createContext<AuthCtx | null>(null);
-
-function metaOwnerId(user: User) {
-  const meta = user.user_metadata ?? {};
-  const raw = meta.owner_id;
-  return typeof raw === "string" && raw.length > 8 ? raw : null;
-}
-
-function toStaff(user: User | null): StaffUser | null {
-  if (!user) return null;
-  const meta = user.user_metadata ?? {};
-  const name =
-    (typeof meta.full_name === "string" && meta.full_name) ||
-    (typeof meta.name === "string" && meta.name) ||
-    null;
-  const username =
-    (typeof meta.username === "string" && meta.username) || null;
-  const ownerId = metaOwnerId(user) || user.id;
-  return {
-    id: user.id,
-    email: user.email ?? null,
-    name,
-    username,
-    role: "admin",
-    ownerId,
-  };
-}
-
-async function staffFromDb(user: User | null): Promise<StaffUser | null> {
-  const base = toStaff(user);
-  if (!base) return null;
-  const hotelOwner = await fetchHotelOwnerId().catch(() => null);
-  try {
-    const row = await fetchPublicUser(base.id);
-    if (row) {
-      const role = roleFromUsersTable(row.role);
-      const linked =
-        row.ownerId && row.ownerId !== row.id ? row.ownerId : null;
-      return {
-        ...base,
-        name: row.name || base.name,
-        username: row.username || base.username,
-        role,
-        ownerId: hotelOwner || linked || base.ownerId || base.id,
-      };
-    }
-  } catch {
-    /* keep JWT / hotel owner link */
-  }
-  if (hotelOwner || base.ownerId !== base.id) {
-    return { ...base, ownerId: hotelOwner || base.ownerId };
-  }
-  try {
-    await ensurePublicUser({
-      id: base.id,
-      ownerId: base.id,
-      name: base.name ?? "",
-      username: base.username,
-      role: "admin",
-    });
-  } catch {
-    /* ignore */
-  }
-  return { ...base, role: "admin", ownerId: hotelOwner || base.id };
-}
-
-function friendlyAuthError(message: string) {
-  const m = message.toLowerCase();
-  if (m.includes("invalid login")) return "Wrong username or password.";
-  if (m.includes("not confirmed") || m.includes("email not confirmed")) {
-    return "This login is not confirmed yet. Ask Admin to run the confirm SQL, then try username and password again.";
-  }
-  if (m.includes("already registered") || m.includes("already been registered")) {
-    return "That username already has an account. Sign in instead.";
-  }
-  if (m.includes("password")) return message;
-  if (m.includes("not connected") || m.includes("not configured")) {
-    return "Supabase is not connected. Add the project ID and publishable key.";
-  }
-  return message || "Could not complete sign-in.";
-}
+const offline = (): Promise<never> =>
+  Promise.reject(new Error("This book is offline. There is no sign-in."));
 
 export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
-  const configured = isSupabaseConfigured();
-  const [user, setUser] = useState<StaffUser | null>(null);
-  const [isPending, setPending] = useState(configured);
-
-  useEffect(() => {
-    if (!configured) {
-      setUser(null);
-      setPending(false);
-      return;
-    }
-    const supabase = getSupabase();
-    let alive = true;
-
-    void supabase.auth.getSession().then(async ({ data }) => {
-      if (!alive) return;
-      const next = await staffFromDb(data.session?.user ?? null);
-      if (!alive) return;
-      setUser(next);
-      setPending(false);
-    });
-
-    const { data: sub } = supabase.auth.onAuthStateChange(
-      (event: string, session: Session | null) => {
-        if (!alive) return;
-        if (!authEventReloadsBooks(event)) return;
-        void staffFromDb(session?.user ?? null).then((next) => {
-          if (!alive) return;
-          setUser((prev) => (sameStaffUser(prev, next) ? prev : next));
-          setPending(false);
-        });
-      },
-    );
-
-    return () => {
-      alive = false;
-      sub.subscription.unsubscribe();
-    };
-  }, [configured]);
-
-  const signIn = useCallback(async (login: string, password: string) => {
-    if (!isSupabaseConfigured()) {
-      throw new Error(friendlyAuthError("not connected"));
-    }
-    const raw = login.trim();
-    const email = loginIsEmail(raw) ? raw.toLowerCase() : usernameToEmail(raw);
-    const { error } = await getSupabase().auth.signInWithPassword({
-      email,
-      password,
-    });
-    if (!error) return;
-    if (loginIsEmail(raw)) throw new Error(friendlyAuthError(error.message));
-    const row = await loginHotelUser(raw, password);
-    if (!row) throw new Error(friendlyAuthError(error.message));
-    const { error: again } = await getSupabase().auth.signInWithPassword({
-      email: usernameToEmail(row.username),
-      password,
-    });
-    if (again) throw new Error(friendlyAuthError(again.message));
-  }, []);
-
+  const signIn = useCallback((): Promise<void> => offline(), []);
   const signUp = useCallback(
-    async (login: string, password: string, name: string) => {
-      if (!isSupabaseConfigured()) {
-        throw new Error(friendlyAuthError("not connected"));
-      }
-      const raw = login.trim();
-      const email = loginIsEmail(raw) ? raw.toLowerCase() : usernameToEmail(raw);
-      const username = loginIsEmail(raw) ? normalizeUsername(raw.split("@")[0] ?? raw) : normalizeUsername(raw);
-      const { data, error } = await getSupabase().auth.signUp({
-        email,
-        password,
-        options: {
-          data: { full_name: name.trim(), username },
-        },
-      });
-      if (error) throw new Error(friendlyAuthError(error.message));
-      return data.session ? "session" : "confirm";
-    },
+    (): Promise<"session" | "confirm"> => offline(),
     [],
   );
-
-  const signOut = useCallback(async () => {
-    if (isSupabaseConfigured()) {
-      await getSupabase().auth.signOut();
-    }
-    stopCloudSync();
-    setUser(null);
-    await setLedgerOwner(null);
-  }, []);
-
+  const signOut = useCallback(async () => {}, []);
   const value = useMemo(
-    () => ({ user, isPending, configured, signIn, signUp, signOut }),
-    [user, isPending, configured, signIn, signUp, signOut],
+    () => ({
+      user: null,
+      isPending: false,
+      configured: false,
+      signIn,
+      signUp,
+      signOut,
+    }),
+    [signIn, signUp, signOut],
   );
-
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

@@ -1,12 +1,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { saveAccountNow } from "@/lib/supabase-sync";
-import { isSupabaseConfigured } from "@/lib/supabase-config";
-
-const OK_MSG = "Saved on the server.";
-const LOCAL_MSG = "Saved on this computer. The other desk is separate.";
-const FAIL_MSG = "Not saved on the server. This computer's data is unchanged.";
+import { flushBooksToDisk } from "@/lib/store";
 
 export function SaveCube({
   busy,
@@ -22,8 +17,8 @@ export function SaveCube({
       type="button"
       disabled={busy}
       onClick={onSave}
-      aria-label="Save to server"
-      title="Send this computer's books to the hotel account"
+      aria-label="Save on this computer"
+      title="Save this book on this computer"
     >
       {busy ? "Saving…" : "Save"}
     </Button>
@@ -36,13 +31,9 @@ export function useAccountSave() {
   async function saveToServer() {
     setBusy(true);
     try {
-      const result = await saveAccountNow();
-      if (result.ok) {
-        toast.success(isSupabaseConfigured() ? OK_MSG : LOCAL_MSG);
-        return true;
-      }
-      toast.error(result.message ? `${FAIL_MSG} ${result.message}` : FAIL_MSG);
-      return false;
+      flushBooksToDisk();
+      toast.success("Saved on this computer.");
+      return true;
     } finally {
       setBusy(false);
     }

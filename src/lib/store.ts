@@ -126,6 +126,11 @@ function flushLedgerDisk() {
   }
 }
 
+export function flushBooksToDisk() {
+  if (diskTimer) clearTimeout(diskTimer);
+  flushLedgerDisk();
+}
+
 const ledgerStorage = {
   getItem(name: string) {
     const raw = pendingRaw.get(name) ?? localStorage.getItem(name);
