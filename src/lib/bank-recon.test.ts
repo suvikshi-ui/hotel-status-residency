@@ -6,6 +6,7 @@ import {
   parseStatementText,
   reconcileBank,
   mergeBankBooks,
+  pkMovesForMonth,
 } from "./bank-recon.ts";
 import type { GuestEntry } from "./types.ts";
 
@@ -379,6 +380,62 @@ describe("bank recon", () => {
     );
     const merged = mergeBankBooks(local, cloud);
     assert.equal(merged.filter((row) => row.month === "2026-09").length, 2);
+  });
+
+  it("lists only that month's P.K. QR in and out", () => {
+    const moves = pkMovesForMonth({
+      month: "2026-10",
+      guests: [
+        {
+          id: "g",
+          date: "2026-10-02",
+          slNo: 1,
+          name: "Ravi",
+          roomNo: "101",
+          mode: "QRPK",
+          amount: 1500,
+          payRefNo: "UPI1",
+        },
+        {
+          id: "cash",
+          date: "2026-10-02",
+          slNo: 2,
+          name: "Cash guest",
+          roomNo: "102",
+          mode: "CASH",
+          amount: 800,
+        },
+      ],
+      food: [{ id: "f", date: "2026-10-03", mode: "QRPK", amount: 200, payRef: "" }],
+      expenses: [
+        {
+          id: "e",
+          date: "2026-10-04",
+          mode: "QRPK",
+          amount: 900,
+          particular: "Electricity bill",
+          payRef: "UPI9",
+        },
+        {
+          id: "old",
+          date: "2026-09-04",
+          mode: "QRPK",
+          amount: 100,
+          particular: "Old",
+        },
+      ],
+      receipts: [
+        { id: "list", date: "2026-10-01", mode: "QRPK", amount: 50, particular: "Note", kind: "list" },
+      ],
+    });
+    assert.deepEqual(
+      moves.map((row) => [row.kind, row.side, row.amount, row.ref]),
+      [
+        ["guest", "in", 1500, "UPI1"],
+        ["food", "in", 200, ""],
+        ["expense", "out", 900, "UPI9"],
+      ],
+    );
   });
 
   it("pulls UPI/IMPS numbers out of narration", () => {

@@ -13,13 +13,16 @@ import {
   downloadBankStatementPdf,
   mergeBankRows,
   parseStatementText,
+  pkMovesForMonth,
   reconcileBank,
   type BankRow,
 } from "@/lib/bank-recon";
 import { formatDayShort, money } from "@/lib/format";
 import { englishNarration } from "@/lib/english-narration";
+import { isDayLocked } from "@/lib/register-lock";
 import { useLedger } from "@/lib/store";
 import { canWrite } from "@/lib/roles";
+import { GuardedPkRef } from "@/components/pk-ref";
 
 export const Route = createFileRoute("/bank-recon")({
   component: BankReconPage,
@@ -34,6 +37,8 @@ function BankReconPage() {
   const receipts = useLedger((s) => s.balReceived);
   const bankRows = useLedger((s) => s.bankRows);
   const setBankRows = useLedger((s) => s.setBankRows);
+  const setLineRef = useLedger((s) => s.setLineRef);
+  const lockedDates = useLedger((s) => s.lockedDates);
   const setDate = useLedger((s) => s.setDate);
   const { busy: saving, saveToServer } = useAccountSave();
   const write = canWrite(useLedger((s) => s.appRole));
@@ -68,6 +73,12 @@ function BankReconPage() {
     () => reconcileBank(monthRows, guests, { food, wholesale, expenses, receipts }),
     [monthRows, guests, food, wholesale, expenses, receipts],
   );
+  const pkMoves = useMemo(
+    () => pkMovesForMonth({ month, guests, food, wholesale, expenses, receipts }),
+    [month, guests, food, wholesale, expenses, receipts],
+  );
+  const pkIn = pkMoves.filter((row) => row.side === "in").reduce((sum, row) => sum + row.amount, 0);
+  const pkOut = pkMoves.filter((row) => row.side === "out").reduce((sum, row) => sum + row.amount, 0);
 
   function applyParsed(parsed: BankRow[]) {
     if (!parsed.length) {
@@ -212,25 +223,95 @@ function BankReconPage() {
         </div>
       </div>
 
-      {months.length ? (
-        <div className="flex flex-wrap gap-2">
-          {months.map((key) => {
-            const d = parseISO(`${key}-01`);
-            const label = isValid(d) ? format(d, "MMMM yyyy") : key;
-            return (
-              <Button
-                key={key}
-                type="button"
-                size="sm"
-                variant={key === month ? "default" : "outline"}
-                onClick={() => setPicked(key)}
-              >
-                {label}
-              </Button>
-            );
-          })}
-        </div>
-      ) : null}
+      <div className="flex flex-wrap gap-2">
+        {months.map((key) => {
+          const d = parseISO(`${key}-01`);
+          const label = isValid(d) ? format(d, "MMMM yyyy") : key;
+          return (
+            <Button
+              key={key}
+              type="button"
+              size="sm"
+              variant={key === month ? "default" : "outline"}
+              onClick={() => setPicked(key)}
+            >
+              {label}
+            </Button>
+          );
+        })}
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={() => document.getElementById("pk-qr")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+        >
+          P.K. QR
+        </Button>
+      </div>
+
+      <Card id="pk-qr">
+        <CardHeader>
+          <CardTitle>P.K. QR · {monthLabel}</CardTitle>
+          <p className="text-sm text-muted">
+            Every payment in and out through P.K. QR this month. A reference saved here is the same reference on the register. It does not change the amount.
+          </p>
+        </CardHeader>
+        <CardContent className="overflow-x-auto p-0">
+          <table className="w-full min-w-[48rem] text-left text-sm">
+            <thead className="text-xs uppercase tracking-wide text-muted">
+              <tr className="border-y border-border bg-bg-warm/50">
+                <th className="px-5 py-2 font-medium">Date</th>
+                <th className="px-3 py-2 font-medium">Name</th>
+                <th className="px-3 py-2 font-medium">Reason</th>
+                <th className="px-3 py-2 text-right font-medium">In</th>
+                <th className="px-3 py-2 text-right font-medium">Out</th>
+                <th className="px-3 py-2 font-medium">Reference number</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pkMoves.map((row) => (
+                <tr key={`${row.kind}-${row.id}`} className="border-b border-border/70">
+                  <td className="px-5 py-2.5 tabular">{formatDayShort(row.date)}</td>
+                  <td className="px-3 py-2.5 font-medium">{row.name || "—"}</td>
+                  <td className="px-3 py-2.5">{englishNarration(row.reason) || row.reason}</td>
+                  <td className="px-3 py-2.5 text-right tabular">
+                    {row.side === "in" ? money(row.amount) : "—"}
+                  </td>
+                  <td className="px-3 py-2.5 text-right tabular">
+                    {row.side === "out" ? money(row.amount) : "—"}
+                  </td>
+                  <td className="px-3 py-2.5">
+                    {write ? (
+                      <GuardedPkRef
+                        locked={isDayLocked(lockedDates, row.date)}
+                        value={row.ref}
+                        onSave={(ref, bypass) =>
+                          setLineRef(row.kind, row.id, ref, bypass ? { bypass: true } : undefined)
+                        }
+                      />
+                    ) : (
+                      <span className="text-sm tabular">{row.ref || "—"}</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t border-border bg-bg-warm/50 font-semibold">
+                <td className="px-5 py-2.5" colSpan={3}>
+                  {monthLabel} total
+                </td>
+                <td className="px-3 py-2.5 text-right tabular">{money(pkIn)}</td>
+                <td className="px-3 py-2.5 text-right tabular">{money(pkOut)}</td>
+                <td />
+              </tr>
+            </tfoot>
+          </table>
+          {pkMoves.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted">No P.K. QR payments this month.</p>
+          ) : null}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

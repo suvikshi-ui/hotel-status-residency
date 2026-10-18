@@ -1,5 +1,5 @@
 import { uid } from "./format.ts";
-import type { GuestEntry, NamedAmount, PayMode } from "./types";
+import type { GuestEntry, ModeAmount, NamedAmount, PayMode } from "./types";
 
 export interface BankRow {
   id: string;
@@ -231,6 +231,103 @@ export function officeHitsFromBooks(input: {
     });
   }
   return out;
+}
+
+export type PkRefKind = "guest" | "food" | "wholesale" | "expense" | "receipt";
+
+export interface PkMove {
+  id: string;
+  date: string;
+  side: "in" | "out";
+  kind: PkRefKind;
+  name: string;
+  reason: string;
+  amount: number;
+  ref: string;
+}
+
+/** Every P.K. QR receipt and payment in one month. The list is only a view. */
+export function pkMovesForMonth(input: {
+  month: string;
+  guests: GuestEntry[];
+  food?: ModeAmount[];
+  wholesale?: ModeAmount[];
+  expenses?: NamedAmount[];
+  receipts?: NamedAmount[];
+}): PkMove[] {
+  const month = input.month;
+  const moves: PkMove[] = [];
+  const inMonth = (date: string) => date.slice(0, 7) === month;
+  for (const guest of input.guests) {
+    if (guest.mode !== "QRPK" || !inMonth(guest.date)) continue;
+    moves.push({
+      id: guest.id,
+      date: guest.date,
+      side: "in",
+      kind: "guest",
+      name: asText(guest.name),
+      reason: "Room rent",
+      amount: guest.amount,
+      ref: asText(guest.payRefNo),
+    });
+  }
+  for (const row of input.food ?? []) {
+    if (row.mode !== "QRPK" || !inMonth(row.date)) continue;
+    moves.push({
+      id: row.id,
+      date: row.date,
+      side: "in",
+      kind: "food",
+      name: "Food",
+      reason: "Food bill",
+      amount: row.amount,
+      ref: asText(row.payRef),
+    });
+  }
+  for (const row of input.wholesale ?? []) {
+    if (row.mode !== "QRPK" || !inMonth(row.date)) continue;
+    moves.push({
+      id: row.id,
+      date: row.date,
+      side: "in",
+      kind: "wholesale",
+      name: "WS",
+      reason: "WS",
+      amount: row.amount,
+      ref: asText(row.payRef),
+    });
+  }
+  for (const row of input.receipts ?? []) {
+    if (row.mode !== "QRPK" || row.kind === "list" || !inMonth(row.date)) continue;
+    moves.push({
+      id: row.id,
+      date: row.date,
+      side: "in",
+      kind: "receipt",
+      name: asText(row.particular),
+      reason: row.kind === "ota" ? "OTA received" : "Balance received",
+      amount: row.amount,
+      ref: asText(row.payRef),
+    });
+  }
+  for (const row of input.expenses ?? []) {
+    if (row.mode !== "QRPK" || !inMonth(row.date)) continue;
+    moves.push({
+      id: row.id,
+      date: row.date,
+      side: "out",
+      kind: "expense",
+      name: "Expense",
+      reason: asText(row.particular) || "Expense",
+      amount: row.amount,
+      ref: asText(row.payRef),
+    });
+  }
+  return moves.sort((a, b) => {
+    if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+    if (a.side !== b.side) return a.side === "in" ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
 }
 
 export function reconcileBank(
