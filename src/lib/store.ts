@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
 import seedJson from "@/data/seed.json";
 import type {
   AdvanceRow,
@@ -74,11 +74,15 @@ import {
   type MonthArchive,
 } from "./month-archive";
 
+import { isSupabaseConfigured } from "./supabase-config";
+
 function afterSave() {
+  if (!isSupabaseConfigured()) return;
   void import("./supabase-sync").then((m) => m.requestCloudSave());
 }
 
 function afterLockChange() {
+  if (!isSupabaseConfigured()) return;
   void import("./supabase-sync").then((m) => {
     m.markLocksDirty();
     m.requestCloudSaveNow();
@@ -86,6 +90,7 @@ function afterLockChange() {
 }
 
 function afterOpeningChange() {
+  if (!isSupabaseConfigured()) return;
   void import("./supabase-sync").then((m) => m.requestCloudSaveNow());
 }
 
@@ -96,6 +101,43 @@ export const LAST_SEEDED = "2026-09-09";
 export const DEFAULT_DATE = todayIso();
 export const LEDGER_STORAGE_KEY = "status-ledger-v6";
 const LEGACY_STORAGE_KEYS = ["status-ledger-v5", "status-ledger-v4"];
+
+const pendingDisk = new Map<string, string>();
+let diskTimer: ReturnType<typeof setTimeout> | null = null;
+
+function flushLedgerDisk() {
+  diskTimer = null;
+  for (const [key, value] of pendingDisk) {
+    try {
+      localStorage.setItem(key, value);
+    } catch {
+      /* keep the latest copy in memory */
+    }
+    pendingDisk.delete(key);
+  }
+}
+
+const ledgerDisk = {
+  getItem(name: string) {
+    return pendingDisk.get(name) ?? localStorage.getItem(name);
+  },
+  setItem(name: string, value: string) {
+    pendingDisk.set(name, value);
+    if (diskTimer) clearTimeout(diskTimer);
+    diskTimer = setTimeout(flushLedgerDisk, 180);
+  },
+  removeItem(name: string) {
+    pendingDisk.delete(name);
+    localStorage.removeItem(name);
+  },
+};
+
+if (typeof window !== "undefined") {
+  window.addEventListener("pagehide", flushLedgerDisk);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") flushLedgerDisk();
+  });
+}
 
 export interface LedgerState {
   hotel: HotelInfo;
@@ -674,6 +716,13 @@ export const useLedger = create<LedgerState>()(
       return {
       ...seedState(),
       setDate: (date) => {
+        if (!date || get().selectedDate === date) return;
+        const days = get().days;
+        const known = days.some((day) => day.date === date);
+        if (known) {
+          set({ selectedDate: date });
+          return;
+        }
         const next = { ...get(), selectedDate: date };
         save({ selectedDate: date, ...rebuildFrom(next, date) });
       },
@@ -1190,6 +1239,7 @@ export const useLedger = create<LedgerState>()(
     },
     {
       name: LEDGER_STORAGE_KEY,
+      storage: createJSONStorage(() => ledgerDisk),
       skipHydration: true,
       partialize: (s) => ({
         hotel: s.hotel,
@@ -1205,7 +1255,6 @@ export const useLedger = create<LedgerState>()(
         wholesale: s.wholesale,
         expenses: s.expenses,
         balReceived: s.balReceived,
-        days: s.days,
         selectedDate: s.selectedDate,
         dirty: s.dirty,
         advances: s.advances,

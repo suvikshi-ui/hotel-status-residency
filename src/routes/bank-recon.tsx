@@ -11,6 +11,7 @@ import { useGate } from "@/components/security-gate";
 import {
   bankRowsFromPdf,
   downloadBankStatementPdf,
+  downloadPkQrPdf,
   mergeBankRows,
   parseStatementText,
   pkMovesForMonth,
@@ -150,6 +151,28 @@ function BankReconPage() {
     });
   }
 
+  async function downloadPk() {
+    if (!pkMoves.length) {
+      toast.error("No P.K. QR payments this month");
+      return;
+    }
+    await downloadPkQrPdf({
+      title: `P.K. QR · ${monthLabel}`,
+      fileName: `pk-qr-${month}.pdf`,
+      lines: pkMoves.map((row) => ({
+        date:
+          row.to && row.to !== row.date
+            ? `${formatDayShort(row.date)} – ${formatDayShort(row.to)}`
+            : formatDayShort(row.date),
+        name: row.name || "—",
+        reason: englishNarration(row.reason) || row.reason || "—",
+        inn: row.side === "in" ? Math.round(row.amount).toLocaleString("en-IN") : "—",
+        out: row.side === "out" ? Math.round(row.amount).toLocaleString("en-IN") : "—",
+        ref: row.ref || "—",
+      })),
+    });
+  }
+
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -212,6 +235,15 @@ function BankReconPage() {
             <Download className="size-4" />
             Download
           </Button>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={!pkMoves.length || busy}
+            onClick={() => void downloadPk()}
+          >
+            <Download className="size-4" />
+            Download P.K. QR
+          </Button>
           {write ? (
           <SaveCube
             busy={saving}
@@ -224,6 +256,7 @@ function BankReconPage() {
         </div>
       </div>
 
+      {months.length ? (
       <div className="flex flex-wrap gap-2">
         {months.map((key) => {
           const d = parseISO(`${key}-01`);
@@ -240,15 +273,8 @@ function BankReconPage() {
             </Button>
           );
         })}
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={() => document.getElementById("pk-qr")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-        >
-          P.K. QR
-        </Button>
       </div>
+      ) : null}
 
       <Card id="pk-qr">
         <CardHeader>
