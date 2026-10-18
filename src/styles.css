@@ -93,8 +93,9 @@
   }
 }
 
-.tabular {
-  font-variant-numeric: tabular-nums;
+.bank-row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 40px;
 }
 
 .liquid-glass,

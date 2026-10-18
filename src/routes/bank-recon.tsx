@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { format, parseISO, isValid } from "date-fns";
 import { Download, Landmark, Upload } from "lucide-react";
@@ -49,6 +49,7 @@ function BankReconPage() {
   const [busy, setBusy] = useState(false);
   const [password, setPassword] = useState("");
   const [picked, setPicked] = useState<string | null>(null);
+  const [journalReady, setJournalReady] = useState(false);
   const months = useMemo(
     () =>
       [...new Set(bankRows.map((row) => row.month))]
@@ -71,13 +72,35 @@ function BankReconPage() {
     () => bankRows.filter((r) => r.month === month),
     [bankRows, month],
   );
-  const lines = useMemo(
-    () => reconcileBank(monthRows, guests, { food, wholesale, expenses, receipts }),
-    [monthRows, guests, food, wholesale, expenses, receipts],
-  );
+  useEffect(() => {
+    setJournalReady(false);
+    const id = window.setTimeout(() => setJournalReady(true), 20);
+    return () => window.clearTimeout(id);
+  }, [month, monthRows]);
+  const lines = useMemo(() => {
+    if (!journalReady) return [];
+    return reconcileBank(monthRows, guests, { food, wholesale, expenses, receipts }).map(
+      (line) => ({
+        ...line,
+        narr: englishNarration(line.bank.particular) || "—",
+        why: line.office?.reason ? englishNarration(line.office.reason) : "—",
+      }),
+    );
+  }, [journalReady, monthRows, guests, food, wholesale, expenses, receipts]);
   const pkMoves = useMemo(
-    () => pkMovesForMonth({ month, guests, food, wholesale, expenses, receipts }),
-    [month, guests, food, wholesale, expenses, receipts],
+    () =>
+      pkMovesForMonth({ month, guests, food, wholesale, expenses, receipts }).map((row) => ({
+        ...row,
+        reasonText: englishNarration(row.reason) || row.reason,
+        locked:
+          row.kind === "guest"
+            ? [...stayChunkIds(guests, row.id)].some((id) => {
+                const guest = guests.find((item) => item.id === id);
+                return guest ? isDayLocked(lockedDates, guest.date) : false;
+              })
+            : isDayLocked(lockedDates, row.date),
+      })),
+    [month, guests, food, wholesale, expenses, receipts, lockedDates],
   );
   const pkIn = pkMoves.filter((row) => row.side === "in").reduce((sum, row) => sum + row.amount, 0);
   const pkOut = pkMoves.filter((row) => row.side === "out").reduce((sum, row) => sum + row.amount, 0);
@@ -304,7 +327,7 @@ function BankReconPage() {
                       : formatDayShort(row.date)}
                   </td>
                   <td className="px-3 py-2.5 font-medium">{row.name || "—"}</td>
-                  <td className="px-3 py-2.5">{englishNarration(row.reason) || row.reason}</td>
+                  <td className="px-3 py-2.5">{row.reasonText}</td>
                   <td className="px-3 py-2.5 text-right tabular">
                     {row.side === "in" ? money(row.amount) : "—"}
                   </td>
@@ -314,15 +337,7 @@ function BankReconPage() {
                   <td className="px-3 py-2.5">
                     {write ? (
                       <GuardedPkRef
-                        locked={
-                          row.kind === "guest"
-                            ? guests.some(
-                                (g) =>
-                                  stayChunkIds(guests, row.id).has(g.id) &&
-                                  isDayLocked(lockedDates, g.date),
-                              )
-                            : isDayLocked(lockedDates, row.date)
-                        }
+                        locked={row.locked}
                         value={row.ref}
                         onSave={(ref, bypass) =>
                           setLineRef(row.kind, row.id, ref, bypass ? { bypass: true } : undefined)
@@ -385,12 +400,12 @@ function BankReconPage() {
             </thead>
             <tbody>
               {lines.map((line) => (
-                <tr key={line.bank.id} className="border-b border-border/70">
+                <tr key={line.bank.id} className="bank-row border-b border-border/70">
                   <td className="px-5 py-2.5 tabular">
                     {line.bank.dateRaw || "—"}
                   </td>
                   <td className="px-3 py-2.5">
-                    {englishNarration(line.bank.particular) || "—"}
+                    {line.narr}
                   </td>
                   <td className="px-3 py-2.5 font-mono text-xs">
                     {line.bank.ref || "—"}
@@ -410,7 +425,7 @@ function BankReconPage() {
                         {line.office.name}
                       </td>
                       <td className="px-3 py-2.5 text-muted">
-                        {line.office.reason ? englishNarration(line.office.reason) : "—"}
+                        {line.why}
                       </td>
                     </>
                   ) : (
@@ -426,6 +441,8 @@ function BankReconPage() {
             <p className="py-10 text-center text-sm text-muted">
               Upload a statement to fill this chart.
             </p>
+          ) : !journalReady ? (
+            <p className="py-6 text-center text-sm text-muted">Opening statement…</p>
           ) : null}
         </CardContent>
       </Card>

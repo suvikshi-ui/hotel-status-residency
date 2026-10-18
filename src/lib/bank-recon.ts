@@ -398,11 +398,48 @@ export function reconcileBank(
   },
 ): ReconLine[] {
   const offices = officeHitsFromBooks({ guests, ...extra });
+  const byRef = new Map<string, OfficeHit[]>();
+  for (const office of offices) {
+    const key = normalizeRef(office.ref);
+    if (key.length < 4) continue;
+    const list = byRef.get(key) ?? [];
+    list.push(office);
+    byRef.set(key, list);
+    const digits = key.replace(/\D/g, "");
+    if (digits.length >= 8 && digits !== key) {
+      const more = byRef.get(digits) ?? [];
+      more.push(office);
+      byRef.set(digits, more);
+    }
+  }
   const used = new Set<string>();
-  return bankRows.map((bank) => {
-    const office = pickOffice(bank, offices, used);
-    return { bank, office };
-  });
+  return bankRows.map((bank) => ({
+    bank,
+    office: matchBankOffice(bank, offices, byRef, used),
+  }));
+}
+
+function matchBankOffice(
+  bank: BankRow,
+  offices: OfficeHit[],
+  byRef: Map<string, OfficeHit[]>,
+  used: Set<string>,
+): OfficeHit | null {
+  const printed = asText(bank.ref) || cellByHeader(bank, REF_HEAD);
+  if (!isZeroRef(printed)) {
+    const key = normalizeRef(printed);
+    const bucket = byRef.get(key) ?? byRef.get(key.replace(/\D/g, "")) ?? [];
+    const hits = bucket.filter(
+      (office) => !used.has(normalizeRef(office.ref)) && refsMatch(printed, office.ref),
+    );
+    const picked = keepOffice(hits);
+    if (picked) {
+      used.add(key);
+      for (const hit of hits) used.add(normalizeRef(hit.ref));
+      return picked;
+    }
+  }
+  return pickOffice(bank, offices, used);
 }
 
 function isZeroRef(value: string) {

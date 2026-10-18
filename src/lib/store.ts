@@ -733,9 +733,14 @@ function withBooks(state: LedgerState): LedgerState {
 export const useLedger = create<LedgerState>()(
   persist(
     (set, get) => {
-      const save: typeof set = ((...args: Parameters<typeof set>) => {
-        set(...args);
-        set({ savedAt: Date.now() });
+      const save: typeof set = ((partial) => {
+        set((state) => ({
+          ...state,
+          ...(typeof partial === "function"
+            ? (partial as (s: LedgerState) => Partial<LedgerState>)(state)
+            : partial),
+          savedAt: Date.now(),
+        }));
         afterSave();
       }) as typeof set;
       return {
@@ -959,9 +964,7 @@ export const useLedger = create<LedgerState>()(
           );
           if (locked && !opts?.bypass) return;
           const guests = applyGuestPatch(get().guests, id, { payRefNo: value });
-          const row = guests.find((g) => g.id === id);
-          const next = { ...get(), guests };
-          save({ guests, ...rebuildFrom(next, row?.date ?? get().selectedDate) });
+          save({ guests });
           return;
         }
         const key =
@@ -977,9 +980,7 @@ export const useLedger = create<LedgerState>()(
         const rows = get()[key].map((row) =>
           row.id === id ? { ...row, payRef: value } : row,
         );
-        const row = rows.find((item) => item.id === id);
-        const next = { ...get(), [key]: rows };
-        save({ [key]: rows, ...rebuildFrom(next, row?.date ?? get().selectedDate) });
+        save({ [key]: rows });
       },
       restoreSeed: () => {
         const s = seedState();
