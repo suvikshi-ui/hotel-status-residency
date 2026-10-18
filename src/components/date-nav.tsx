@@ -39,7 +39,7 @@ export function DateNav({ light = false }: { light?: boolean }) {
         <ChevronLeft className="size-5" />
       </Button>
       <div className="min-w-[10.5rem] text-center">
-        <div className="font-display text-sm font-semibold leading-tight tracking-tight sm:text-base">
+        <div className="text-[15px] font-bold leading-tight tracking-[-0.02em] text-[#fffaf3] sm:text-base">
           {formatDay(date)}
         </div>
       </div>
