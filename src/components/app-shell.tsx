@@ -55,7 +55,7 @@ function NavLinks({ onDark = false }: { onDark?: boolean }) {
         return (
           <span key={item.to} className="contents">
             {groupBreak ? (
-              <span className="mx-1.5 size-1 shrink-0 rounded-full bg-[#f4c430]/80" aria-hidden />
+              <span className="mx-1 h-6 w-px shrink-0 bg-[#1b2e28]/20" aria-hidden />
             ) : null}
             <TopLink to={item.to} active={active} onDark={onDark}>
               <Icon className="size-4 shrink-0" />
@@ -89,11 +89,11 @@ function TopLink({
       to={to as "/"}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "flex h-10 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[15px] font-semibold tracking-[-0.01em]",
+        "flex h-11 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-semibold",
         active
-          ? "bg-[#f4c430] text-[#1b332a] shadow-[0_1px_0_rgba(255,255,255,0.35)]"
+          ? "bg-[#f4faf6] text-[#1b3f32]"
           : onDark
-            ? "text-[#f7f3ea] hover:bg-white/10"
+            ? "text-[#f4faf6] hover:bg-white/12"
             : "text-fg hover:bg-bg-warm",
       )}
     >
@@ -113,17 +113,17 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div className="flex min-w-0 flex-1 items-center gap-2">
               <HotelLogo mark className="logo-3d h-11 w-auto shrink-0" />
               <div className="min-w-0">
-                <div className="truncate text-[17px] font-bold leading-tight tracking-[-0.03em] text-[#fffaf3]">
+                <div className="truncate font-display text-base font-semibold leading-tight">
                   {hotel.name}
                 </div>
-                <div className="truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-[#f4c430]">
+                <div className="truncate text-[11px] font-semibold uppercase tracking-[0.12em] text-[#d7efe4]">
                   On this computer
                 </div>
               </div>
             </div>
             <DateNav light />
           </div>
-          <div className="border-t border-[#f4c430]/25 px-2 py-2 md:px-5">
+          <div className="border-t border-white/15 px-3 pb-2 md:px-6">
             <NavLinks onDark />
           </div>
         </header>
