@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { createJSONStorage, persist } from "zustand/middleware";
+import { persist } from "zustand/middleware";
 import seedJson from "@/data/seed.json";
 import type {
   AdvanceRow,
@@ -102,40 +102,60 @@ export const DEFAULT_DATE = todayIso();
 export const LEDGER_STORAGE_KEY = "status-ledger-v6";
 const LEGACY_STORAGE_KEYS = ["status-ledger-v5", "status-ledger-v4"];
 
-const pendingDisk = new Map<string, string>();
+const pendingObjects = new Map<string, { state: unknown; version?: number }>();
+const pendingRaw = new Map<string, string>();
 let diskTimer: ReturnType<typeof setTimeout> | null = null;
 
 function flushLedgerDisk() {
   diskTimer = null;
-  for (const [key, value] of pendingDisk) {
+  for (const [key, value] of pendingObjects) {
+    let raw = "";
     try {
-      localStorage.setItem(key, value);
+      raw = JSON.stringify(value);
+    } catch {
+      pendingObjects.delete(key);
+      continue;
+    }
+    pendingRaw.set(key, raw);
+    try {
+      localStorage.setItem(key, raw);
     } catch {
       /* keep the latest copy in memory */
     }
-    pendingDisk.delete(key);
+    pendingObjects.delete(key);
   }
 }
 
-const ledgerDisk = {
+const ledgerStorage = {
   getItem(name: string) {
-    return pendingDisk.get(name) ?? localStorage.getItem(name);
+    const raw = pendingRaw.get(name) ?? localStorage.getItem(name);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw) as { state: unknown; version?: number };
+    } catch {
+      return null;
+    }
   },
-  setItem(name: string, value: string) {
-    pendingDisk.set(name, value);
+  setItem(name: string, value: { state: unknown; version?: number }) {
+    pendingObjects.set(name, value);
     if (diskTimer) clearTimeout(diskTimer);
-    diskTimer = setTimeout(flushLedgerDisk, 180);
+    diskTimer = setTimeout(flushLedgerDisk, 600);
   },
   removeItem(name: string) {
-    pendingDisk.delete(name);
+    pendingObjects.delete(name);
+    pendingRaw.delete(name);
     localStorage.removeItem(name);
   },
 };
 
 if (typeof window !== "undefined") {
-  window.addEventListener("pagehide", flushLedgerDisk);
+  const flushNow = () => {
+    if (diskTimer) clearTimeout(diskTimer);
+    flushLedgerDisk();
+  };
+  window.addEventListener("pagehide", flushNow);
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") flushLedgerDisk();
+    if (document.visibilityState === "hidden") flushNow();
   });
 }
 
@@ -1239,7 +1259,7 @@ export const useLedger = create<LedgerState>()(
     },
     {
       name: LEDGER_STORAGE_KEY,
-      storage: createJSONStorage(() => ledgerDisk),
+      storage: ledgerStorage,
       skipHydration: true,
       partialize: (s) => ({
         hotel: s.hotel,

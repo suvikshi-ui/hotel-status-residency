@@ -12,7 +12,7 @@ export function getRouter() {
   return createRouter({
     routeTree,
     basepath: routerBasepath(),
-    defaultPreload: false,
+    defaultPreload: "viewport",
     defaultErrorComponent: AppErrorComponent,
   });
 }
