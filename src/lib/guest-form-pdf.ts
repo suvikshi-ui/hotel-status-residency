@@ -1,22 +1,4 @@
-import { publicUrl } from "./public-url";
-
-const GREEN: [number, number, number] = [27, 51, 42];
-
-async function logoDataUrl() {
-  try {
-    const res = await fetch(publicUrl("logo.png?v=2"));
-    if (!res.ok) return null;
-    const blob = await res.blob();
-    return await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result));
-      reader.onerror = () => reject(reader.error);
-      reader.readAsDataURL(blob);
-    });
-  } catch {
-    return null;
-  }
-}
+import { paintPdfReportHead } from "./report-head";
 
 function line(pdf: import("jspdf").jsPDF, x: number, y: number, w: number) {
   pdf.setDrawColor(90, 98, 94);
@@ -40,35 +22,16 @@ export async function downloadGuestCheckinPdf() {
   pdf.setFillColor(255, 255, 255);
   pdf.rect(0, 0, 210, 297, "F");
 
-  const headH = 32;
-  pdf.setFillColor(...GREEN);
-  pdf.roundedRect(x, m, W, headH, 2, 2, "F");
-
-  const logo = await logoDataUrl();
-  if (logo) {
-    pdf.setFillColor(255, 255, 255);
-    pdf.roundedRect(x + 3, m + 4, 24, 24, 2, 2, "F");
-    try {
-      pdf.addImage(logo, "PNG", x + 4.2, m + 5.2, 21.6, 21.6);
-    } catch {
-      /* header still prints */
-    }
-  }
-
-  const tx = x + 32;
-  pdf.setTextColor(255, 255, 255);
-  pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(15);
-  pdf.text("Hotel Status Residency — Guest Check-in", tx, m + 12);
-  pdf.setFont("helvetica", "normal");
-  pdf.setFontSize(8.5);
-  pdf.text(
-    "PAP-595/596, TTC MIDC Mahape, Navi Mumbai 400701 · FabHotel Status Residency",
-    tx,
-    m + 18.5,
-  );
-  pdf.setFontSize(8);
-  pdf.text("Please fill in under 2 minutes", tx, m + 24);
+  const headH = 22;
+  await paintPdfReportHead(pdf, {
+    x,
+    y: m,
+    w: W,
+    h: headH,
+    hotel: "Hotel Status Residency",
+    blessing: "Shree Kateel Shree Durga Parameshwari Amma",
+    right: "Guest check-in",
+  });
 
   let y = m + headH + 12;
   pdf.setTextColor(70, 78, 74);

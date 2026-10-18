@@ -414,7 +414,8 @@ function InventoryBookPanel({ kind }: { kind: InventoryBook }) {
     printDocument({
       title: `${kind} inventory`,
       heading: hotel.name,
-      sub: `${hotel.place} · ${periodLabel(kind, openFile?.period ?? period)}`,
+      blessing: hotel.blessing,
+      sub: periodLabel(kind, openFile?.period ?? period),
       table: body,
     });
   }

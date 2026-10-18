@@ -161,7 +161,8 @@ function StaffPage() {
     printDocument({
       title: "Staff register",
       heading: hotel.name,
-      sub: `${hotel.place} · Staff register`,
+      blessing: hotel.blessing,
+      sub: "Staff register",
       table: body,
     });
   }
@@ -248,7 +249,8 @@ function StaffPage() {
     printDocument({
       title: `Salary of ${payName}`,
       heading: hotel.name,
-      sub: `${hotel.place} · Salary of ${payName} · Payment of ${payMonth}`,
+      blessing: hotel.blessing,
+      sub: `Salary of ${payName}`,
       table: body,
     });
   }
@@ -298,7 +300,8 @@ function StaffPage() {
     printDocument({
       title: "Advance sheet",
       heading: hotel.name,
-      sub: `${hotel.place} · Advance sheet · ${formatDay(date)}`,
+      blessing: hotel.blessing,
+      sub: `Advance · ${formatDay(date)}`,
       table: body,
     });
   }

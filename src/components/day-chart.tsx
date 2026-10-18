@@ -316,59 +316,48 @@ export function DayChart({
         border: "1px solid #e2d6c2",
       }}
     >
-      <div style={{ textAlign: "center", paddingBottom: 14, borderBottom: "1px solid #eadfcd" }}>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 12,
-          }}
-        >
-          <img src={publicUrl("logo.png?v=2")} alt="" style={{ height: 48, width: "auto" }} />
+      <div
+        className="daily-a4-head"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          margin: "-18px -20px 14px",
+          padding: "8px 12px",
+          background: "#1b332a",
+          color: "#f6f0e6",
+        }}
+      >
+        <img src={publicUrl("logo.png?v=2")} alt="" className="logo-3d" style={{ height: 48, width: "auto" }} />
+        <div style={{ flex: 1, textAlign: "center", minWidth: 0 }}>
           <div
+            className="report-title-3d"
             style={{
               fontFamily: '"Fraunces", "Times New Roman", serif',
-              fontSize: 34,
+              fontSize: 28,
               fontWeight: 700,
-              letterSpacing: "0.05em",
+              letterSpacing: "0.04em",
               lineHeight: 1.05,
-              transform: "scaleX(0.94)",
-              transformOrigin: "center",
               whiteSpace: "nowrap",
             }}
           >
             {hotel}
           </div>
-          <img src={publicUrl("logo.png?v=2")} alt="" style={{ height: 48, width: "auto" }} />
+          <div style={{ marginTop: 2, fontSize: 13, fontFamily: '"Fraunces", "Times New Roman", serif' }}>
+            {blessing}
+          </div>
         </div>
-        <div
-          style={{
-            marginTop: 4,
-            fontSize: 13,
-            color: "#6f675c",
-            fontFamily: '"Fraunces", "Times New Roman", serif',
-          }}
-        >
-          {blessing}
+        <div style={{ fontWeight: 700, fontSize: 14, textAlign: "right" }}>
+          Detailed daily
+          <div>{longDay(date)}</div>
         </div>
-        <div
-          style={{
-            marginTop: 10,
-            fontSize: 18,
-            fontWeight: 600,
-            fontFamily: '"Fraunces", "Times New Roman", serif',
-          }}
-        >
-          Detailed daily · {longDay(date)}
-        </div>
-        <div style={{ marginTop: 4, fontSize: 16, fontWeight: 600 }}>
-          {sept(date)} 11:00 AM — {sept(next)} 11:00 AM
-        </div>
-        <div style={{ marginTop: 3, fontSize: 11, color: "#6f675c" }}>
-          Same layout as Daily register · {guests.length} posting
-          {guests.length === 1 ? "" : "s"}
-        </div>
+      </div>
+      <div style={{ marginTop: 4, fontSize: 16, fontWeight: 600 }}>
+        {sept(date)} 11:00 AM — {sept(next)} 11:00 AM
+      </div>
+      <div style={{ marginTop: 3, marginBottom: 10, fontSize: 11, color: "#6f675c" }}>
+        Same layout as Daily register · {guests.length} posting
+        {guests.length === 1 ? "" : "s"}
       </div>
 
       <Section title="Guest register">

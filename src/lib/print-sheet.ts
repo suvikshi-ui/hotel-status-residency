@@ -1,4 +1,5 @@
 import { publicUrl } from "@/lib/public-url";
+import { REPORT_HEAD_CSS, reportHeadHtml } from "./report-head";
 
 export function escapeHtml(s: string) {
   return s
@@ -54,11 +55,13 @@ export function printDocument({
   title,
   heading,
   sub,
+  blessing,
   table,
 }: {
   title: string;
   heading: string;
   sub: string;
+  blessing?: string;
   table: string;
 }) {
   const html = `<!doctype html>
@@ -66,13 +69,11 @@ export function printDocument({
 <head>
   <meta charset="utf-8" />
   <title>${escapeHtml(title)}</title>
+  <link rel="stylesheet" href="${REPORT_FONT_HREF}" />
   <style>
     @page { size: A4; margin: 12mm; }
     body { margin: 0; color: #1c1915; font: 13px/1.45 Georgia, "Times New Roman", serif; }
-    .brand { display: flex; align-items: center; gap: 12px; margin: 0 0 12px; }
-    .brand img { height: 56px; width: auto; }
-    h1 { margin: 0 0 4px; font-size: 22px; }
-    .sub { margin: 0 0 16px; color: #6f675c; font-size: 12px; }
+    ${REPORT_HEAD_CSS}
     table { width: 100%; border-collapse: collapse; }
     th, td { padding: 7px 8px; border-bottom: 1px solid #ddd4c2; text-align: left; }
     th { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: #6f675c; }
@@ -81,17 +82,11 @@ export function printDocument({
   </style>
 </head>
 <body>
-  <div class="brand">
-    <img src="${publicUrl("logo.png?v=2")}" alt="" />
-    <div>
-      <h1>${escapeHtml(heading)}</h1>
-      <p class="sub" style="margin:0">${escapeHtml(sub)}</p>
-    </div>
-  </div>
+  ${reportHeadHtml({ hotel: heading, blessing, right: sub })}
   ${table}
 </body>
 </html>`;
-  openPrintFrame(title, html);
+  openPrintFrame(title, html, true);
 }
 
 export const A4_PX = { width: 794, height: 1123, marginMm: 8 };
@@ -257,14 +252,28 @@ export function printDailyRegister(input: {
     .head {
       display: flex;
       align-items: center;
+      justify-content: space-between;
       gap: 10px;
       padding: 8px 10px;
-      background: #000;
-      color: #fff;
+      background: #1b332a;
+      color: #f6f0e6;
     }
-    .head img { height: 42px; width: auto; }
-    .head h1 { margin: 0; font-size: 16px; letter-spacing: .08em; }
-    .head p { margin: 2px 0 0; font-size: 10px; }
+    .head img {
+      height: 46px;
+      width: auto;
+      transform: perspective(180px) rotateX(10deg) rotateY(-12deg);
+      filter: drop-shadow(0 1px 0 rgba(255,236,186,.7)) drop-shadow(0 3px 0 rgba(62,40,8,.65)) drop-shadow(0 6px 8px rgba(0,0,0,.5));
+    }
+    .head h1 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: .04em;
+      color: #f4c430;
+      text-align: center;
+      text-shadow: 0 1px 0 #fff1b0, 0 2px 0 #b8892a, 0 3px 0 #6d5010;
+    }
+    .head p { margin: 2px 0 0; font-size: 10px; text-align: center; }
+    .head .mid { flex: 1; text-align: center; }
     .body { flex: 1; padding: 6px 8px 8px; }
     h2 { margin: 7px 0 3px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; border-bottom: 1px solid #1a1a1a; padding-bottom: 2px; }
     table { width: 100%; border-collapse: collapse; }
@@ -283,10 +292,11 @@ export function printDailyRegister(input: {
   <div class="sheet">
     <div class="head">
       <img src="${publicUrl("logo.png?v=2")}" alt="" />
-      <div>
+      <div class="mid">
         <h1>${escapeHtml(input.hotel.toUpperCase())}</h1>
-        <p>Daily report · ${escapeHtml(input.dateLabel)} · ${escapeHtml(input.place)}</p>
+        <p>${escapeHtml(input.place)}</p>
       </div>
+      <div style="font-weight:700;font-size:12px;text-align:right">Daily report<br/>${escapeHtml(input.dateLabel)}</div>
     </div>
     <div class="body">
       <h2>Daily register</h2>

@@ -282,6 +282,7 @@ export function DailyA4({
           <img
             src={publicUrl("logo.png?v=2")}
             alt=""
+            className="logo-3d"
             style={{
               height: 52,
               width: "auto",
@@ -291,16 +292,14 @@ export function DailyA4({
           />
           <div style={{ flex: 1, minWidth: 0, textAlign: "center", overflow: "hidden" }}>
             <div
+              className="report-title-3d"
               style={{
                 fontFamily: DISPLAY,
                 fontWeight: 700,
                 fontSize: SIZE.title,
                 letterSpacing: "0.05em",
                 lineHeight: 1.05,
-                color: "#f4c430",
                 fontOpticalSizing: "auto",
-                transform: "scaleX(0.94)",
-                transformOrigin: "center",
                 whiteSpace: "nowrap",
               }}
             >

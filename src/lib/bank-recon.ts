@@ -1,4 +1,5 @@
 import { uid } from "./format.ts";
+import { paintPdfReportHead } from "./report-head.ts";
 import type { GuestEntry, ModeAmount, NamedAmount, PayMode } from "./types";
 
 export interface BankRow {
@@ -1111,6 +1112,8 @@ export interface BankPdfLine {
 export async function downloadBankStatementPdf(input: {
   title: string;
   fileName: string;
+  hotel?: string;
+  blessing?: string;
   lines: BankPdfLine[];
 }) {
   const { jsPDF } = await import("jspdf");
@@ -1119,10 +1122,18 @@ export async function downloadBankStatementPdf(input: {
   const pageH = 210;
   const margin = 5;
   const innerW = pageW - margin * 2;
-  const titleH = 8;
+  const headBottom = await paintPdfReportHead(pdf, {
+    x: 0,
+    y: 0,
+    w: pageW,
+    h: 16,
+    hotel: input.hotel || "Hotel Status Residency",
+    blessing: input.blessing,
+    right: input.title,
+  });
   const headH = 6;
   const n = Math.max(input.lines.length, 1);
-  const usable = pageH - margin * 2 - titleH - headH;
+  const usable = pageH - headBottom - margin - headH;
   const rowH = Math.min(5.2, usable / n);
   const font = rowH >= 4.6 ? 7 : rowH >= 3.6 ? 6 : rowH >= 2.8 ? 5 : 4;
   const cols: { label: string; w: number; right?: boolean }[] = [
@@ -1138,15 +1149,8 @@ export async function downloadBankStatementPdf(input: {
   const scale = innerW / cols.reduce((s, c) => s + c.w, 0);
   for (const col of cols) col.w *= scale;
 
-  pdf.setFillColor(15, 61, 42);
-  pdf.rect(0, 0, pageW, titleH + margin, "F");
-  pdf.setTextColor(240, 192, 64);
-  pdf.setFont("times", "bold");
-  pdf.setFontSize(13);
-  pdf.text(input.title, margin, margin + 5.2);
-
   let x = margin;
-  let y = margin + titleH;
+  let y = headBottom;
   pdf.setFillColor(246, 239, 220);
   pdf.rect(margin, y, innerW, headH, "F");
   pdf.setTextColor(17, 17, 17);
@@ -1195,7 +1199,7 @@ export async function downloadBankStatementPdf(input: {
   });
 
   pdf.setDrawColor(17, 17, 17);
-  pdf.rect(margin, margin + titleH, innerW, headH + rowH * input.lines.length);
+  pdf.rect(margin, headBottom, innerW, headH + rowH * input.lines.length);
 
   pdf.save(input.fileName);
 }
@@ -1203,6 +1207,8 @@ export async function downloadBankStatementPdf(input: {
 export async function downloadPkQrPdf(input: {
   title: string;
   fileName: string;
+  hotel?: string;
+  blessing?: string;
   lines: { date: string; name: string; reason: string; inn: string; out: string; ref: string }[];
 }) {
   const { jsPDF } = await import("jspdf");
@@ -1211,10 +1217,18 @@ export async function downloadPkQrPdf(input: {
   const pageH = 210;
   const margin = 8;
   const innerW = pageW - margin * 2;
-  const titleH = 8;
+  const headBottom = await paintPdfReportHead(pdf, {
+    x: 0,
+    y: 0,
+    w: pageW,
+    h: 16,
+    hotel: input.hotel || "Hotel Status Residency",
+    blessing: input.blessing,
+    right: input.title,
+  });
   const headH = 7;
   const n = Math.max(input.lines.length, 1);
-  const usable = pageH - margin * 2 - titleH - headH;
+  const usable = pageH - headBottom - margin - headH;
   const rowH = Math.min(6, usable / n);
   const font = rowH >= 4.6 ? 8 : rowH >= 3.6 ? 7 : 6;
   const cols: { label: string; w: number; right?: boolean }[] = [
@@ -1227,14 +1241,8 @@ export async function downloadPkQrPdf(input: {
   ];
   const scale = innerW / cols.reduce((sum, col) => sum + col.w, 0);
   for (const col of cols) col.w *= scale;
-  pdf.setFillColor(15, 61, 42);
-  pdf.rect(0, 0, pageW, titleH + margin, "F");
-  pdf.setTextColor(240, 192, 64);
-  pdf.setFont("times", "bold");
-  pdf.setFontSize(13);
-  pdf.text(input.title, margin, margin + 5.2);
   let x = margin;
-  let y = margin + titleH;
+  let y = headBottom;
   pdf.setFillColor(246, 239, 220);
   pdf.rect(margin, y, innerW, headH, "F");
   pdf.setTextColor(17, 17, 17);
@@ -1271,6 +1279,6 @@ export async function downloadPkQrPdf(input: {
     y += rowH;
   });
   pdf.setDrawColor(17, 17, 17);
-  pdf.rect(margin, margin + titleH, innerW, headH + rowH * input.lines.length);
+  pdf.rect(margin, headBottom, innerW, headH + rowH * input.lines.length);
   pdf.save(input.fileName);
 }

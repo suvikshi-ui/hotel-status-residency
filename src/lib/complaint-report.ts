@@ -1,5 +1,6 @@
 import { COMPLAINT_LEVELS, isAcService, type ComplaintLevel, type RoomComplaint } from "./complaints";
 import { escapeHtml, printDocument } from "./print-sheet";
+import { paintPdfReportHead } from "./report-head";
 import type { RoomDef } from "./types";
 
 export type ComplaintListKind = "all" | "open" | "solved";
@@ -79,7 +80,8 @@ export function printComplaintList(input: {
   printDocument({
     title,
     heading: input.hotel,
-    sub: `${input.place} · ${title} · ${input.rows.length} ${input.rows.length === 1 ? "entry" : "entries"}`,
+    blessing: "Shree Kateel Shree Durga Parameshwari Amma",
+    sub: title,
     table: complaintTableHtml(input.rows, input.rooms),
   });
 }
@@ -96,8 +98,17 @@ export async function complaintListPdf(input: {
   const list = sortComplaints(input.rows, input.rooms);
   const title = complaintListTitle(input.kind);
   const pageW = 210;
-  const margin = 14;
+  const margin = 12;
   const bottom = 287;
+  const headBottom = await paintPdfReportHead(pdf, {
+    x: margin,
+    y: 8,
+    w: pageW - margin * 2,
+    h: 18,
+    hotel: input.hotel,
+    blessing: "Shree Kateel Shree Durga Parameshwari Amma",
+    right: title,
+  });
   const cols = [
     { x: margin, w: 18, key: "room" as const },
     { x: margin + 18, w: 78, key: "note" as const },
@@ -106,19 +117,7 @@ export async function complaintListPdf(input: {
     { x: margin + 156, w: 26, key: "date" as const },
   ];
 
-  let y = 18;
-  pdf.setFont("times", "bold");
-  pdf.setFontSize(16);
-  pdf.text(input.hotel, margin, y);
-  y += 6;
-  pdf.setFont("times", "normal");
-  pdf.setFontSize(10);
-  pdf.setTextColor(80);
-  pdf.text(`${input.place} · ${title}`, margin, y);
-  y += 5;
-  pdf.text(`${list.length} ${list.length === 1 ? "entry" : "entries"}`, margin, y);
-  y += 8;
-  pdf.setTextColor(20);
+  let y = headBottom + 6;
 
   function header() {
     pdf.setFont("times", "bold");

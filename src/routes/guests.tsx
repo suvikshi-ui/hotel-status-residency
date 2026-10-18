@@ -106,21 +106,21 @@ function GuestsPage() {
             </Button>
           </div>
           <div className="mx-auto w-full max-w-2xl overflow-hidden rounded-xl border border-border bg-white text-[#141816] shadow-sm">
-            <div className="flex items-center gap-3 bg-[#1b332a] px-4 py-3 text-white">
+            <div className="flex items-center gap-3 bg-[#1b332a] px-4 py-3 text-[#f6f0e6]">
               <img
                 src={publicUrl("logo.png?v=2")}
                 alt=""
-                className="size-14 shrink-0 rounded-md bg-white object-contain p-1"
+                className="logo-3d h-14 w-auto shrink-0 object-contain"
               />
-              <div>
-                <p className="text-base font-semibold leading-tight sm:text-lg">
-                  Hotel Status Residency — Guest Check-in
+              <div className="min-w-0 flex-1 text-center">
+                <p className="report-title-3d font-display text-xl font-bold leading-tight sm:text-2xl">
+                  Hotel Status Residency
                 </p>
-                <p className="mt-1 text-[11px] text-white/80">
-                  PAP-595/596, TTC MIDC Mahape, Navi Mumbai 400701 · FabHotel Status Residency
+                <p className="mt-1 text-[12px]">
+                  Shree Kateel Shree Durga Parameshwari Amma
                 </p>
-                <p className="text-[11px] text-white/80">Please fill in under 2 minutes</p>
               </div>
+              <p className="shrink-0 text-right text-xs font-semibold">Guest check-in</p>
             </div>
             <div className="grid grid-cols-3 gap-4 px-5 pt-5 text-[11px] font-semibold tracking-wide text-[#5c6662]">
               {["DATE", "ROOM", "STAFF"].map((label) => (

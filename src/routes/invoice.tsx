@@ -122,7 +122,8 @@ function InvoicePage() {
     printDocument({
       title: "Register",
       heading: hotel.name,
-      sub: `${hotel.place} · ${format(parseISO(monthStart), "MMMM yyyy")} · 1 to ${format(parseISO(monthEnd), "d")}`,
+      blessing: hotel.blessing,
+      sub: format(parseISO(monthStart), "MMMM yyyy"),
       table: body,
     });
   }

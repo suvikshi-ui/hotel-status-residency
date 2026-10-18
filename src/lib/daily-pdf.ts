@@ -1,10 +1,10 @@
 import { format, parseISO } from "date-fns";
 import type { jsPDF } from "jspdf";
 import type { DayTake } from "./day-report";
-import { publicUrl } from "./public-url";
 import type { DayBooks, GuestEntry, NamedAmount } from "./types";
 import { joinRecvTags, otaReceivedTag } from "./ota-label";
 import { englishNarration } from "./english-narration";
+import { paintPdfReportHead } from "./report-head";
 
 export type DailyPdfInput = {
   hotel: string;
@@ -261,22 +261,6 @@ function drawTable(
   return y;
 }
 
-async function logoDataUrl() {
-  try {
-    const res = await fetch(publicUrl("logo.png?v=2"));
-    if (!res.ok) return null;
-    const blob = await res.blob();
-    return await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result));
-      reader.onerror = () => reject(reader.error);
-      reader.readAsDataURL(blob);
-    });
-  } catch {
-    return null;
-  }
-}
-
 export async function buildDailyPdf(input: DailyPdfInput): Promise<jsPDF> {
   const { jsPDF } = await import("jspdf");
   const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
@@ -293,27 +277,15 @@ export async function buildDailyPdf(input: DailyPdfInput): Promise<jsPDF> {
   pdf.roundedRect(x0, y0, W, H, 3.2, 3.2, "F");
 
   const headH = 20;
-  pdf.setFillColor(...HEAD);
-  pdf.rect(x0, y0, W, headH, "F");
-
-  const logo = await logoDataUrl();
-  if (logo) {
-    try {
-      pdf.addImage(logo, "PNG", x0 + 3, y0 + 2.5, 14, 15);
-    } catch {
-      /* skip logo */
-    }
-  }
-
-  pdf.setTextColor(...GOLD);
-  pdf.setFont("times", "bold");
-  pdf.setFontSize(16);
-  pdf.text(input.hotel.toUpperCase(), x0 + W / 2, y0 + 9, { align: "center" });
-  pdf.setTextColor(...IVORY);
-  pdf.setFontSize(9);
-  pdf.text(input.blessing.toUpperCase(), x0 + W / 2, y0 + 15.5, { align: "center" });
-  pdf.setFontSize(9);
-  pdf.text(`DATE : ${sheetDate(input.date)}`, x0 + W - 4, y0 + 12, { align: "right" });
+  await paintPdfReportHead(pdf, {
+    x: x0,
+    y: y0,
+    w: W,
+    h: headH,
+    hotel: input.hotel.toUpperCase(),
+    blessing: input.blessing.toUpperCase(),
+    right: `DATE : ${sheetDate(input.date)}`,
+  });
 
   const gap = 1.2;
   const colW = (W - gap) / 2;

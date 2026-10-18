@@ -140,6 +140,17 @@
     drop-shadow(0 8px 10px rgba(0, 0, 0, 0.55));
 }
 
+.report-title-3d {
+  color: #f4c430 !important;
+  text-shadow:
+    0 1px 0 #fff1b0,
+    0 2px 0 #b8892a,
+    0 4px 0 #6d5010,
+    0 6px 8px rgba(0, 0, 0, 0.45);
+  transform: perspective(180px) rotateX(8deg) scaleX(0.96);
+  transform-origin: center;
+}
+
 .nav-scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;

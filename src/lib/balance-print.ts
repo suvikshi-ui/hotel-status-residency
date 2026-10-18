@@ -1,7 +1,7 @@
 import { format, isValid, parseISO } from "date-fns";
 import type { DueAccount, DueStay } from "./balance";
 import { escapeHtml } from "./print-sheet";
-import { publicUrl } from "./public-url";
+import { REPORT_HEAD_CSS, reportHeadHtml } from "./report-head";
 import { HOTEL_CLOCK, stayStamp } from "./format";
 
 function sheetDate(iso: string) {
@@ -41,17 +41,7 @@ function printFrame(title: string, inner: string) {
     * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
     body { font: 12.5px/1.45 "Source Serif 4", Georgia, "Times New Roman", serif; }
     .sheet { border: 2.5px solid #1a1a1a; min-height: 277mm; overflow: hidden; }
-    .head {
-      display: flex; align-items: center; gap: 14px;
-      padding: 10px 14px; background: #14352c; color: #f4efe4;
-    }
-    .head img { height: 52px; width: auto; }
-    .head h1 {
-      margin: 0; font-family: Fraunces, "Times New Roman", serif;
-      font-size: 32px; letter-spacing: .05em; color: #f4c430; font-weight: 700;
-      transform: scaleX(0.94); transform-origin: center; white-space: nowrap;
-    }
-    .head p { margin: 4px 0 0; font-family: Fraunces, "Times New Roman", serif; font-size: 13px; letter-spacing: -.02em; }
+    ${REPORT_HEAD_CSS}
     .body { padding: 12px 14px 16px; }
     h2 {
       margin: 0 0 10px; text-align: center; font-family: Fraunces, "Times New Roman", serif;
@@ -115,13 +105,11 @@ function printFrame(title: string, inner: string) {
 }
 
 function brand(hotel: string, place: string, title: string) {
-  return `<div class="head">
-    <img src="${publicUrl("logo.png?v=2")}" alt="" />
-    <div style="flex:1;text-align:center">
-      <h1>${escapeHtml(hotel.toUpperCase())}</h1>
-      <p>${escapeHtml(place.toUpperCase())} · ${escapeHtml(title)}</p>
-    </div>
-  </div>`;
+  return reportHeadHtml({
+    hotel,
+    blessing: "Shree Kateel Shree Durga Parameshwari Amma",
+    right: `${title} · ${place}`,
+  });
 }
 
 /** Print 1 — sources only, remaining balance, no guest rows. */

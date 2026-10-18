@@ -32,6 +32,7 @@ export const Route = createFileRoute("/bank-recon")({
 
 function BankReconPage() {
   const date = useLedger((s) => s.selectedDate);
+  const hotel = useLedger((s) => s.hotel);
   const guests = useLedger((s) => s.guests);
   const food = useLedger((s) => s.food);
   const wholesale = useLedger((s) => s.wholesale);
@@ -157,6 +158,8 @@ function BankReconPage() {
     await downloadBankStatementPdf({
       title: `Bank statement · ${monthLabel}`,
       fileName: `bank-statement-${month}.pdf`,
+      hotel: hotel.name,
+      blessing: hotel.blessing,
       lines: lines.map((line) => ({
         date: line.bank.dateRaw || "—",
         narration: englishNarration(line.bank.particular) || "—",
@@ -182,6 +185,8 @@ function BankReconPage() {
     await downloadPkQrPdf({
       title: `P.K. QR · ${monthLabel}`,
       fileName: `pk-qr-${month}.pdf`,
+      hotel: hotel.name,
+      blessing: hotel.blessing,
       lines: pkMoves.map((row) => ({
         date:
           row.to && row.to !== row.date
