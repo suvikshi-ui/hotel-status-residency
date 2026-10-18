@@ -32,13 +32,8 @@ export const REPORT_HEAD_CSS = `
   line-height: 1.05;
   color: #f4c430;
   white-space: nowrap;
-  transform: perspective(180px) rotateX(8deg) scaleX(0.96);
+  transform: scaleX(0.96);
   transform-origin: center;
-  text-shadow:
-    0 1px 0 #fff1b0,
-    0 2px 0 #b8892a,
-    0 4px 0 #6d5010,
-    0 6px 8px rgba(0, 0, 0, 0.45);
 }
 .report-head .bless {
   margin: 2px 0 0;
@@ -138,8 +133,6 @@ export async function paintPdfReportHead(
   const cx = input.x + input.w / 2;
   pdf.setFont("times", "bold");
   pdf.setFontSize(15);
-  pdf.setTextColor(90, 58, 10);
-  pdf.text(input.hotel, cx + 0.4, input.y + 8.4, { align: "center" });
   pdf.setTextColor(244, 196, 48);
   pdf.text(input.hotel, cx, input.y + 7.8, { align: "center" });
   if (input.blessing) {

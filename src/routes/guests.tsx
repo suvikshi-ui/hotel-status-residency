@@ -113,7 +113,7 @@ function GuestsPage() {
                 className="logo-3d h-14 w-auto shrink-0 object-contain"
               />
               <div className="min-w-0 flex-1 text-center">
-                <p className="report-title-3d font-display text-xl font-bold leading-tight sm:text-2xl">
+                <p className="font-display text-xl font-bold leading-tight text-[#f4c430] sm:text-2xl">
                   Hotel Status Residency
                 </p>
                 <p className="mt-1 text-[12px]">

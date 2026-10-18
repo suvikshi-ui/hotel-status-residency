@@ -331,13 +331,15 @@ export function DayChart({
         <img src={publicUrl("logo.png?v=2")} alt="" className="logo-3d" style={{ height: 48, width: "auto" }} />
         <div style={{ flex: 1, textAlign: "center", minWidth: 0 }}>
           <div
-            className="report-title-3d"
             style={{
               fontFamily: '"Fraunces", "Times New Roman", serif',
               fontSize: 28,
               fontWeight: 700,
               letterSpacing: "0.04em",
               lineHeight: 1.05,
+              color: "#f4c430",
+              transform: "scaleX(0.96)",
+              transformOrigin: "center",
               whiteSpace: "nowrap",
             }}
           >

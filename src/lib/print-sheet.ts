@@ -270,7 +270,6 @@ export function printDailyRegister(input: {
       letter-spacing: .04em;
       color: #f4c430;
       text-align: center;
-      text-shadow: 0 1px 0 #fff1b0, 0 2px 0 #b8892a, 0 3px 0 #6d5010;
     }
     .head p { margin: 2px 0 0; font-size: 10px; text-align: center; }
     .head .mid { flex: 1; text-align: center; }
