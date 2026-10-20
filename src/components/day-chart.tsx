@@ -30,6 +30,26 @@ function padRoom(n: string) {
   return /^\d+$/.test(t) ? t.padStart(3, "0") : t;
 }
 
+function roomTag(particular: string, guests: GuestEntry[], date: string) {
+  const raw = particular.trim();
+  if (!raw) return "—";
+  if (/^\d{1,4}[A-Z]?$/i.test(raw)) return raw;
+  const key = raw.toUpperCase();
+  const hits = guests.filter((g) => {
+    const src = (g.source ?? "").trim().toUpperCase();
+    const name = g.name.trim().toUpperCase();
+    return src === key || name === key;
+  });
+  const today = hits.filter((g) => g.date === date);
+  const pool = today.length
+    ? today
+    : hits.length
+      ? [hits.reduce((best, g) => (g.date > best.date ? g : best))]
+      : [];
+  const rooms = [...new Set(pool.map((g) => g.roomNo.trim()).filter(Boolean))];
+  return rooms.length ? rooms.join(", ") : "—";
+}
+
 function sum(rows: { amount: number }[]) {
   return rows.reduce((s, r) => s + r.amount, 0);
 }
@@ -504,7 +524,7 @@ export function DayChart({
                   key={r.id}
                   left={
                     <>
-                      <span style={{ fontWeight: 600 }}>{r.particular}</span>
+                      <span style={{ fontWeight: 600 }}>{roomTag(r.particular, allGuests, date)}</span>
                       <Pill mode={r.mode} />
                     </>
                   }

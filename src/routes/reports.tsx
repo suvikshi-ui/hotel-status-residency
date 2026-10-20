@@ -582,7 +582,7 @@ function DailyReportPanel() {
         take={take}
         expenses={expenses}
         receipts={receipts}
-        guests={guests}
+        guests={allGuests}
       />
       </div>
     </div>

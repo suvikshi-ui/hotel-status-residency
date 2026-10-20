@@ -23,8 +23,9 @@ function isRoomNo(s: string) {
 }
 
 function roomsFor(
-  recs: { particular: string }[],
+  recs: { particular: string; kind?: string | null }[],
   guests: GuestEntry[],
+  date: string,
 ) {
   const out: string[] = [];
   const seen = new Set<string>();
@@ -37,31 +38,28 @@ function roomsFor(
     out.push(t);
   };
   for (const r of recs) {
+    if (r.kind === "ota" || r.kind === "list") continue;
     const p = r.particular.trim();
     if (!p) continue;
-    if (isRoomNo(p)) add(p);
+    if (isRoomNo(p)) {
+      add(p);
+      continue;
+    }
     const key = p.toUpperCase();
-    for (const g of guests) {
+    const hits = guests.filter((g) => {
       const src = (g.source ?? "").trim().toUpperCase();
       const name = g.name.trim().toUpperCase();
-      if (src === key || name === key) add(g.roomNo);
-    }
+      return src === key || name === key;
+    });
+    const today = hits.filter((g) => g.date === date);
+    const pool = today.length
+      ? today
+      : hits.length
+        ? [hits.reduce((best, g) => (g.date > best.date ? g : best))]
+        : [];
+    for (const g of pool) add(g.roomNo);
   }
   return out.length ? ` (${out.join(",")})` : "";
-}
-
-function receivedNames(
-  recs: { particular: string; kind?: string | null }[],
-) {
-  const names = [
-    ...new Set(
-      recs
-        .filter((r) => r.kind !== "ota" && r.kind !== "list")
-        .map((r) => r.particular.trim().toUpperCase())
-        .filter(Boolean),
-    ),
-  ];
-  return names.length ? ` ${names.join(", ")}` : "";
 }
 
 const SIZE = { fs: 12.5, pad: "5px 8px", head: 13, title: 34, date: 16 };
@@ -229,15 +227,18 @@ export function DailyA4({
   const pkExp = expenses.filter((e) => e.mode === "QRPK");
   const rooms = take.balanceRooms.join(",");
   const balTag = rooms ? `BAL (${rooms})` : "BAL";
-  const cashRooms = receivedNames(cashRec) || roomsFor(cashRec, guests);
-  const qrRooms = receivedNames(qrRec) || roomsFor(qrRec, guests);
-  const pkRooms =
-    joinRecvTags(
-      receivedNames(pkRec.filter((r) => r.kind !== "ota")),
-      otaReceivedTag(receipts),
-    ) || roomsFor(pkRec, guests);
+  const cashRooms = roomsFor(cashRec, guests, date);
+  const qrRooms = roomsFor(qrRec, guests, date);
+  const pkRooms = joinRecvTags(
+    roomsFor(
+      pkRec.filter((r) => r.kind !== "ota"),
+      guests,
+      date,
+    ),
+    otaReceivedTag(receipts),
+  );
   const onRooms = otaReceivedTag(receipts);
-  const dueRooms = roomsFor([...qrRec, ...cashRec, ...pkRec], guests);
+  const dueRooms = roomsFor([...qrRec, ...cashRec, ...pkRec], guests, date);
   const santoshSub =
     (s?.ob ?? 0) + (s?.salesQr ?? 0) + (s?.foodQr ?? 0) + (s?.other ?? 0);
   const pkSub =
