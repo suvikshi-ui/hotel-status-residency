@@ -1,6 +1,7 @@
 import { addDays, format, parseISO } from "date-fns";
 import type { jsPDF } from "jspdf";
 import { buildDueAccounts } from "./balance";
+import { reconcileBank, type BankRow } from "./bank-recon";
 import {
   acServiceKind,
   acServiceLabel,
@@ -9,10 +10,13 @@ import {
 } from "./complaints";
 import type { RoomComplaint } from "./complaints";
 import { complaintStatus } from "./complaint-report";
+import { englishNarration } from "./english-narration";
+import { salaryPayMonth, salaryPayMonthKey } from "./format";
 import { inventoryDifference, signedCount, type InventoryFile } from "./inventory";
 import type { PayrollFile } from "./payroll-files";
 import { paintPdfReportHead } from "./report-head";
-import type { AdvanceRow, GuestEntry, NamedAmount, StaffRow } from "./types";
+import { staffPay } from "./staff-pay";
+import type { AdvanceRow, GuestEntry, ModeAmount, NamedAmount, StaffRow } from "./types";
 
 const HEAD: [number, number, number] = [27, 51, 42];
 const GOLD: [number, number, number] = [244, 196, 48];
@@ -24,7 +28,11 @@ export type MonthPackInput = {
   blessing: string;
   asOf: string;
   guests: GuestEntry[];
+  food: ModeAmount[];
+  wholesale: ModeAmount[];
+  expenses: NamedAmount[];
   receipts: NamedAmount[];
+  bankRows: BankRow[];
   payrollFiles: PayrollFile[];
   staff: StaffRow[];
   advances: AdvanceRow[];
@@ -46,6 +54,13 @@ function stamp(iso: string) {
 
 function monthStart(iso: string) {
   return `${iso.slice(0, 7)}-01`;
+}
+
+function wsDay(file: { id: string; period: string; createdAt: string }) {
+  const fromId = file.id.split(":").slice(2).join(":");
+  const raw = `${file.period || ""} ${fromId} ${file.createdAt || ""}`;
+  const hit = raw.match(/\d{4}-\d{2}-\d{2}/);
+  return hit ? hit[0] : "";
 }
 
 function datesFrom(start: string, end: string) {
@@ -157,18 +172,25 @@ export async function downloadMonthPack(input: MonthPackInput, filename: string)
 
   await sheet(false, `MONTH  ${range}`);
 
-  const salaryFile = input.payrollFiles.find((f) => f.kind === "salary" && f.period === month);
-  const salary = (salaryFile?.staff?.length ? salaryFile.staff : input.staff.filter((r) => r.month === month))
+  const payKey = salaryPayMonthKey(input.asOf);
+  const payTitle = salaryPayMonth(input.asOf);
+  const salaryFile = input.payrollFiles.find((f) => f.kind === "salary" && f.period === payKey);
+  const salary = (salaryFile?.staff?.length ? salaryFile.staff : input.staff.filter((r) => r.month === payKey))
     .filter((r) => r.name.trim());
-  section("Salary");
+  section(`Salary of ${payTitle}`);
   const salW = [42, 28, 16, 16, 18, 18, 26, 26];
   grid(salW, [["Name", "Role", "Days", "Absent", "Work", "Extra", "Advance", "Net"]], {
     header: true,
     rightFrom: 2,
   });
-  if (salary.length === 0) grid([190], [["Salary for this month is not saved"]]);
+  if (salary.length === 0) grid([190], [[`Salary of ${payTitle} is not saved`]]);
+  let netSum = 0;
+  let advSum = 0;
   for (const row of salary) {
     await room(7, `MONTH  ${range}`);
+    const pay = staffPay(row.salary, row.working, row.extra ?? 0, row.advance, 30);
+    netSum += pay.payable;
+    advSum += row.advance;
     grid(salW, [[
       row.name.toUpperCase(),
       (row.role || "—").toUpperCase(),
@@ -177,16 +199,12 @@ export async function downloadMonthPack(input: MonthPackInput, filename: string)
       String(row.working || 0),
       String(row.extra || 0),
       money(row.advance),
-      money(row.total),
+      money(pay.payable),
     ]], { rightFrom: 2 });
   }
   if (salary.length) {
     await room(7, `MONTH  ${range}`);
-    grid([138, 26, 26], [[
-      "Total",
-      money(salary.reduce((s, r) => s + r.advance, 0)),
-      money(salary.reduce((s, r) => s + r.total, 0)),
-    ]], { boldLast: true, rightFrom: 1 });
+    grid([138, 26, 26], [["Total", money(advSum), money(netSum)]], { boldLast: true, rightFrom: 1 });
   }
   y += 3;
 
@@ -296,20 +314,22 @@ export async function downloadMonthPack(input: MonthPackInput, filename: string)
   await stock("kitchen", "Kitchen stock");
 
   const days = datesFrom(start, end);
-  const wsFiles = input.inventoryFiles.filter(
-    (f) => f.kind === "ws" && f.period >= start && f.period <= end,
-  );
+  const wsFiles = input.inventoryFiles.filter((file) => {
+    if (file.kind !== "ws") return false;
+    const day = wsDay(file);
+    return Boolean(day) && day >= start && day <= end;
+  });
   await sheet(true, `WS STOCK  ${range}`);
   section("WS stock · one row per item, one column per day");
   const names: string[] = [];
-  for (const file of [...wsFiles].sort((a, b) => a.period.localeCompare(b.period))) {
+  for (const file of [...wsFiles].sort((a, b) => wsDay(a).localeCompare(wsDay(b)))) {
     for (const line of file.lines) {
       const name = line.name.trim();
       if (name && !names.includes(name)) names.push(name);
     }
   }
   if (names.length === 0) {
-    grid([277], [["No WS count saved in this period"]], { size: 8 });
+    grid([277], [["No WS count saved from the 1st through this date"]], { size: 8 });
   } else {
     const nameW = 36;
     const usable = 277 - nameW;
@@ -320,7 +340,7 @@ export async function downloadMonthPack(input: MonthPackInput, filename: string)
     const size = days.length > 24 ? 6 : 7;
     const head = ["Item", ...days.map((d) => String(Number(d.slice(8))))];
     grid(widths, [head], { header: true, rightFrom: 1, size });
-    const byDay = new Map(wsFiles.map((f) => [f.period, f]));
+    const byDay = new Map(wsFiles.map((f) => [wsDay(f), f]));
     for (const name of names) {
       if (y + 6 > bottom()) {
         await sheet(true, `WS STOCK  ${range}`);
@@ -330,11 +350,54 @@ export async function downloadMonthPack(input: MonthPackInput, filename: string)
       const cells = days.map((d) => {
         const file = byDay.get(d);
         if (!file) return "";
-        const line = file.lines.find((r) => r.name.trim() === name);
-        return line ? String(line.thisMonth) : "";
+        const line = file.lines.find((r) => r.name.trim().toLowerCase() === name.toLowerCase());
+        if (!line) return "";
+        return String(line.thisMonth);
       });
       grid(widths, [[name, ...cells]], { rightFrom: 1, size });
     }
+  }
+
+  const bankRows = input.bankRows.filter(
+    (row) => row.month === month || (row.date >= start && row.date <= end),
+  );
+  const bankLines = reconcileBank(bankRows, input.guests, {
+    food: input.food,
+    wholesale: input.wholesale,
+    expenses: input.expenses,
+    receipts: input.receipts,
+  });
+  await sheet(true, `BANK  ${range}`);
+  section("Bank reconciliation");
+  const bankW = [22, 78, 36, 24, 24, 22, 36, 35];
+  grid(bankW, [["Date", "Narration", "Reference", "Withdrawal", "Deposit", "Office", "Name", "Reason"]], {
+    header: true,
+    rightFrom: 3,
+    size: 7,
+  });
+  if (bankLines.length === 0) {
+    grid([277], [["No bank statement for this month"]], { size: 8 });
+  }
+  for (const line of bankLines) {
+    if (y + 6 > bottom()) {
+      await sheet(true, `BANK  ${range}`);
+      section("Bank reconciliation · continued");
+      grid(bankW, [["Date", "Narration", "Reference", "Withdrawal", "Deposit", "Office", "Name", "Reason"]], {
+        header: true,
+        rightFrom: 3,
+        size: 7,
+      });
+    }
+    grid(bankW, [[
+      line.bank.dateRaw || stamp(line.bank.date),
+      englishNarration(line.bank.particular) || "—",
+      line.bank.ref || "—",
+      line.bank.debit ? money(line.bank.debit) : "—",
+      line.bank.credit ? money(line.bank.credit) : "—",
+      line.office ? stamp(line.office.date) : "—",
+      line.office?.name || "—",
+      line.office?.reason ? englishNarration(line.office.reason) : "—",
+    ]], { rightFrom: 3, size: 7 });
   }
 
   const raised = input.complaints.filter(

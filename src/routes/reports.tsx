@@ -237,7 +237,11 @@ function MonthFileButton() {
   const date = useLedger((s) => s.selectedDate);
   const hotel = useLedger((s) => s.hotel);
   const guests = useLedger((s) => s.guests);
+  const food = useLedger((s) => s.food);
+  const wholesale = useLedger((s) => s.wholesale);
+  const expenses = useLedger((s) => s.expenses);
   const receipts = useLedger((s) => s.balReceived);
+  const bankRows = useLedger((s) => s.bankRows);
   const payrollFiles = useLedger((s) => s.payrollFiles);
   const staff = useLedger((s) => s.staff);
   const advances = useLedger((s) => s.advances);
@@ -256,7 +260,11 @@ function MonthFileButton() {
           blessing: hotel.blessing,
           asOf: date,
           guests,
+          food,
+          wholesale,
+          expenses,
           receipts,
+          bankRows,
           payrollFiles,
           staff,
           advances,
