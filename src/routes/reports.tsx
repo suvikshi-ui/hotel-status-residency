@@ -23,6 +23,7 @@ import { sumByBucket, expenseBucket } from "@/lib/expense-tally";
 import { formatDay, formatDayShort, money, moneyCompact } from "@/lib/format";
 import { printHtmlDocument } from "@/lib/print-sheet";
 import { downloadDayPack } from "@/lib/daily-pdf";
+import { downloadMonthPack } from "@/lib/month-pack-pdf";
 import { buildDueAccounts } from "@/lib/balance";
 import { REPORT_TAB, parseReportView } from "@/lib/report-views";
 import { useLedger, useDayBooks } from "@/lib/store";
@@ -128,7 +129,10 @@ function ReportsPage() {
             Day book, the detailed day, then the month.
           </p>
         </div>
-        <DayFileButton />
+        <div className="flex flex-wrap gap-2">
+          <DayFileButton />
+          <MonthFileButton />
+        </div>
         <TabsList className="flex h-auto min-h-11 w-full flex-wrap justify-start sm:w-auto">
           {REPORT_TAB.map((tab) => (
             <TabsTrigger key={tab.id} value={tab.id}>
@@ -225,6 +229,65 @@ function DayFileButton() {
         Day file
       </div>
       <div className="text-xs text-[#d7efe4]">Daily, detailed, balance</div>
+    </button>
+  );
+}
+
+function MonthFileButton() {
+  const date = useLedger((s) => s.selectedDate);
+  const hotel = useLedger((s) => s.hotel);
+  const guests = useLedger((s) => s.guests);
+  const receipts = useLedger((s) => s.balReceived);
+  const payrollFiles = useLedger((s) => s.payrollFiles);
+  const staff = useLedger((s) => s.staff);
+  const advances = useLedger((s) => s.advances);
+  const inventoryFiles = useLedger((s) => s.inventoryFiles);
+  const complaints = useLedger((s) => s.complaints);
+  const [busy, setBusy] = useState(false);
+  const from = `${date.slice(0, 7)}-01`;
+
+  async function download() {
+    setBusy(true);
+    toast.message("Preparing the month file…");
+    try {
+      await downloadMonthPack(
+        {
+          hotel: hotel.name,
+          blessing: hotel.blessing,
+          asOf: date,
+          guests,
+          receipts,
+          payrollFiles,
+          staff,
+          advances,
+          inventoryFiles,
+          complaints,
+        },
+        `HSR-${date.slice(0, 7)}-to-${date.slice(8)}.pdf`,
+      );
+      toast.success("Month file downloaded");
+    } catch {
+      toast.error("Could not download the month file");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => void download()}
+      disabled={busy}
+      className="min-w-36 rounded-2xl border border-[#1b332a] bg-[#1b332a] px-4 py-3 text-left text-[#f6f0e6] disabled:opacity-60"
+    >
+      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#f4c430]">
+        {formatDayShort(from)} – {formatDayShort(date)}
+      </div>
+      <div className="mt-1 flex items-center gap-2 font-display text-lg font-semibold">
+        <Download className="size-4" />
+        Month file
+      </div>
+      <div className="text-xs text-[#d7efe4]">Salary, balance, stock</div>
     </button>
   );
 }
