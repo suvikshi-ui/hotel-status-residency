@@ -11,7 +11,7 @@ import {
   YAxis,
 } from "recharts";
 import { format, isValid, parseISO } from "date-fns";
-import { Printer } from "lucide-react";
+import { Printer, Download } from "lucide-react";
 import { toast } from "sonner";
 import { DailyA4 } from "@/components/daily-a4";
 import { DayChart } from "@/components/day-chart";
@@ -22,10 +22,13 @@ import { buildDayTake } from "@/lib/day-report";
 import { sumByBucket, expenseBucket } from "@/lib/expense-tally";
 import { formatDay, formatDayShort, money, moneyCompact } from "@/lib/format";
 import { printHtmlDocument } from "@/lib/print-sheet";
+import { downloadPdfPages } from "@/lib/save-jpeg";
+import { buildDueAccounts, type DueAccount } from "@/lib/balance";
+import { otaChannelLabel } from "@/lib/ota-label";
 import { REPORT_TAB, parseReportView } from "@/lib/report-views";
 import { useLedger, useDayBooks } from "@/lib/store";
 import { isPriorMonthClosed } from "@/lib/register-lock";
-import type { DayBooks } from "@/lib/types";
+import type { DayBooks, GuestEntry, NamedAmount } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/reports")({
@@ -126,6 +129,7 @@ function ReportsPage() {
             Day book, the detailed day, then the month.
           </p>
         </div>
+        <DayFileButton />
         <TabsList className="flex h-auto min-h-11 w-full flex-wrap justify-start sm:w-auto">
           {REPORT_TAB.map((tab) => (
             <TabsTrigger key={tab.id} value={tab.id}>
@@ -147,6 +151,246 @@ function ReportsPage() {
         <MonthlyReportPanel />
       </TabsContent>
     </Tabs>
+  );
+}
+
+function roomsForName(particular: string, guests: GuestEntry[], date: string) {
+  const raw = particular.trim();
+  if (!raw) return "—";
+  if (/^\d{1,4}[A-Z]?$/i.test(raw)) return raw;
+  const key = raw.toUpperCase();
+  const hits = guests.filter((g) => {
+    const src = (g.source ?? "").trim().toUpperCase();
+    const name = g.name.trim().toUpperCase();
+    return src === key || name === key;
+  });
+  const today = hits.filter((g) => g.date === date);
+  const pool = today.length
+    ? today
+    : hits.length
+      ? [hits.reduce((best, g) => (g.date > best.date ? g : best))]
+      : [];
+  const rooms = [...new Set(pool.map((g) => g.roomNo.trim()).filter(Boolean))];
+  return rooms.length ? rooms.join(", ") : "—";
+}
+
+function DayFileButton() {
+  const date = useLedger((s) => s.selectedDate);
+  const hotel = useLedger((s) => s.hotel);
+  const allGuests = useLedger((s) => s.guests);
+  const allFood = useLedger((s) => s.food);
+  const allWs = useLedger((s) => s.wholesale);
+  const allExp = useLedger((s) => s.expenses);
+  const allRecv = useLedger((s) => s.balReceived);
+  const books = useDayBooks(date);
+  const [busy, setBusy] = useState(false);
+  const [armed, setArmed] = useState(false);
+  const guests = allGuests.filter((g) => g.date === date);
+  const food = allFood.filter((f) => f.date === date);
+  const ws = allWs.filter((w) => w.date === date);
+  const expenses = allExp.filter((e) => e.date === date);
+  const receipts = allRecv.filter((r) => r.date === date);
+  const take = buildDayTake(guests, food, ws);
+  const openAccounts = buildDueAccounts(
+    allGuests.filter((g) => g.date <= date),
+    allRecv.filter((r) => r.date <= date),
+  ).filter((a) => a.remaining > 0 && !a.settled);
+
+  async function download() {
+    setBusy(true);
+    setArmed(true);
+    toast.message("Preparing the day file…");
+    await new Promise((r) => setTimeout(r, 250));
+    try {
+      const imgs = document.querySelectorAll("#pack-daily img, #pack-detail img");
+      await Promise.all(
+        [...imgs].map(
+          (img) =>
+            img instanceof HTMLImageElement && img.complete
+              ? Promise.resolve()
+              : new Promise<void>((res) => {
+                  img.addEventListener("load", () => res(), { once: true });
+                  img.addEventListener("error", () => res(), { once: true });
+                }),
+        ),
+      );
+      const pages = ["pack-daily", "pack-detail", "pack-balance"]
+        .map((id) => document.getElementById(id))
+        .filter((el): el is HTMLElement => Boolean(el));
+      if (pages.length < 3) throw new Error("report is not ready");
+      await downloadPdfPages(pages, `HSR-${date}.pdf`);
+      toast.success("Day file downloaded");
+    } catch {
+      toast.error("Could not download the day file");
+    } finally {
+      setArmed(false);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => void download()}
+        disabled={busy}
+        className="min-w-36 rounded-2xl border border-[#1b332a] bg-[#1b332a] px-4 py-3 text-left text-[#f6f0e6] disabled:opacity-60"
+      >
+        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#f4c430]">
+          {formatDayShort(date)}
+        </div>
+        <div className="mt-1 flex items-center gap-2 font-display text-lg font-semibold">
+          <Download className="size-4" />
+          Day file
+        </div>
+        <div className="text-xs text-[#d7efe4]">Daily, detailed, balance</div>
+      </button>
+      {armed ? (
+        <div
+          className="pointer-events-none fixed top-0 -left-[4200px] z-0 w-[794px]"
+          aria-hidden
+        >
+          <div id="pack-daily" className="w-[794px] bg-white">
+            <DailyA4
+              hotel={hotel.name}
+              blessing={hotel.blessing}
+              date={date}
+              books={books}
+              take={take}
+              expenses={expenses}
+              receipts={receipts}
+              guests={allGuests}
+            />
+          </div>
+          <div id="pack-detail" className="w-[794px] bg-white">
+            <DayChart
+              hotel={hotel.name}
+              blessing={hotel.blessing}
+              date={date}
+              guests={guests}
+              allGuests={allGuests}
+              food={food}
+              ws={ws}
+              expenses={expenses}
+              receipts={receipts}
+              books={books}
+            />
+          </div>
+          <div id="pack-balance" className="w-[794px] bg-white">
+            <BalancePack
+              hotel={hotel.name}
+              blessing={hotel.blessing}
+              date={date}
+              accounts={openAccounts}
+              receipts={receipts}
+              guests={allGuests}
+            />
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+function BalancePack({
+  hotel,
+  blessing,
+  date,
+  accounts,
+  receipts,
+  guests,
+}: {
+  hotel: string;
+  blessing: string;
+  date: string;
+  accounts: DueAccount[];
+  receipts: NamedAmount[];
+  guests: GuestEntry[];
+}) {
+  const billed = accounts.reduce((s, a) => s + a.billed, 0);
+  const paid = accounts.reduce((s, a) => s + a.collected, 0);
+  const due = accounts.reduce((s, a) => s + Math.max(0, a.remaining), 0);
+  const dayIn = receipts.filter((r) => r.kind !== "list");
+  return (
+    <div style={{ padding: 24, color: "#1a1a1a", fontFamily: "Georgia, serif" }}>
+      <div style={{ background: "#1b332a", color: "#f6f0e6", padding: "12px 16px" }}>
+        <div style={{ color: "#f4c430", fontSize: 22, fontWeight: 700 }}>{hotel}</div>
+        <div style={{ fontSize: 13 }}>{blessing}</div>
+        <div style={{ marginTop: 6, fontWeight: 700 }}>Balance · {formatDay(date)}</div>
+      </div>
+      <h2 style={{ margin: "16px 0 8px", fontSize: 16 }}>Open source balance</h2>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <thead>
+          <tr>
+            {["Source", "Rooms", "Billed", "Paid", "Balance"].map((h) => (
+              <th key={h} style={{ border: "1px solid #1a1a1a", padding: "6px 8px", textAlign: "left", background: "#efe8d8" }}>
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {accounts.length === 0 ? (
+            <tr>
+              <td colSpan={5} style={{ border: "1px solid #1a1a1a", padding: 8, textAlign: "center" }}>
+                No open balance
+              </td>
+            </tr>
+          ) : (
+            accounts.map((a) => (
+              <tr key={a.key}>
+                <td style={{ border: "1px solid #1a1a1a", padding: "6px 8px" }}>{a.key}</td>
+                <td style={{ border: "1px solid #1a1a1a", padding: "6px 8px" }}>
+                  {[...new Set(a.guests.map((g) => g.roomNo.trim()).filter(Boolean))].join(", ") || "—"}
+                </td>
+                <td style={{ border: "1px solid #1a1a1a", padding: "6px 8px", textAlign: "right" }}>{money(a.billed)}</td>
+                <td style={{ border: "1px solid #1a1a1a", padding: "6px 8px", textAlign: "right" }}>{money(a.collected)}</td>
+                <td style={{ border: "1px solid #1a1a1a", padding: "6px 8px", textAlign: "right" }}>{money(Math.max(0, a.remaining))}</td>
+              </tr>
+            ))
+          )}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colSpan={2} style={{ border: "1px solid #1a1a1a", padding: "6px 8px", fontWeight: 700 }}>Total</td>
+            <td style={{ border: "1px solid #1a1a1a", padding: "6px 8px", textAlign: "right", fontWeight: 700 }}>{money(billed)}</td>
+            <td style={{ border: "1px solid #1a1a1a", padding: "6px 8px", textAlign: "right", fontWeight: 700 }}>{money(paid)}</td>
+            <td style={{ border: "1px solid #1a1a1a", padding: "6px 8px", textAlign: "right", fontWeight: 700 }}>{money(due)}</td>
+          </tr>
+        </tfoot>
+      </table>
+      <h2 style={{ margin: "18px 0 8px", fontSize: 16 }}>Received this day</h2>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <thead>
+          <tr>
+            {["Room", "Mode", "Amount"].map((h) => (
+              <th key={h} style={{ border: "1px solid #1a1a1a", padding: "6px 8px", textAlign: "left", background: "#efe8d8" }}>
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {dayIn.length === 0 ? (
+            <tr>
+              <td colSpan={3} style={{ border: "1px solid #1a1a1a", padding: 8, textAlign: "center" }}>
+                Nothing received
+              </td>
+            </tr>
+          ) : (
+            dayIn.map((r) => (
+              <tr key={r.id}>
+                <td style={{ border: "1px solid #1a1a1a", padding: "6px 8px" }}>
+                  {r.kind === "ota" ? otaChannelLabel(r.particular) : roomsForName(r.particular, guests, date)}
+                </td>
+                <td style={{ border: "1px solid #1a1a1a", padding: "6px 8px" }}>{r.mode}</td>
+                <td style={{ border: "1px solid #1a1a1a", padding: "6px 8px", textAlign: "right" }}>{money(r.amount)}</td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

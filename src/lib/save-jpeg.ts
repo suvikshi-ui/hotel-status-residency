@@ -183,6 +183,49 @@ export async function printElementPdf(el: HTMLElement) {
   await printPdfBlob(await pdfFromPrintElement(el));
 }
 
+export async function downloadPdfPages(pages: HTMLElement[], filename: string) {
+  const { jsPDF } = await import("jspdf");
+  const html2canvas = (await import("html2canvas")).default;
+  const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
+  let started = false;
+  for (const el of pages) {
+    const width = Math.max(el.scrollWidth, el.offsetWidth, 794);
+    const height = Math.max(el.scrollHeight, el.offsetHeight, 200);
+    const canvas = await html2canvas(el, {
+      scale: 1.4,
+      useCORS: true,
+      backgroundColor: "#ffffff",
+      width,
+      height,
+      windowWidth: width,
+      windowHeight: height,
+      logging: false,
+      imageTimeout: 8000,
+    });
+    if (canvasLooksEmpty(canvas)) continue;
+    const pagePx = Math.max(1, Math.floor(canvas.width * (297 / 210)));
+    let y = 0;
+    while (y < canvas.height - 4) {
+      const h = Math.min(pagePx, canvas.height - y);
+      const slice = document.createElement("canvas");
+      slice.width = canvas.width;
+      slice.height = h;
+      const ctx = slice.getContext("2d");
+      if (!ctx) break;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, slice.width, slice.height);
+      ctx.drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
+      if (started) pdf.addPage();
+      started = true;
+      pdf.addImage(slice.toDataURL("image/jpeg", 0.86), "JPEG", 0, 0, 210, 210 * (h / canvas.width));
+      y += pagePx;
+    }
+  }
+  if (!started) throw new Error("report capture was blank");
+  const name = filename.toLowerCase().endsWith(".pdf") ? filename : `${filename}.pdf`;
+  pdf.save(name);
+}
+
 export async function saveElementJpeg(el: HTMLElement, filename: string) {
   const page = await a4PageFromElement(el);
   if (canvasLooksEmpty(page)) throw new Error("jpeg was blank");
