@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { useGate } from "@/components/security-gate";
 import {
   CASH_NOTES,
   cashCountTotal,
@@ -121,14 +122,18 @@ function CashDaySheet({ day }: { day: string }) {
   const counts = useLedger((s) => s.cashCounts);
   const saveCashCount = useLedger((s) => s.saveCashCount);
   const write = canWrite(useLedger((s) => s.appRole));
+  const { gate } = useGate();
   const books = useDayBooks(day);
   const closing = books?.cashBook.cb ?? 0;
   const saved = counts.find((row) => row.date === day);
   const loaded = useRef(Boolean(saved));
+  const [editing, setEditing] = useState(!saved);
   const [notes, setNotes] = useState(saved ? { ...emptyCashNotes(), ...saved.notes } : emptyCashNotes);
   const [coins, setCoins] = useState(saved?.coins ?? 0);
   const [lines, setLines] = useState<CashAdjust[]>(saved?.lines?.length ? saved.lines : emptyCashLines);
   const counted = cashCountTotal({ notes, coins, lines });
+  const locked = Boolean(saved) && !editing;
+  const open = write && !locked;
 
   useEffect(() => {
     if (loaded.current) return;
@@ -144,7 +149,9 @@ function CashDaySheet({ day }: { day: string }) {
     <Card>
       <CardHeader>
         <CardTitle>{formatDay(day)}</CardTitle>
-        <p className="text-sm text-muted">Count the notes for this day. Saving stays on this page only.</p>
+        <p className="text-sm text-muted">
+          {locked ? "Saved. Use Edit to change this count." : "Count the notes for this day. Saving stays on this page only."}
+        </p>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <div className="grid gap-3 sm:grid-cols-2">
@@ -168,7 +175,7 @@ function CashDaySheet({ day }: { day: string }) {
                   inputMode="numeric"
                   className="tabular"
                   value={count ? String(count) : ""}
-                  disabled={!write}
+                  disabled={!open}
                   aria-label={`${note} notes`}
                   placeholder="How many"
                   onChange={(event) => {
@@ -186,7 +193,7 @@ function CashDaySheet({ day }: { day: string }) {
               inputMode="numeric"
               className="tabular"
               value={coins ? String(coins) : ""}
-              disabled={!write}
+              disabled={!open}
               aria-label="Coins"
               placeholder="Amount"
               onChange={(event) => setCoins(Math.max(0, Math.round(Number(event.target.value) || 0)))}
@@ -204,7 +211,7 @@ function CashDaySheet({ day }: { day: string }) {
               <div key={index} className="grid items-center gap-2 rounded-lg border border-border p-2 md:grid-cols-[1fr_auto_8rem_6.5rem]">
                 <Input
                   value={line.description}
-                  disabled={!write}
+                  disabled={!open}
                   placeholder="Description"
                   aria-label={`Cash note ${index + 1}`}
                   onChange={(event) => {
@@ -213,10 +220,10 @@ function CashDaySheet({ day }: { day: string }) {
                   }}
                 />
                 <div className="flex gap-1">
-                  <Button type="button" size="sm" variant={line.side === "add" ? "default" : "outline"} disabled={!write} onClick={() => setLines((prev) => prev.map((row, i) => (i === index ? { ...row, side: "add" } : row)))}>
+                  <Button type="button" size="sm" variant={line.side === "add" ? "default" : "outline"} disabled={!open} onClick={() => setLines((prev) => prev.map((row, i) => (i === index ? { ...row, side: "add" } : row)))}>
                     Add
                   </Button>
-                  <Button type="button" size="sm" variant={line.side === "less" ? "default" : "outline"} disabled={!write} onClick={() => setLines((prev) => prev.map((row, i) => (i === index ? { ...row, side: "less" } : row)))}>
+                  <Button type="button" size="sm" variant={line.side === "less" ? "default" : "outline"} disabled={!open} onClick={() => setLines((prev) => prev.map((row, i) => (i === index ? { ...row, side: "less" } : row)))}>
                     Less
                   </Button>
                 </div>
@@ -224,7 +231,7 @@ function CashDaySheet({ day }: { day: string }) {
                   inputMode="numeric"
                   className="tabular"
                   value={amount ? String(amount) : ""}
-                  disabled={!write}
+                  disabled={!open}
                   placeholder="Amount"
                   aria-label={`Amount ${index + 1}`}
                   onChange={(event) => {
@@ -240,16 +247,37 @@ function CashDaySheet({ day }: { day: string }) {
           })}
         </div>
         {write ? (
-          <div>
-            <Button
-              type="button"
-              onClick={() => {
-                saveCashCount({ id: `cc-${day}`, date: day, notes, coins, lines });
-                toast.success(`${formatDay(day)} cash count saved`);
-              }}
-            >
-              Save count
-            </Button>
+          <div className="flex gap-2">
+            {locked ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() =>
+                  gate(
+                    () => setEditing(true),
+                    {
+                      title: `Edit ${formatDay(day)}?`,
+                      message: "Enter the security code to change this cash count.",
+                      confirmLabel: "Edit",
+                      requireCode: true,
+                    },
+                  )
+                }
+              >
+                Edit
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                onClick={() => {
+                  saveCashCount({ id: `cc-${day}`, date: day, notes, coins, lines });
+                  setEditing(false);
+                  toast.success(`${formatDay(day)} cash count saved`);
+                }}
+              >
+                Save count
+              </Button>
+            )}
           </div>
         ) : null}
       </CardContent>
