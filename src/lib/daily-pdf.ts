@@ -2,9 +2,10 @@ import { format, parseISO } from "date-fns";
 import type { jsPDF } from "jspdf";
 import type { DayTake } from "./day-report";
 import type { DayBooks, GuestEntry, NamedAmount } from "./types";
-import { joinRecvTags, otaReceivedTag } from "./ota-label";
+import { joinRecvTags, otaChannelLabel, otaReceivedTag } from "./ota-label";
 import { englishNarration } from "./english-narration";
 import { paintPdfReportHead } from "./report-head";
+import { stayDates } from "./stay";
 
 export type DailyPdfInput = {
   hotel: string;
@@ -412,4 +413,371 @@ export async function saveDailyJpeg(input: DailyPdfInput, filename: string) {
   const blob = await dailyPdfBlob(input);
   const jpeg = await jpegFromPdfBlob(blob);
   download(jpeg, filename.toLowerCase().endsWith(".jpg") ? filename : `${filename}.jpg`);
+}
+
+export type DayPackBalance = {
+  source: string;
+  rooms: string;
+  billed: number;
+  paid: number;
+  balance: number;
+};
+
+const PACK_M = 10;
+const PACK_BOTTOM = 284;
+
+function packClip(pdf: jsPDF, text: string, width: number) {
+  const line = pdf.splitTextToSize(text || "—", Math.max(4, width - 1.4))[0];
+  return String(line ?? "—");
+}
+
+function modeName(mode: string) {
+  if (mode === "QRS") return "Santosh QR";
+  if (mode === "QRPK") return "P.K. QR";
+  if (mode === "ONLINE") return "Online";
+  if (mode === "BALANCE") return "Balance";
+  return "Cash";
+}
+
+async function packPage(
+  pdf: jsPDF,
+  hotel: string,
+  blessing: string,
+  right: string,
+) {
+  pdf.addPage();
+  pdf.setFillColor(255, 255, 255);
+  pdf.rect(0, 0, 210, 297, "F");
+  const y = await paintPdfReportHead(pdf, {
+    x: PACK_M,
+    y: PACK_M,
+    w: 190,
+    h: 18,
+    hotel: hotel.toUpperCase(),
+    blessing: blessing.toUpperCase(),
+    right,
+  });
+  return y + 4;
+}
+
+function packSection(pdf: jsPDF, y: number, title: string) {
+  pdf.setFillColor(...HEAD);
+  pdf.rect(PACK_M, y, 190, 7, "F");
+  pdf.setFont("times", "bold");
+  pdf.setFontSize(10);
+  pdf.setTextColor(...GOLD);
+  pdf.text(title, PACK_M + 2, y + 4.8);
+  return y + 7;
+}
+
+function packGrid(
+  pdf: jsPDF,
+  y: number,
+  widths: number[],
+  rows: string[][],
+  opts?: { header?: boolean; boldLast?: boolean; rightFrom?: number },
+) {
+  const rh = 6.4;
+  const rightFrom = opts?.rightFrom ?? widths.length;
+  rows.forEach((cells, index) => {
+    const head = Boolean(opts?.header && index === 0);
+    const last = Boolean(opts?.boldLast && index === rows.length - 1);
+    let x = PACK_M;
+    if (head || last) {
+      pdf.setFillColor(...(head ? CREAM : SUB));
+      pdf.rect(PACK_M, y, 190, rh, "F");
+    }
+    pdf.setDrawColor(26, 26, 26);
+    pdf.setLineWidth(0.15);
+    pdf.rect(PACK_M, y, 190, rh, "S");
+    pdf.setFont("times", head || last ? "bold" : "normal");
+    pdf.setFontSize(8);
+    pdf.setTextColor(17, 17, 17);
+    cells.forEach((cell, i) => {
+      const w = widths[i] ?? 20;
+      const num = i >= rightFrom;
+      pdf.text(packClip(pdf, cell, w), num ? x + w - 1.2 : x + 1.2, y + 4.3, {
+        align: num ? "right" : "left",
+      });
+      if (i < cells.length - 1) pdf.line(x + w, y, x + w, y + rh);
+      x += w;
+    });
+    y += rh;
+  });
+  return y;
+}
+
+export async function downloadDayPack(
+  input: DailyPdfInput & {
+    food: { mode: string; amount: number }[];
+    ws: { mode: string; amount: number }[];
+    openBalance: DayPackBalance[];
+  },
+  filename: string,
+) {
+  const pdf = await buildDailyPdf(input);
+  const dayGuests = input.guests
+    .filter((g) => g.date === input.date)
+    .sort((a, b) => a.slNo - b.slNo);
+  const dayReceipts = input.receipts.filter((r) => r.kind !== "list");
+  const due = dayReceipts.filter((r) => r.kind !== "ota");
+  const ota = dayReceipts.filter((r) => r.kind === "ota");
+  let y = await packPage(
+    pdf,
+    input.hotel,
+    input.blessing,
+    `DETAILED  ${sheetDate(input.date)}`,
+  );
+
+  async function room(need: number) {
+    if (y + need <= PACK_BOTTOM) return;
+    y = await packPage(pdf, input.hotel, input.blessing, `DETAILED  ${sheetDate(input.date)}`);
+  }
+
+  await room(16);
+  y = packSection(pdf, y, "Guest register");
+  const guestW = [8, 46, 14, 24, 20, 26, 26, 26];
+  const guestHead = ["#", "Name", "Room", "Mode", "Amount", "Check-in", "Check-out", "Source"];
+  await room(8);
+  y = packGrid(pdf, y, guestW, [guestHead], { header: true });
+  if (dayGuests.length === 0) {
+    await room(7);
+    y = packGrid(pdf, y, [190], [["No posting"]]);
+  }
+  for (const g of dayGuests) {
+    await room(7);
+    const stay = stayDates(input.guests, g);
+    const tag =
+      g.otaChannel === "FAB" ? "FAB" : g.otaChannel === "BRAVE" ? "BraveStay" : g.ota ? "OTA" : "";
+    y = packGrid(pdf, y, guestW, [[
+      String(g.slNo || ""),
+      `${g.name.toUpperCase()}${tag ? ` · ${tag}` : ""}`,
+      g.roomNo || "—",
+      modeName(g.mode),
+      money(g.amount),
+      stay.checkIn ? sheetDate(stay.checkIn) : "—",
+      stay.checkOut ? sheetDate(stay.checkOut) : "In house",
+      (g.source || "—").toUpperCase(),
+    ]], { rightFrom: 4 });
+  }
+  await room(8);
+  y = packGrid(pdf, y, [160, 30], [["Posting total", money(input.take.roomsTotal)]], {
+    boldLast: true,
+    rightFrom: 1,
+  });
+  y += 3;
+
+  async function lines(title: string, rows: { mode: string; amount: number }[]) {
+    await room(14);
+    y = packSection(pdf, y, title);
+    if (rows.length === 0) {
+      y = packGrid(pdf, y, [190], [["—"]]);
+      y += 3;
+      return;
+    }
+    for (const row of rows) {
+      await room(7);
+      y = packGrid(pdf, y, [160, 30], [[modeName(row.mode), money(row.amount)]], { rightFrom: 1 });
+    }
+    const sum = rows.reduce((s, row) => s + row.amount, 0);
+    await room(7);
+    y = packGrid(pdf, y, [160, 30], [["Total", money(sum)]], { boldLast: true, rightFrom: 1 });
+    y += 3;
+  }
+
+  await lines("Food", input.food);
+  await lines("WS", input.ws);
+
+  await room(14);
+  y = packSection(pdf, y, "Expenses");
+  if (input.expenses.length === 0) {
+    y = packGrid(pdf, y, [190], [["—"]]);
+  } else {
+    for (const e of input.expenses) {
+      await room(7);
+      y = packGrid(pdf, y, [130, 30, 30], [[
+        englishNarration(e.particular).toUpperCase(),
+        modeName(e.mode),
+        money(e.amount),
+      ]], { rightFrom: 2 });
+    }
+    await room(7);
+    y = packGrid(
+      pdf,
+      y,
+      [160, 30],
+      [["Total", money(input.expenses.reduce((s, e) => s + e.amount, 0))]],
+      { boldLast: true, rightFrom: 1 },
+    );
+  }
+  y += 3;
+
+  await room(14);
+  y = packSection(pdf, y, "Balance received");
+  const recvRows = due.length
+    ? due.map((r) => [packRoom(r, input.guests, input.date), modeName(r.mode), money(r.amount)])
+    : [["—", "", ""]];
+  for (const row of recvRows) {
+    await room(7);
+    y = packGrid(pdf, y, [100, 50, 40], [row], { rightFrom: 2 });
+  }
+  y += 3;
+
+  await room(14);
+  y = packSection(pdf, y, "Fab / BraveStay");
+  const otaRows = ota.length
+    ? ota.map((r) => [otaChannelLabel(r.particular), modeName(r.mode), money(r.amount)])
+    : [["—", "", ""]];
+  for (const row of otaRows) {
+    await room(7);
+    y = packGrid(pdf, y, [100, 50, 40], [row], { rightFrom: 2 });
+  }
+  y += 3;
+
+  const bucket = (mode: string, part: "rooms" | "food" | "ws") => {
+    const book =
+      mode === "CASH"
+        ? input.take.cash
+        : mode === "QRS"
+          ? input.take.santosh
+          : mode === "QRPK"
+            ? input.take.pk
+            : input.take.online;
+    return book[part];
+  };
+  const recv = (mode: string, rows: NamedAmount[]) =>
+    rows.filter((r) => r.mode === mode).reduce((s, r) => s + r.amount, 0);
+  const payLines: string[][] = [
+    ["Particular", "Cash", "Santosh QR", "P.K. QR", "Online", "Total"],
+    ["Room sale", money(bucket("CASH", "rooms")), money(bucket("QRS", "rooms")), money(bucket("QRPK", "rooms")), money(bucket("ONLINE", "rooms")), money(input.take.roomsTotal)],
+    ["Food", money(bucket("CASH", "food")), money(bucket("QRS", "food")), money(bucket("QRPK", "food")), money(bucket("ONLINE", "food")), money(input.take.foodTotal)],
+    ["WS", money(bucket("CASH", "ws")), money(bucket("QRS", "ws")), money(bucket("QRPK", "ws")), money(bucket("ONLINE", "ws")), money(input.take.wsTotal)],
+    [
+      "Balance received",
+      money(recv("CASH", due)),
+      money(recv("QRS", due)),
+      money(recv("QRPK", due)),
+      money(recv("ONLINE", due)),
+      money(due.reduce((s, r) => s + r.amount, 0)),
+    ],
+  ];
+  const otaNames = [...new Set(ota.map((r) => otaChannelLabel(r.particular)))];
+  for (const name of otaNames) {
+    const rows = ota.filter((r) => otaChannelLabel(r.particular) === name);
+    payLines.push([
+      name,
+      money(recv("CASH", rows)),
+      money(recv("QRS", rows)),
+      money(recv("QRPK", rows)),
+      money(recv("ONLINE", rows)),
+      money(rows.reduce((s, r) => s + r.amount, 0)),
+    ]);
+  }
+  const modes = ["CASH", "QRS", "QRPK", "ONLINE"] as const;
+  const col = (mode: (typeof modes)[number]) =>
+    bucket(mode, "rooms") +
+    bucket(mode, "food") +
+    bucket(mode, "ws") +
+    recv(mode, dayReceipts);
+  const allIn = modes.reduce((s, mode) => s + col(mode), 0);
+  payLines.push(["Total", money(col("CASH")), money(col("QRS")), money(col("QRPK")), money(col("ONLINE")), money(allIn)]);
+
+  await room(16);
+  y = packSection(pdf, y, "Payment in");
+  const payW = [40, 30, 30, 30, 30, 30];
+  for (let i = 0; i < payLines.length; i++) {
+    await room(7);
+    y = packGrid(pdf, y, payW, [payLines[i]], {
+      header: i === 0,
+      boldLast: i === payLines.length - 1,
+      rightFrom: 1,
+    });
+  }
+
+  y = await packPage(pdf, input.hotel, input.blessing, `BALANCE  ${sheetDate(input.date)}`);
+  y = packSection(pdf, y, "Open source balance");
+  const balW = [52, 38, 33, 33, 34];
+  y = packGrid(pdf, y, balW, [["Source", "Rooms", "Billed", "Paid", "Balance"]], { header: true, rightFrom: 2 });
+  const accounts = input.openBalance;
+  if (accounts.length === 0) {
+    y = packGrid(pdf, y, [190], [["No open balance"]]);
+  }
+  for (const a of accounts) {
+    if (y + 7 > PACK_BOTTOM) {
+      y = await packPage(pdf, input.hotel, input.blessing, `BALANCE  ${sheetDate(input.date)}`);
+      y = packSection(pdf, y, "Open source balance");
+      y = packGrid(pdf, y, balW, [["Source", "Rooms", "Billed", "Paid", "Balance"]], { header: true, rightFrom: 2 });
+    }
+    y = packGrid(pdf, y, balW, [[
+      a.source.toUpperCase(),
+      a.rooms || "—",
+      money(a.billed),
+      money(a.paid),
+      money(a.balance),
+    ]], { rightFrom: 2 });
+  }
+  const billed = accounts.reduce((s, a) => s + a.billed, 0);
+  const paid = accounts.reduce((s, a) => s + a.paid, 0);
+  const left = accounts.reduce((s, a) => s + a.balance, 0);
+  if (y + 7 > PACK_BOTTOM) {
+    y = await packPage(pdf, input.hotel, input.blessing, `BALANCE  ${sheetDate(input.date)}`);
+  }
+  y = packGrid(pdf, y, [90, 33, 33, 34], [["Total", money(billed), money(paid), money(left)]], {
+    boldLast: true,
+    rightFrom: 1,
+  });
+  y += 4;
+  if (y + 20 > PACK_BOTTOM) {
+    y = await packPage(pdf, input.hotel, input.blessing, `BALANCE  ${sheetDate(input.date)}`);
+  }
+  y = packSection(pdf, y, "Received this day");
+  y = packGrid(pdf, y, [80, 55, 55], [["Room", "Mode", "Amount"]], { header: true, rightFrom: 2 });
+  const today = dayReceipts.length
+    ? dayReceipts.map((r) => [
+        r.kind === "ota" ? otaChannelLabel(r.particular) : packRoom(r, input.guests, input.date),
+        modeName(r.mode),
+        money(r.amount),
+      ])
+    : [["—", "", ""]];
+  for (const row of today) {
+    if (y + 7 > PACK_BOTTOM) {
+      y = await packPage(pdf, input.hotel, input.blessing, `BALANCE  ${sheetDate(input.date)}`);
+    }
+    y = packGrid(pdf, y, [80, 55, 55], [row], { rightFrom: 2 });
+  }
+
+  const pages = pdf.getNumberOfPages();
+  for (let i = 1; i <= pages; i++) {
+    pdf.setPage(i);
+    pdf.setFont("times", "normal");
+    pdf.setFontSize(8);
+    pdf.setTextColor(90, 90, 90);
+    pdf.text(`${i} / ${pages}`, 105, 293, { align: "center" });
+  }
+  const name = filename.toLowerCase().endsWith(".pdf") ? filename : `${filename}.pdf`;
+  pdf.save(name);
+}
+
+function packRoom(
+  rec: { particular: string },
+  guests: GuestEntry[],
+  date: string,
+) {
+  const raw = rec.particular.trim();
+  if (!raw) return "—";
+  if (/^\d{1,4}[A-Z]?$/i.test(raw)) return raw;
+  const key = raw.toUpperCase();
+  const hits = guests.filter((g) => {
+    const src = (g.source ?? "").trim().toUpperCase();
+    const name = g.name.trim().toUpperCase();
+    return src === key || name === key;
+  });
+  const today = hits.filter((g) => g.date === date);
+  const pool = today.length
+    ? today
+    : hits.length
+      ? [hits.reduce((best, g) => (g.date > best.date ? g : best))]
+      : [];
+  const rooms = [...new Set(pool.map((g) => g.roomNo.trim()).filter(Boolean))];
+  return rooms.length ? rooms.join(", ") : "—";
 }
