@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Plus, Printer, Trash2 } from "lucide-react";
+import { Plus, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -254,50 +254,93 @@ function PartyBook({
   const { busy: saving, saveToServer } = useAccountSave();
   const { gate } = useGate();
   const [open, setOpen] = useState(false);
+  const [pick, setPick] = useState<null | "edit" | "delete">(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<PartyDraft>(blankParty);
   const set = (key: keyof PartyDraft) => (value: string) =>
     setDraft((prev) => ({ ...prev, [key]: value }));
 
-  function add() {
+  function save() {
     const name = draft.name.trim();
     if (!name) {
       toast.error(`Write the ${nameLabel.toLowerCase()}`);
       return;
     }
     const bookingAmount = Math.round(Number(draft.amount.replace(/,/g, "")) || 0);
+    const next = {
+      name,
+      person: draft.person.trim(),
+      phone: draft.phone.trim(),
+      phone2: draft.phone2.trim(),
+      email: draft.email.trim(),
+      email2: draft.email2.trim(),
+      gst: draft.gst.trim(),
+      city: draft.city.trim(),
+      address: draft.address.trim(),
+      note: draft.note.trim(),
+      bookingAmount,
+    };
+    const finish = () => {
+      setDraft(blankParty());
+      setOpen(false);
+      setEditingId(null);
+      setPick(null);
+    };
+    if (editingId) {
+      onSave(rows.map((row) => (row.id === editingId ? { ...row, ...next } : row)));
+      finish();
+      toast.success("Updated");
+      return;
+    }
     gate(
       () => {
-        onSave([
-          ...rows,
-          {
-            id: uid("co"),
-            name,
-            person: draft.person.trim(),
-            phone: draft.phone.trim(),
-            phone2: draft.phone2.trim(),
-            email: draft.email.trim(),
-            email2: draft.email2.trim(),
-            gst: draft.gst.trim(),
-            city: draft.city.trim(),
-            address: draft.address.trim(),
-            note: draft.note.trim(),
-            bookingAmount,
-          },
-        ]);
-        setDraft(blankParty());
-        setOpen(false);
+        onSave([...rows, { id: uid("co"), ...next }]);
+        finish();
         toast.success(saved);
       },
       { title: addTitle, message: name, confirmLabel: "Add" },
     );
   }
 
-  function remove(id: string) {
-    const row = rows.find((item) => item.id === id);
-    if (!row) return;
+  function beginEdit(row: PartyRow) {
     gate(
       () => {
-        onSave(rows.filter((item) => item.id !== id));
+        setEditingId(row.id);
+        setDraft({
+          person: row.person,
+          name: row.name,
+          phone: row.phone,
+          phone2: row.phone2,
+          email: row.email,
+          email2: row.email2,
+          gst: row.gst,
+          city: row.city,
+          address: row.address,
+          note: row.note,
+          amount: row.bookingAmount ? String(row.bookingAmount) : "",
+        });
+        setOpen(true);
+        setPick(null);
+      },
+      {
+        title: `Edit ${row.name}?`,
+        message: "Enter the security code, then change this entry.",
+        confirmLabel: "Edit",
+        requireCode: true,
+      },
+    );
+  }
+
+  function beginDelete(row: PartyRow) {
+    gate(
+      () => {
+        onSave(rows.filter((item) => item.id !== row.id));
+        if (editingId === row.id) {
+          setEditingId(null);
+          setOpen(false);
+          setDraft(blankParty());
+        }
+        setPick(null);
         toast.success("Deleted");
       },
       {
@@ -316,9 +359,32 @@ function PartyBook({
         <p className="text-sm text-muted">{blurb}</p>
         {write ? (
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant={open ? "outline" : "default"} onClick={() => setOpen((v) => !v)}>
+            <Button
+              type="button"
+              variant={open && !editingId ? "outline" : "default"}
+              onClick={() => {
+                setEditingId(null);
+                setDraft(blankParty());
+                setPick(null);
+                setOpen((v) => !v || Boolean(editingId));
+              }}
+            >
               <Plus className="size-4" />
-              {open ? "Close" : "Add"}
+              {open && !editingId ? "Close" : "Add"}
+            </Button>
+            <Button
+              type="button"
+              variant={pick === "edit" ? "default" : "outline"}
+              onClick={() => setPick((mode) => (mode === "edit" ? null : "edit"))}
+            >
+              Edit
+            </Button>
+            <Button
+              type="button"
+              variant={pick === "delete" ? "default" : "outline"}
+              onClick={() => setPick((mode) => (mode === "delete" ? null : "delete"))}
+            >
+              Delete
             </Button>
             <SaveCube busy={saving} onSave={() => void saveToServer()} />
           </div>
@@ -327,7 +393,7 @@ function PartyBook({
       {write && open ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">{addTitle}</CardTitle>
+            <CardTitle className="text-base">{editingId ? "Edit entry" : addTitle}</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2">
             <FieldBox label="Contact person" value={draft.person} onChange={set("person")} />
@@ -348,9 +414,9 @@ function PartyBook({
               <FieldBox label="Booking amount" value={draft.amount} onChange={set("amount")} numeric />
             ) : null}
             <div>
-              <Button type="button" onClick={add}>
+              <Button type="button" onClick={save}>
                 <Plus className="size-4" />
-                Add
+                {editingId ? "Save" : "Add"}
               </Button>
             </div>
           </CardContent>
@@ -361,6 +427,11 @@ function PartyBook({
           <CardTitle className="text-base">
             {listTitle} · {rows.length}
           </CardTitle>
+          {pick ? (
+            <p className="text-sm text-muted">
+              {pick === "edit" ? "Tick the row you want to edit." : "Tick the row you want to delete."}
+            </p>
+          ) : null}
         </CardHeader>
         <CardContent className="overflow-x-auto p-0">
           {rows.length === 0 ? (
@@ -369,6 +440,7 @@ function PartyBook({
             <table className="w-full min-w-[64rem] text-left text-sm">
               <thead className="text-[11px] uppercase tracking-wide text-muted">
                 <tr className="border-y border-border">
+                  {pick ? <th className="px-3 py-2 font-medium">Tick</th> : null}
                   <th className="px-5 py-2 font-medium">Name</th>
                   <th className="px-3 py-2 font-medium">Person</th>
                   <th className="px-3 py-2 font-medium">Mobile</th>
@@ -378,12 +450,22 @@ function PartyBook({
                   <th className="px-3 py-2 font-medium">Address</th>
                   {withAmount ? <th className="px-3 py-2 font-medium">Booking</th> : null}
                   <th className="px-3 py-2 font-medium">Other</th>
-                  {write ? <th className="py-2" /> : null}
                 </tr>
               </thead>
               <tbody>
                 {rows.map((row) => (
                   <tr key={row.id} className="border-b border-border/70">
+                    {pick ? (
+                      <td className="px-3 py-2.5">
+                        <input
+                          type="checkbox"
+                          className="size-4"
+                          aria-label={`${pick === "edit" ? "Edit" : "Delete"} ${row.name}`}
+                          checked={pick === "edit" && editingId === row.id}
+                          onChange={() => (pick === "edit" ? beginEdit(row) : beginDelete(row))}
+                        />
+                      </td>
+                    ) : null}
                     <td className="px-5 py-2.5 font-medium">{row.name}</td>
                     <td className="px-3 py-2.5">{row.person || "—"}</td>
                     <td className="px-3 py-2.5 tabular">
@@ -403,13 +485,6 @@ function PartyBook({
                       </td>
                     ) : null}
                     <td className="px-3 py-2.5">{row.note || "—"}</td>
-                    {write ? (
-                      <td className="py-2.5 pr-3 text-right">
-                        <Button type="button" size="sm" variant="ghost" onClick={() => remove(row.id)}>
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </td>
-                    ) : null}
                   </tr>
                 ))}
               </tbody>
