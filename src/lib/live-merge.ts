@@ -355,6 +355,14 @@ export function mergeLiveSnapshot(
         cloud.agents ?? [],
       ),
     ),
+    bookers: normalizeAgents(
+      mergeByKey(
+        (r) => r.id,
+        b.bookers ?? [],
+        local.bookers ?? [],
+        cloud.bookers ?? [],
+      ),
+    ),
     monthDraws: normalizeMonthDraws(
       mergeByKey(
         (r) => r.month,

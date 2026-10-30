@@ -26,7 +26,7 @@ import {
 } from "./invoice";
 import { contactsFromHotel, normalizeContacts, type HotelContact } from "./contacts";
 import { corporatesFromHotel, normalizeCorporates, type CorporateCompany } from "./corporates";
-import { agentsFromHotel, normalizeAgents, type TravelAgent } from "./agents";
+import { agentsFromHotel, bookersFromHotel, normalizeAgents, type TravelAgent } from "./agents";
 import { monthDrawsFromHotel, normalizeMonthDraws, type MonthDraw } from "./month-draw";
 import { monthOpeningsFromHotel, normalizeMonthOpenings, type MonthOpening } from "./month-opening";
 import {
@@ -132,6 +132,7 @@ export type LedgerSnapshot = {
   contacts?: HotelContact[];
   corporates?: CorporateCompany[];
   agents?: TravelAgent[];
+  bookers?: TravelAgent[];
   monthDraws?: MonthDraw[];
   monthOpenings?: MonthOpening[];
   monthArchives?: MonthArchive[];
@@ -319,6 +320,11 @@ export function snapshotFromUnknown(
       : agentsFromHotel(p.hotel).length
         ? agentsFromHotel(p.hotel)
         : normalizeAgents(fallback.agents),
+    bookers: Array.isArray((p as { bookers?: TravelAgent[] }).bookers)
+      ? normalizeAgents((p as { bookers?: TravelAgent[] }).bookers)
+      : bookersFromHotel(p.hotel).length
+        ? bookersFromHotel(p.hotel)
+        : normalizeAgents(fallback.bookers),
     monthDraws: Array.isArray((p as { monthDraws?: MonthDraw[] }).monthDraws)
       ? normalizeMonthDraws((p as { monthDraws?: MonthDraw[] }).monthDraws)
       : monthDrawsFromHotel(p.hotel).length
@@ -1274,6 +1280,7 @@ export async function pushLedger(
         snap.monthOpenings ?? [],
         snap.openMonths ?? [],
         snap.monthArchives ?? [],
+        snap.bookers ?? [],
       ),
       _books: booksForHotel(snap),
     },

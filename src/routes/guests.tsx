@@ -51,7 +51,8 @@ function GuestsPage() {
           <TabsTrigger value="list">Guest list</TabsTrigger>
           <TabsTrigger value="form">Form</TabsTrigger>
           <TabsTrigger value="corporate">Corporate</TabsTrigger>
-          <TabsTrigger value="agent">Travel agent</TabsTrigger>
+          <TabsTrigger value="travel">Travel agent</TabsTrigger>
+          <TabsTrigger value="agent">Agent</TabsTrigger>
         </TabsList>
         <TabsContent value="list" className="flex flex-col gap-4">
           <Input
@@ -172,69 +173,122 @@ function GuestsPage() {
         <TabsContent value="corporate">
           <CorporateTab />
         </TabsContent>
+        <TabsContent value="travel">
+          <TravelTab />
+        </TabsContent>
         <TabsContent value="agent">
-          <AgentTab />
+          <BookerTab />
         </TabsContent>
       </Tabs>
     </div>
   );
 }
 
-function CorporateTab() {
-  const rows = useLedger((s) => s.corporates);
-  const setCorporates = useLedger((s) => s.setCorporates);
+type PartyRow = {
+  id: string;
+  name: string;
+  person: string;
+  phone: string;
+  phone2: string;
+  email: string;
+  email2: string;
+  gst: string;
+  city: string;
+  address: string;
+  note: string;
+  bookingAmount?: number;
+};
+
+type PartyDraft = {
+  person: string;
+  name: string;
+  phone: string;
+  phone2: string;
+  email: string;
+  email2: string;
+  gst: string;
+  city: string;
+  address: string;
+  note: string;
+  amount: string;
+};
+
+function blankParty(): PartyDraft {
+  return {
+    person: "",
+    name: "",
+    phone: "",
+    phone2: "",
+    email: "",
+    email2: "",
+    gst: "",
+    city: "",
+    address: "",
+    note: "",
+    amount: "",
+  };
+}
+
+function PartyBook({
+  rows,
+  onSave,
+  nameLabel,
+  blurb,
+  listTitle,
+  empty,
+  addTitle,
+  saved,
+  withAmount,
+}: {
+  rows: PartyRow[];
+  onSave: (rows: PartyRow[]) => void;
+  nameLabel: string;
+  blurb: string;
+  listTitle: string;
+  empty: string;
+  addTitle: string;
+  saved: string;
+  withAmount?: boolean;
+}) {
   const write = canWrite(useLedger((s) => s.appRole));
   const { busy: saving, saveToServer } = useAccountSave();
   const { gate } = useGate();
-  const [name, setName] = useState("");
-  const [gst, setGst] = useState("");
-  const [amount, setAmount] = useState("");
-  const [address, setAddress] = useState("");
-  const [person, setPerson] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  const [note, setNote] = useState("");
   const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState<PartyDraft>(blankParty);
+  const set = (key: keyof PartyDraft) => (value: string) =>
+    setDraft((prev) => ({ ...prev, [key]: value }));
 
   function add() {
-    const company = name.trim();
-    if (!company) {
-      toast.error("Write the company name");
+    const name = draft.name.trim();
+    if (!name) {
+      toast.error(`Write the ${nameLabel.toLowerCase()}`);
       return;
     }
-    const bookingAmount = Math.round(Number(amount.replace(/,/g, "")) || 0);
+    const bookingAmount = Math.round(Number(draft.amount.replace(/,/g, "")) || 0);
     gate(
       () => {
-        setCorporates([
+        onSave([
           ...rows,
           {
             id: uid("co"),
-            name: company,
-            gst: gst.trim(),
+            name,
+            person: draft.person.trim(),
+            phone: draft.phone.trim(),
+            phone2: draft.phone2.trim(),
+            email: draft.email.trim(),
+            email2: draft.email2.trim(),
+            gst: draft.gst.trim(),
+            city: draft.city.trim(),
+            address: draft.address.trim(),
+            note: draft.note.trim(),
             bookingAmount,
-            address: address.trim(),
-            person: person.trim(),
-            phone: phone.trim(),
-            email: email.trim(),
-            note: note.trim(),
           },
         ]);
-        setName("");
-        setGst("");
-        setAmount("");
-        setAddress("");
-        setPerson("");
-        setPhone("");
-        setEmail("");
-        setNote("");
+        setDraft(blankParty());
         setOpen(false);
-        toast.success("Company added");
+        toast.success(saved);
       },
-      {
-        title: "Add this company?",
-        message: company,
-        confirmLabel: "Add",
-      },
+      { title: addTitle, message: name, confirmLabel: "Add" },
     );
   }
 
@@ -243,11 +297,11 @@ function CorporateTab() {
     if (!row) return;
     gate(
       () => {
-        setCorporates(rows.filter((item) => item.id !== id));
-        toast.success("Company deleted");
+        onSave(rows.filter((item) => item.id !== id));
+        toast.success("Deleted");
       },
       {
-        title: "Delete this company?",
+        title: "Delete this entry?",
         message: row.name,
         confirmLabel: "Delete",
         danger: true,
@@ -259,9 +313,7 @@ function CorporateTab() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <p className="text-sm text-muted">
-          Companies the hotel has a tie-up with. Name, GST, agreed booking amount and address.
-        </p>
+        <p className="text-sm text-muted">{blurb}</p>
         {write ? (
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant={open ? "outline" : "default"} onClick={() => setOpen((v) => !v)}>
@@ -275,21 +327,26 @@ function CorporateTab() {
       {write && open ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Add company</CardTitle>
+            <CardTitle className="text-base">{addTitle}</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2">
-            <FieldBox label="Company name" value={name} onChange={setName} />
-            <FieldBox label="GST number" value={gst} onChange={setGst} />
-            <FieldBox label="Booking amount" value={amount} onChange={setAmount} numeric />
-            <FieldBox label="Contact person" value={person} onChange={setPerson} />
-            <FieldBox label="Phone" value={phone} onChange={setPhone} />
-            <FieldBox label="Email" value={email} onChange={setEmail} />
+            <FieldBox label="Contact person" value={draft.person} onChange={set("person")} />
+            <FieldBox label={nameLabel} value={draft.name} onChange={set("name")} />
+            <FieldBox label="Mobile number 1" value={draft.phone} onChange={set("phone")} />
+            <FieldBox label="Mobile number 2" value={draft.phone2} onChange={set("phone2")} />
+            <FieldBox label="Email ID 1" value={draft.email} onChange={set("email")} />
+            <FieldBox label="Email ID 2" value={draft.email2} onChange={set("email2")} />
+            <FieldBox label="Company GST number" value={draft.gst} onChange={set("gst")} />
+            <FieldBox label="City" value={draft.city} onChange={set("city")} />
             <div className="sm:col-span-2">
-              <FieldBox label="Address" value={address} onChange={setAddress} />
+              <FieldBox label="Address" value={draft.address} onChange={set("address")} />
             </div>
             <div className="sm:col-span-2">
-              <FieldBox label="Tie-up note" value={note} onChange={setNote} />
+              <FieldBox label="Other detail" value={draft.note} onChange={set("note")} />
             </div>
+            {withAmount ? (
+              <FieldBox label="Booking amount" value={draft.amount} onChange={set("amount")} numeric />
+            ) : null}
             <div>
               <Button type="button" onClick={add}>
                 <Plus className="size-4" />
@@ -301,22 +358,26 @@ function CorporateTab() {
       ) : null}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Tie-up list · {rows.length}</CardTitle>
+          <CardTitle className="text-base">
+            {listTitle} · {rows.length}
+          </CardTitle>
         </CardHeader>
         <CardContent className="overflow-x-auto p-0">
           {rows.length === 0 ? (
-            <p className="px-5 py-8 text-center text-sm text-muted">No company yet.</p>
+            <p className="px-5 py-8 text-center text-sm text-muted">{empty}</p>
           ) : (
-            <table className="w-full min-w-[52rem] text-left text-sm">
+            <table className="w-full min-w-[64rem] text-left text-sm">
               <thead className="text-[11px] uppercase tracking-wide text-muted">
                 <tr className="border-y border-border">
-                  <th className="px-5 py-2 font-medium">Company</th>
-                  <th className="px-3 py-2 font-medium">GST</th>
-                  <th className="px-3 py-2 font-medium">Booking</th>
+                  <th className="px-5 py-2 font-medium">Name</th>
                   <th className="px-3 py-2 font-medium">Person</th>
-                  <th className="px-3 py-2 font-medium">Phone</th>
+                  <th className="px-3 py-2 font-medium">Mobile</th>
+                  <th className="px-3 py-2 font-medium">Email</th>
+                  <th className="px-3 py-2 font-medium">GST</th>
+                  <th className="px-3 py-2 font-medium">City</th>
                   <th className="px-3 py-2 font-medium">Address</th>
-                  <th className="px-3 py-2 font-medium">Note</th>
+                  {withAmount ? <th className="px-3 py-2 font-medium">Booking</th> : null}
+                  <th className="px-3 py-2 font-medium">Other</th>
                   {write ? <th className="py-2" /> : null}
                 </tr>
               </thead>
@@ -324,16 +385,23 @@ function CorporateTab() {
                 {rows.map((row) => (
                   <tr key={row.id} className="border-b border-border/70">
                     <td className="px-5 py-2.5 font-medium">{row.name}</td>
-                    <td className="px-3 py-2.5 tabular">{row.gst || "—"}</td>
+                    <td className="px-3 py-2.5">{row.person || "—"}</td>
                     <td className="px-3 py-2.5 tabular">
-                      {row.bookingAmount ? `₹${row.bookingAmount.toLocaleString("en-IN")}` : "—"}
+                      {row.phone || "—"}
+                      {row.phone2 ? <div>{row.phone2}</div> : null}
                     </td>
                     <td className="px-3 py-2.5">
-                      {row.person || "—"}
-                      {row.email ? <div className="text-xs text-muted">{row.email}</div> : null}
+                      {row.email || "—"}
+                      {row.email2 ? <div className="text-xs text-muted">{row.email2}</div> : null}
                     </td>
-                    <td className="px-3 py-2.5 tabular">{row.phone || "—"}</td>
+                    <td className="px-3 py-2.5 tabular">{row.gst || "—"}</td>
+                    <td className="px-3 py-2.5">{row.city || "—"}</td>
                     <td className="px-3 py-2.5">{row.address || "—"}</td>
+                    {withAmount ? (
+                      <td className="px-3 py-2.5 tabular">
+                        {row.bookingAmount ? `₹${row.bookingAmount.toLocaleString("en-IN")}` : "—"}
+                      </td>
+                    ) : null}
                     <td className="px-3 py-2.5">{row.note || "—"}</td>
                     {write ? (
                       <td className="py-2.5 pr-3 text-right">
@@ -353,160 +421,57 @@ function CorporateTab() {
   );
 }
 
-function AgentTab() {
+function CorporateTab() {
+  const rows = useLedger((s) => s.corporates);
+  const setCorporates = useLedger((s) => s.setCorporates);
+  return (
+    <PartyBook
+      rows={rows}
+      withAmount
+      nameLabel="Company name"
+      blurb="Companies the hotel has a tie-up with."
+      listTitle="Tie-up list"
+      empty="No company yet."
+      addTitle="Add this company?"
+      saved="Company added"
+      onSave={(next) =>
+        setCorporates(next.map((row) => ({ ...row, bookingAmount: row.bookingAmount ?? 0 })))
+      }
+    />
+  );
+}
+
+function TravelTab() {
   const rows = useLedger((s) => s.agents);
   const setAgents = useLedger((s) => s.setAgents);
-  const write = canWrite(useLedger((s) => s.appRole));
-  const { busy: saving, saveToServer } = useAccountSave();
-  const { gate } = useGate();
-  const [open, setOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  const [address, setAddress] = useState("");
-  const [city, setCity] = useState("");
-  const [note, setNote] = useState("");
-
-  function add() {
-    const who = name.trim();
-    if (!who) {
-      toast.error("Write the travel agent name");
-      return;
-    }
-    gate(
-      () => {
-        setAgents([
-          ...rows,
-          {
-            id: uid("ta"),
-            name: who,
-            phone: phone.trim(),
-            email: email.trim(),
-            address: address.trim(),
-            city: city.trim(),
-            note: note.trim(),
-          },
-        ]);
-        setName("");
-        setPhone("");
-        setEmail("");
-        setAddress("");
-        setCity("");
-        setNote("");
-        setOpen(false);
-        toast.success("Travel agent added");
-      },
-      {
-        title: "Add this travel agent?",
-        message: who,
-        confirmLabel: "Add",
-      },
-    );
-  }
-
-  function remove(id: string) {
-    const row = rows.find((item) => item.id === id);
-    if (!row) return;
-    gate(
-      () => {
-        setAgents(rows.filter((item) => item.id !== id));
-        toast.success("Travel agent deleted");
-      },
-      {
-        title: "Delete this travel agent?",
-        message: row.name,
-        confirmLabel: "Delete",
-        danger: true,
-        requireCode: true,
-      },
-    );
-  }
-
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <p className="text-sm text-muted">
-          Travel agents the hotel works with. Name, phone, email and other detail.
-        </p>
-        {write ? (
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" variant={open ? "outline" : "default"} onClick={() => setOpen((v) => !v)}>
-              <Plus className="size-4" />
-              {open ? "Close" : "Add"}
-            </Button>
-            <SaveCube busy={saving} onSave={() => void saveToServer()} />
-          </div>
-        ) : null}
-      </div>
-      {write && open ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">New travel agent</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-3 sm:grid-cols-2">
-            <FieldBox label="Agent name" value={name} onChange={setName} />
-            <FieldBox label="Phone" value={phone} onChange={setPhone} />
-            <FieldBox label="Email" value={email} onChange={setEmail} />
-            <FieldBox label="City" value={city} onChange={setCity} />
-            <div className="sm:col-span-2">
-              <FieldBox label="Address" value={address} onChange={setAddress} />
-            </div>
-            <div className="sm:col-span-2">
-              <FieldBox label="Other detail" value={note} onChange={setNote} />
-            </div>
-            <div>
-              <Button type="button" onClick={add}>
-                <Plus className="size-4" />
-                Save agent
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Agent list · {rows.length}</CardTitle>
-        </CardHeader>
-        <CardContent className="overflow-x-auto p-0">
-          {rows.length === 0 ? (
-            <p className="px-5 py-8 text-center text-sm text-muted">No travel agent yet.</p>
-          ) : (
-            <table className="w-full min-w-[48rem] text-left text-sm">
-              <thead className="text-[11px] uppercase tracking-wide text-muted">
-                <tr className="border-y border-border">
-                  <th className="px-5 py-2 font-medium">Name</th>
-                  <th className="px-3 py-2 font-medium">Phone</th>
-                  <th className="px-3 py-2 font-medium">Email</th>
-                  <th className="px-3 py-2 font-medium">City</th>
-                  <th className="px-3 py-2 font-medium">Address</th>
-                  <th className="px-3 py-2 font-medium">Detail</th>
-                  {write ? <th className="py-2" /> : null}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row.id} className="border-b border-border/70">
-                    <td className="px-5 py-2.5 font-medium">{row.name}</td>
-                    <td className="px-3 py-2.5 tabular">{row.phone || "—"}</td>
-                    <td className="px-3 py-2.5">{row.email || "—"}</td>
-                    <td className="px-3 py-2.5">{row.city || "—"}</td>
-                    <td className="px-3 py-2.5">{row.address || "—"}</td>
-                    <td className="px-3 py-2.5">{row.note || "—"}</td>
-                    {write ? (
-                      <td className="py-2.5 pr-3 text-right">
-                        <Button type="button" size="sm" variant="ghost" onClick={() => remove(row.id)}>
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </td>
-                    ) : null}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+    <PartyBook
+      rows={rows}
+      nameLabel="Travel agent name"
+      blurb="Travel agents the hotel works with."
+      listTitle="Travel agent list"
+      empty="No travel agent yet."
+      addTitle="Add this travel agent?"
+      saved="Travel agent added"
+      onSave={setAgents}
+    />
+  );
+}
+
+function BookerTab() {
+  const rows = useLedger((s) => s.bookers);
+  const setBookers = useLedger((s) => s.setBookers);
+  return (
+    <PartyBook
+      rows={rows}
+      nameLabel="Agent name"
+      blurb="Other agents the hotel works with."
+      listTitle="Agent list"
+      empty="No agent yet."
+      addTitle="Add this agent?"
+      saved="Agent added"
+      onSave={setBookers}
+    />
   );
 }
 

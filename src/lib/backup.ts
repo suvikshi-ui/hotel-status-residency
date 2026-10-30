@@ -32,6 +32,7 @@ export type BackupTables = {
   contacts?: unknown[];
   corporates?: unknown[];
   agents?: unknown[];
+  bookers?: unknown[];
   guestCards?: unknown[];
   monthDraws?: unknown[];
   monthOpenings?: unknown[];
@@ -110,6 +111,7 @@ export function backupCounts(s: {
   contacts?: unknown[];
   corporates?: unknown[];
   agents?: unknown[];
+  bookers?: unknown[];
   guestCards?: unknown[];
   bankRows?: unknown[];
 }) {
@@ -137,6 +139,7 @@ export function backupCounts(s: {
     contacts: s.contacts?.length ?? 0,
     corporates: s.corporates?.length ?? 0,
     agents: s.agents?.length ?? 0,
+    bookers: s.bookers?.length ?? 0,
     guestCards: s.guestCards?.length ?? 0,
     bankRows: s.bankRows?.length ?? 0,
     dates: [
@@ -343,6 +346,7 @@ export function sliceBackupTables(tables: BackupTables, month: string): BackupTa
     contacts: listFrom(tables, "contacts", "_contacts"),
     corporates: listFrom(tables, "corporates", "_corporates"),
     agents: listFrom(tables, "agents", "_agents"),
+    bookers: listFrom(tables, "bookers", "_bookers"),
     guestCards: filterMonth(listFrom(tables, "guestCards", "_guestCards"), month),
     monthDraws: filterMonth(listFrom(tables, "monthDraws", "_monthDraws"), month),
     monthOpenings: filterMonth(listFrom(tables, "monthOpenings", "_monthOpenings"), month),
@@ -393,6 +397,7 @@ export type MonthBookShape = {
   contacts?: IdRow[];
   corporates?: IdRow[];
   agents?: IdRow[];
+  bookers?: IdRow[];
   creditGuests?: unknown[];
   lockedDates?: Record<string, true>;
   lockRev?: Record<string, number>;
@@ -580,6 +585,7 @@ export function mergeMonthBooks<T extends MonthBookShape>(
     contacts: unionBy(base.contacts, incoming.contacts, rowKey),
     corporates: unionBy(base.corporates, incoming.corporates, rowKey),
     agents: unionBy(base.agents, incoming.agents, rowKey),
+    bookers: unionBy(base.bookers, incoming.bookers, rowKey),
     creditGuests: (base.creditGuests?.length ? base.creditGuests : incoming.creditGuests) ?? [],
     lockedDates: replaceMonthRecord(base.lockedDates, incoming.lockedDates, month),
     lockRev: replaceMonthRecord(base.lockRev, incoming.lockRev, month),

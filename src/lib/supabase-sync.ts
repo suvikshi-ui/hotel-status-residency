@@ -120,6 +120,7 @@ function snapshotFromStore(): LedgerSnapshot {
     contacts: s.contacts,
     corporates: s.corporates,
     agents: s.agents,
+    bookers: s.bookers,
     monthDraws: s.monthDraws,
     monthOpenings: s.monthOpenings,
     monthArchives: s.monthArchives,

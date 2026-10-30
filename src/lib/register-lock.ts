@@ -202,6 +202,7 @@ export function hotelForCloud(
   monthOpenings: MonthOpening[] = [],
   openMonths: string[] = [],
   monthArchives: MonthArchive[] = [],
+  bookers: TravelAgent[] = [],
 ): HotelInfo & {
   _lockedDates: Record<string, true>;
   _lockRev: Record<string, number>;
@@ -219,6 +220,7 @@ export function hotelForCloud(
   _monthOpenings: MonthOpening[];
   _openMonths: string[];
   _monthArchives: MonthArchive[];
+  _bookers: TravelAgent[];
 } {
   return {
     ...hotel,
@@ -238,6 +240,7 @@ export function hotelForCloud(
     _monthOpenings: monthOpenings,
     _openMonths: readOpenMonths(openMonths),
     _monthArchives: monthArchives,
+    _bookers: bookers,
   };
 }
 

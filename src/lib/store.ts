@@ -63,7 +63,7 @@ import {
 import { guestCardsFromHotel, normalizeGuestCards, type GuestCard } from "./guest-cards";
 import { contactsFromHotel, normalizeContacts, type HotelContact } from "./contacts";
 import { corporatesFromHotel, normalizeCorporates, type CorporateCompany } from "./corporates";
-import { agentsFromHotel, normalizeAgents, type TravelAgent } from "./agents";
+import { agentsFromHotel, bookersFromHotel, normalizeAgents, type TravelAgent } from "./agents";
 import { monthDrawsFromHotel, normalizeMonthDraws, type MonthDraw } from "./month-draw";
 import { normalizeCashCounts, type CashCount } from "./cash-count";
 import { monthOpeningsFromHotel, normalizeMonthOpenings, type MonthOpening } from "./month-opening";
@@ -189,6 +189,7 @@ export interface LedgerState {
   contacts: HotelContact[];
   corporates: CorporateCompany[];
   agents: TravelAgent[];
+  bookers: TravelAgent[];
   monthDraws: MonthDraw[];
   monthOpenings: MonthOpening[];
   monthArchives: MonthArchive[];
@@ -251,6 +252,7 @@ export interface LedgerState {
   setContacts: (contacts: HotelContact[]) => void;
   setCorporates: (rows: CorporateCompany[]) => void;
   setAgents: (rows: TravelAgent[]) => void;
+  setBookers: (rows: TravelAgent[]) => void;
   setMonthDraws: (rows: MonthDraw[]) => void;
   setMonthOpenings: (rows: MonthOpening[]) => void;
   saveGuestCard: (card: GuestCard) => void;
@@ -303,6 +305,7 @@ function seedState(): Omit<
   | "setContacts"
   | "setCorporates"
   | "setAgents"
+  | "setBookers"
   | "setMonthDraws"
   | "setMonthOpenings"
   | "saveGuestCard"
@@ -339,6 +342,7 @@ function seedState(): Omit<
     contacts: [],
     corporates: [],
     agents: [],
+    bookers: [],
     monthDraws: [],
     monthOpenings: [],
     monthArchives: [],
@@ -444,6 +448,12 @@ function mergeSnapshot(
     : (() => {
         const fromHotel = agentsFromHotel(persisted.hotel);
         return fromHotel.length ? fromHotel : normalizeAgents(current.agents);
+      })();
+  const bookers = Array.isArray(persisted.bookers)
+    ? normalizeAgents(persisted.bookers)
+    : (() => {
+        const fromHotel = bookersFromHotel(persisted.hotel);
+        return fromHotel.length ? fromHotel : normalizeAgents(current.bookers);
       })();
   const monthDraws = Array.isArray(persisted.monthDraws)
     ? normalizeMonthDraws(persisted.monthDraws)
@@ -563,6 +573,7 @@ function mergeSnapshot(
     contacts,
     corporates,
     agents,
+    bookers,
     monthDraws,
     monthOpenings,
     monthArchives,
@@ -1089,6 +1100,7 @@ export const useLedger = create<LedgerState>()(
       setCorporates: (rows) =>
         save({ corporates: normalizeCorporates(rows) }),
       setAgents: (rows) => save({ agents: normalizeAgents(rows) }),
+      setBookers: (rows) => save({ bookers: normalizeAgents(rows) }),
       setMonthDraws: (rows) => {
         const monthDraws = normalizeMonthDraws(rows);
         const next = { ...get(), monthDraws };
@@ -1178,6 +1190,7 @@ export const useLedger = create<LedgerState>()(
             ? normalizeCorporates(p.corporates)
             : cur.corporates,
           agents: Array.isArray(p.agents) ? normalizeAgents(p.agents) : cur.agents,
+          bookers: Array.isArray(p.bookers) ? normalizeAgents(p.bookers) : cur.bookers,
           monthDraws: Array.isArray(p.monthDraws)
             ? normalizeMonthDraws(p.monthDraws)
             : cur.monthDraws,
@@ -1237,6 +1250,7 @@ export const useLedger = create<LedgerState>()(
           contacts: [],
           corporates: [],
           agents: [],
+          bookers: [],
           monthDraws: [],
           monthOpenings: [],
           monthArchives: [],
@@ -1296,6 +1310,7 @@ export const useLedger = create<LedgerState>()(
         contacts: s.contacts,
         corporates: s.corporates,
         agents: s.agents,
+        bookers: s.bookers,
         monthDraws: s.monthDraws,
         monthOpenings: s.monthOpenings,
         monthArchives: s.monthArchives,

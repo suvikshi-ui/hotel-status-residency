@@ -4,10 +4,17 @@ export interface CorporateCompany {
   gst: string;
   bookingAmount: number;
   address: string;
+  city: string;
   person: string;
   phone: string;
+  phone2: string;
   email: string;
+  email2: string;
   note: string;
+}
+
+function text(v: unknown) {
+  return typeof v === "string" ? v.trim() : "";
 }
 
 export function normalizeCorporates(raw: unknown): CorporateCompany[] {
@@ -25,13 +32,16 @@ export function normalizeCorporates(raw: unknown): CorporateCompany[] {
     out.push({
       id,
       name,
-      gst: typeof r.gst === "string" ? r.gst.trim() : "",
+      gst: text(r.gst),
       bookingAmount: Number.isFinite(amount) ? Math.max(0, Math.round(amount)) : 0,
-      address: typeof r.address === "string" ? r.address.trim() : "",
-      person: typeof r.person === "string" ? r.person.trim() : "",
-      phone: typeof r.phone === "string" ? r.phone.trim() : "",
-      email: typeof r.email === "string" ? r.email.trim() : "",
-      note: typeof r.note === "string" ? r.note.trim() : "",
+      address: text(r.address),
+      city: text(r.city),
+      person: text(r.person),
+      phone: text(r.phone),
+      phone2: text(r.phone2),
+      email: text(r.email),
+      email2: text(r.email2),
+      note: text(r.note),
     });
   }
   return out;
