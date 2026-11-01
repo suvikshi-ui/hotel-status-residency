@@ -62,7 +62,7 @@ function Overview() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-[#3d5c50]">
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-[#5c5148]">
             Night audit
           </p>
           <div className="mt-1 flex items-center gap-3">
@@ -71,7 +71,7 @@ function Overview() {
               {hotel.name}
             </h1>
           </div>
-          <p className="mt-1 max-w-xl text-sm text-[#3d5c50]">
+          <p className="mt-1 max-w-xl text-sm text-[#5c5148]">
             Daily occupancy, sales and night audit — start posting from today.
           </p>
         </div>
@@ -215,8 +215,8 @@ function SalesChart({
       <AreaChart data={chart} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
         <defs>
           <linearGradient id="salesFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#1f4a3c" stopOpacity={0.35} />
-            <stop offset="100%" stopColor="#1f4a3c" stopOpacity={0.02} />
+            <stop offset="0%" stopColor="#8d6b3a" stopOpacity={0.35} />
+            <stop offset="100%" stopColor="#8d6b3a" stopOpacity={0.02} />
           </linearGradient>
         </defs>
         <CartesianGrid stroke="#e3d7c6" vertical={false} />
@@ -244,7 +244,7 @@ function SalesChart({
           }}
         />
         <Area type="monotone" dataKey="target" stroke="#c4b8a1" strokeDasharray="4 4" fill="none" name="Daily target" />
-        <Area type="monotone" dataKey="sales" stroke="#1f4a3c" strokeWidth={2} fill="url(#salesFill)" name="Room sales" />
+        <Area type="monotone" dataKey="sales" stroke="#8d6b3a" strokeWidth={2} fill="url(#salesFill)" name="Room sales" />
       </AreaChart>
     </ResponsiveContainer>
   );

@@ -344,7 +344,7 @@ export function DayChart({
           gap: 10,
           margin: "-18px -20px 14px",
           padding: "8px 12px",
-          background: "#1b332a",
+          background: "#16130f",
           color: "#f6f0e6",
         }}
       >
@@ -357,7 +357,7 @@ export function DayChart({
               fontWeight: 700,
               letterSpacing: "0.04em",
               lineHeight: 1.05,
-              color: "#f4c430",
+              color: "#e6c56a",
               transform: "scaleX(0.96)",
               transformOrigin: "center",
               whiteSpace: "nowrap",

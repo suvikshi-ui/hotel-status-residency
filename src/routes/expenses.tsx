@@ -101,7 +101,7 @@ function ExpensesPage() {
           type="button"
           onClick={() => setDesk("all")}
           className={`rounded-2xl border px-4 py-3 text-left ${
-            desk === "all" ? "border-[#1f4a3c] bg-[#1f4a3c] text-[#f4faf6]" : "border-border bg-card"
+            desk === "all" ? "border-[#c4a36a] bg-[#1c1612] text-[#f8f1e4]" : "border-border bg-card"
           }`}
         >
           <div className="text-[10px] font-semibold uppercase tracking-[0.14em] opacity-70">
@@ -120,7 +120,7 @@ function ExpensesPage() {
               type="button"
               onClick={() => setDesk(item.id)}
               className={`rounded-2xl border px-4 py-3 text-left ${
-                on ? "border-[#1f4a3c] bg-[#1f4a3c] text-[#f4faf6]" : "border-border bg-card"
+                on ? "border-[#c4a36a] bg-[#1c1612] text-[#f8f1e4]" : "border-border bg-card"
               }`}
             >
               <div className="text-[10px] font-semibold uppercase tracking-[0.14em] opacity-70">

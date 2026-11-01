@@ -107,14 +107,14 @@ function GuestsPage() {
             </Button>
           </div>
           <div className="mx-auto w-full max-w-2xl overflow-hidden rounded-xl border border-border bg-white text-[#141816] shadow-sm">
-            <div className="flex items-center gap-3 bg-[#1b332a] px-4 py-3 text-[#f6f0e6]">
+            <div className="flex items-center gap-3 bg-[#16130f] px-4 py-3 text-[#f8f1e4]">
               <img
                 src={publicUrl("logo.png?v=2")}
                 alt=""
                 className="logo-3d h-14 w-auto shrink-0 object-contain"
               />
               <div className="min-w-0 flex-1 text-center">
-                <p className="font-display text-xl font-bold leading-tight text-[#f4c430] sm:text-2xl">
+                <p className="font-display text-xl font-bold leading-tight text-[#e6c56a] sm:text-2xl">
                   Hotel Status Residency
                 </p>
                 <p className="mt-1 text-[12px]">

@@ -482,7 +482,7 @@ function AcService({
 }
 
 const AC_TONE: Record<AcServiceKind, string> = {
-  "jet-pump": "bg-[#d7ebe3] text-[#1b332a]",
+  "jet-pump": "bg-[#f0e4cc] text-[#1c1612]",
   breakdown: "bg-[#f6e7c8] text-[#5c4314]",
   gas: "bg-[#d9e6f5] text-[#1d3d66]",
   motherboard: "bg-[#eadff2] text-[#4a2d5c]",

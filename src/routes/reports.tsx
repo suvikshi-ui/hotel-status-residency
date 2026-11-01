@@ -219,16 +219,16 @@ function DayFileButton() {
       type="button"
       onClick={() => void download()}
       disabled={busy}
-      className="min-w-36 rounded-2xl border border-[#1b332a] bg-[#1b332a] px-4 py-3 text-left text-[#f6f0e6] disabled:opacity-60"
+      className="min-w-36 rounded-2xl border border-[#16130f] bg-[#16130f] px-4 py-3 text-left text-[#f6f0e6] disabled:opacity-60"
     >
-      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#f4c430]">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#e6c56a]">
         {formatDayShort(date)}
       </div>
       <div className="mt-1 flex items-center gap-2 font-display text-lg font-semibold">
         <Download className="size-4" />
         Day file
       </div>
-      <div className="text-xs text-[#d7efe4]">Daily, detailed, balance</div>
+      <div className="text-xs text-[#e6d3a8]">Daily, detailed, balance</div>
     </button>
   );
 }
@@ -286,16 +286,16 @@ function MonthFileButton() {
       type="button"
       onClick={() => void download()}
       disabled={busy}
-      className="min-w-36 rounded-2xl border border-[#1b332a] bg-[#1b332a] px-4 py-3 text-left text-[#f6f0e6] disabled:opacity-60"
+      className="min-w-36 rounded-2xl border border-[#16130f] bg-[#16130f] px-4 py-3 text-left text-[#f6f0e6] disabled:opacity-60"
     >
-      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#f4c430]">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#e6c56a]">
         {formatDayShort(from)} – {formatDayShort(date)}
       </div>
       <div className="mt-1 flex items-center gap-2 font-display text-lg font-semibold">
         <Download className="size-4" />
         Month file
       </div>
-      <div className="text-xs text-[#d7efe4]">Salary, balance, stock</div>
+      <div className="text-xs text-[#e6d3a8]">Salary, balance, stock</div>
     </button>
   );
 }
@@ -556,7 +556,7 @@ function MonthlyReportPanel() {
               />
               <Legend />
               <Bar dataKey="Prev" name={prevLabel} fill="#c4b8a1" radius={[6, 6, 0, 0]} />
-              <Bar dataKey="Now" name={label} fill="#1f4a3c" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="Now" name={label} fill="#8d6b3a" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>
@@ -584,7 +584,7 @@ function MonthlyReportPanel() {
               />
               <Legend />
               <Bar dataKey="Cash" stackId="a" fill="#2f6b4f" />
-              <Bar dataKey="QR" stackId="a" fill="#1f4a3c" />
+              <Bar dataKey="QR" stackId="a" fill="#8d6b3a" />
               <Bar dataKey="PK" stackId="a" fill="#3d5a80" />
               <Bar dataKey="Online" stackId="a" fill="#6f675c" />
               <Bar dataKey="Due" stackId="a" fill="#8a5a22" />

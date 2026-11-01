@@ -365,7 +365,7 @@ function RegisterPage() {
                   <td className="px-3 py-2.5">
                     <input
                       type="checkbox"
-                      className="size-5 accent-[#1f4a3c]"
+                      className="size-5 accent-[#8d6b3a]"
                       checked={guestCards.some((card) => card.postingId === g.id)}
                       aria-label={`Guest detail for ${g.name}`}
                       onChange={() => setDetailFor(g)}

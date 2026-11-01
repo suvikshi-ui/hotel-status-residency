@@ -8,7 +8,7 @@ export const REPORT_HEAD_CSS = `
   gap: 10px;
   margin: 0 0 12px;
   padding: 8px 12px;
-  background: #1b332a;
+  background: #16130f;
   color: #f6f0e6;
 }
 .report-head img {
@@ -30,7 +30,7 @@ export const REPORT_HEAD_CSS = `
   font-size: 26px;
   letter-spacing: 0.04em;
   line-height: 1.05;
-  color: #f4c430;
+  color: #e6c56a;
   white-space: nowrap;
   transform: scaleX(0.96);
   transform-origin: center;

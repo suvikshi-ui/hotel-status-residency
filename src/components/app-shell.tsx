@@ -12,7 +12,6 @@ import {
   Landmark,
   Layers,
   MessageSquareWarning,
-  Globe,
   Phone,
   Receipt,
   Scale,
@@ -36,7 +35,6 @@ const NAV = [
   { to: "/staff", label: "Staff", icon: Users, group: "Payroll" },
   { to: "/inventory", label: "Inventory", icon: Layers, group: "Stores" },
   { to: "/complaints", label: "Complaints", icon: MessageSquareWarning, group: "Desk" },
-  { to: "/website-bookings", label: "Web bookings", icon: Globe, group: "Desk" },
   { to: "/reminders", label: "Reminder", icon: Bell, group: "Desk" },
   { to: "/contacts", label: "Contacts", icon: Phone, group: "Desk" },
   { to: "/reports", label: "Reports", icon: BarChart3, group: "Close" },
@@ -57,7 +55,7 @@ function NavLinks({ onDark = false }: { onDark?: boolean }) {
         return (
           <span key={item.to} className="contents">
             {groupBreak ? (
-              <span className="mx-1 h-6 w-px shrink-0 bg-[#1b2e28]/20" aria-hidden />
+              <span className="mx-1 h-6 w-px shrink-0 bg-[#e6d3a8]/35" aria-hidden />
             ) : null}
             <TopLink to={item.to} active={active} onDark={onDark}>
               <Icon className="size-4 shrink-0" />
@@ -93,9 +91,9 @@ function TopLink({
       className={cn(
         "flex h-11 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-semibold",
         active
-          ? "bg-[#f4faf6] text-[#1b3f32]"
+          ? "bg-[#e8d5b0] text-[#1c1612]"
           : onDark
-            ? "text-[#f4faf6] hover:bg-white/12"
+            ? "text-[#f8f1e4] hover:bg-white/10"
             : "text-fg hover:bg-bg-warm",
       )}
     >
@@ -108,9 +106,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const hotel = useLedger((s) => s.hotel);
 
   return (
-    <div className="min-h-dvh text-[#1b2e28]">
+    <div className="min-h-dvh text-[#1c1612]">
       <div className="flex min-w-0 flex-col">
-        <header className="page-bar sticky top-0 z-30 border-b text-[#f4faf6] print:hidden">
+        <header className="page-bar sticky top-0 z-30 border-b text-[#f8f1e4] print:hidden">
           <div className="flex items-center gap-2 px-3 py-2 md:px-6">
             <div className="flex min-w-0 flex-1 items-center gap-2">
               <HotelLogo mark className="logo-3d h-11 w-auto shrink-0" />
@@ -118,7 +116,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <div className="truncate font-display text-base font-semibold leading-tight">
                   {hotel.name}
                 </div>
-                <div className="truncate text-[11px] font-semibold uppercase tracking-[0.12em] text-[#d7efe4]">
+                <div className="truncate text-[11px] font-semibold uppercase tracking-[0.16em] text-[#e6d3a8]">
                   On this computer
                 </div>
               </div>

@@ -3,32 +3,27 @@
 @import "tw-animate-css";
 
 @theme {
-  --color-bg: #f6f1e8;
-  --color-bg-warm: #ebe3d4;
-  --color-fg: #1c1914;
+  --color-bg: #f4efe6;
+  --color-bg-warm: #efe4d2;
+  --color-fg: #1c1612;
   --color-card: #fffdf8;
-  --color-muted: #6e665c;
-  --color-muted-fg: #6e665c;
-  --color-border: #e3d7c6;
-  --color-primary: #1f4a3c;
-  --color-primary-fg: #f4faf6;
-  --color-accent: #3d6b58;
-  --color-accent-fg: #f4faf6;
-  --color-ring: #1f4a3c;
-  --color-sidebar: #1b2622;
-  --color-sidebar-fg: #f4faf6;
-  --color-sidebar-muted: #c9ddd2;
-  --color-sidebar-line: #2a4038;
-  --color-danger: #9b3d32;
-  --color-warn: #8a5a22;
-  --color-ok: #2f6b4f;
-  --color-due: #8a5a22;
-  --color-ota: #3d5a80;
-  --color-danger: #9b3d32;
-  --color-warn: #8a5a22;
-  --color-ok: #2f6b4f;
-  --color-due: #8a5a22;
-  --color-ota: #3d5a80;
+  --color-muted: #5c5148;
+  --color-muted-fg: #5c5148;
+  --color-border: #e4d5bc;
+  --color-primary: #1c1612;
+  --color-primary-fg: #f8f1e4;
+  --color-accent: #8d6b3a;
+  --color-accent-fg: #f8f1e4;
+  --color-ring: #c4a36a;
+  --color-sidebar: #16130f;
+  --color-sidebar-fg: #f8f1e4;
+  --color-sidebar-muted: #e6d3a8;
+  --color-sidebar-line: #2c261f;
+  --color-danger: #8c3a32;
+  --color-warn: #8a6232;
+  --color-ok: #3d6b45;
+  --color-due: #8a6232;
+  --color-ota: #3d5270;
 
   --font-sans: "Figtree", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Fraunces", "Times New Roman", serif;
@@ -55,11 +50,11 @@
   }
 
   body {
-    background-color: #d5e6dc;
-    color: #1b2e28;
-    --color-fg: #1b2e28;
-    --color-muted: #3d5c50;
-    --color-primary: #1f4a3c;
+    background-color: #e7dcc8;
+    color: #1c1612;
+    --color-fg: #1c1612;
+    --color-muted: #5c5148;
+    --color-primary: #1c1612;
     font-family: var(--font-sans);
     font-weight: 500;
     min-height: 100dvh;
@@ -102,34 +97,34 @@
 .paper-card,
 .bg-card,
 .bg-bg-warm {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(236, 246, 240, 0.94));
-  border: 1px solid rgba(27, 46, 40, 0.08);
+  background: linear-gradient(180deg, #fffdf8 0%, #f7f1e6 100%);
+  border: 1px solid rgba(196, 163, 106, 0.45);
   box-shadow: none;
-  --color-fg: #14241e;
-  --color-muted: #3e5a4c;
-  --color-primary: #1a4538;
-  color: #14241e;
+  --color-fg: #1c1612;
+  --color-muted: #5c5148;
+  --color-primary: #1c1612;
+  color: #1c1612;
   -webkit-font-smoothing: auto;
 }
 
 .liquid-glass {
-  background: rgba(255, 255, 255, 0.92);
+  background: #fffdf8;
 }
 
 .liquid-bar {
-  background: rgba(255, 255, 255, 0.72);
-  border-color: rgba(27, 46, 40, 0.1);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
-  color: #1b2e28;
+  background: rgba(255, 253, 248, 0.88);
+  border-color: rgba(196, 163, 106, 0.4);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  color: #1c1612;
 }
 
 .page-bar {
-  background: #1b332a;
+  background: #16130f;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  border-color: rgba(0, 0, 0, 0.35);
-  box-shadow: none;
-  color: #f4faf6;
+  border-color: #c4a36a;
+  box-shadow: inset 0 -1px 0 #c4a36a;
+  color: #f8f1e4;
 }
 
 .logo-3d {
@@ -154,7 +149,7 @@ input,
 textarea,
 select {
   background-color: #fffdf8;
-  color: #14241e;
+  color: #1c1612;
 }
 
 .paper-card {
@@ -177,7 +172,7 @@ select {
 }
 
 .daily-a4-head {
-  background: #1b332a !important;
+  background: #16130f !important;
   color: #f6f0e6 !important;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
@@ -231,6 +226,6 @@ select {
   }
 
   .daily-a4-head {
-    background: #1b332a !important;
+    background: #16130f !important;
   }
 }
