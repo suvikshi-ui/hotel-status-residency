@@ -3,18 +3,18 @@
 @import "tw-animate-css";
 
 @theme {
-  --color-bg: #f4efe6;
-  --color-bg-warm: #efe4d2;
+  --color-bg: #f6edd8;
+  --color-bg-warm: #ead7ae;
   --color-fg: #1c1612;
   --color-card: #fffdf8;
   --color-muted: #5c5148;
   --color-muted-fg: #5c5148;
-  --color-border: #e4d5bc;
+  --color-border: #d4b072;
   --color-primary: #1c1612;
   --color-primary-fg: #f8f1e4;
-  --color-accent: #8d6b3a;
+  --color-accent: #a6843d;
   --color-accent-fg: #f8f1e4;
-  --color-ring: #c4a36a;
+  --color-ring: #c9a227;
   --color-sidebar: #16130f;
   --color-sidebar-fg: #f8f1e4;
   --color-sidebar-muted: #e6d3a8;
@@ -50,10 +50,9 @@
   }
 
   body {
-    background-color: #d9c7a4;
+    background-color: #b8894a;
     background-image:
-      radial-gradient(900px 420px at 50% -120px, #f8efdc 0%, rgba(248, 239, 220, 0) 70%),
-      linear-gradient(180deg, #efe2c8 0%, #d7c29a 100%);
+      radial-gradient(1100px 640px at 50% -40px, #f8f0dc 0%, #e7d3a4 46%, #b8894a 100%);
     color: #1c1612;
     --color-fg: #1c1612;
     --color-muted: #5c5148;
@@ -100,9 +99,13 @@
 .paper-card,
 .bg-card,
 .bg-bg-warm {
-  background: linear-gradient(180deg, #fffdf8 0%, #f8f1e2 100%);
-  border: 1px solid rgba(180, 138, 62, 0.62);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 10px 24px rgba(28, 22, 14, 0.06);
+  background: linear-gradient(180deg, #fffdf8 0%, #fbf4e4 100%);
+  border: 1px solid #c9a04a;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 248, 230, 0.9),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 0 0 1px rgba(120, 84, 28, 0.28),
+    0 14px 32px rgba(48, 32, 10, 0.12);
   --color-fg: #1c1612;
   --color-muted: #5c5148;
   --color-primary: #1c1612;
@@ -122,11 +125,11 @@
 }
 
 .page-bar {
-  background: linear-gradient(180deg, #2a241c 0%, #100e0c 100%);
+  background: linear-gradient(180deg, #3a3124 0%, #0c0a08 42%, #0c0a08 100%);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  border-color: #e6c56a;
-  box-shadow: inset 0 1px 0 #e6c56a, inset 0 -2px 0 #c4a36a;
+  border-color: #f0d78c;
+  box-shadow: inset 0 1px 0 #f6e7b8, inset 0 -3px 0 #c9a227;
   color: #f8f1e4;
 }
 
@@ -153,6 +156,7 @@ textarea,
 select {
   background-color: #fffdf8;
   color: #1c1612;
+  border-color: #d4b072;
 }
 
 .paper-card {

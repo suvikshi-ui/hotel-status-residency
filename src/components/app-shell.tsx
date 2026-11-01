@@ -91,7 +91,7 @@ function TopLink({
       className={cn(
         "flex h-11 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-semibold",
         active
-          ? "bg-[#c4a36a] text-[#1c1612]"
+          ? "bg-gradient-to-b from-[#f3e2ad] to-[#c9a227] text-[#1c1612] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]"
           : onDark
             ? "text-[#f8f1e4] hover:bg-white/10"
             : "text-fg hover:bg-bg-warm",
@@ -113,17 +113,17 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div className="flex min-w-0 flex-1 items-center gap-2">
               <HotelLogo mark className="logo-3d h-11 w-auto shrink-0" />
               <div className="min-w-0">
-                <div className="truncate font-display text-base font-semibold leading-tight">
+                <div className="truncate font-display text-lg font-semibold leading-tight tracking-[0.04em] text-[#f0d78c]">
                   {hotel.name}
                 </div>
-                <div className="truncate text-[11px] font-semibold uppercase tracking-[0.16em] text-[#e6d3a8]">
+                <div className="truncate text-[11px] font-semibold uppercase tracking-[0.22em] text-[#e6c56a]">
                   On this computer
                 </div>
               </div>
             </div>
             <DateNav light />
           </div>
-          <div className="border-t border-white/15 px-3 pb-2 md:px-6">
+          <div className="border-t border-[#c9a227]/70 px-3 pb-2 md:px-6">
             <NavLinks onDark />
           </div>
         </header>
