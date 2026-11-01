@@ -11,7 +11,7 @@ import {
   YAxis,
 } from "recharts";
 import { format, isValid, parseISO } from "date-fns";
-import { Printer, Download } from "lucide-react";
+import { Printer, Download, LockOpen } from "lucide-react";
 import { toast } from "sonner";
 import { DailyA4 } from "@/components/daily-a4";
 import { DayChart } from "@/components/day-chart";
@@ -28,6 +28,7 @@ import { buildDueAccounts } from "@/lib/balance";
 import { REPORT_TAB, parseReportView } from "@/lib/report-views";
 import { useLedger, useDayBooks } from "@/lib/store";
 import { isPriorMonthClosed } from "@/lib/register-lock";
+import { useGate } from "@/components/security-gate";
 import type { DayBooks } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -47,6 +48,9 @@ function latestMarkFor(date: string, rows: { date?: string }[], openingDate: str
 function useMonthLock(date: string) {
   const openMonths = useLedger((s) => s.openMonths);
   const lockRev = useLedger((s) => s.lockRev);
+  const lockedMonths = useLedger((s) => s.lockedMonths);
+  const lockedDates = useLedger((s) => s.lockedDates);
+  const openDays = useLedger((s) => s.openDays);
   const openingDate = useLedger((s) => s.openingDate);
   const guests = useLedger((s) => s.guests);
   const food = useLedger((s) => s.food);
@@ -58,10 +62,52 @@ function useMonthLock(date: string) {
     [...guests, ...food, ...wholesale, ...expenses, ...balReceived],
     openingDate,
   );
-  const closed = isPriorMonthClosed(date, openMonths, latest, lockRev);
-  const first = `${date.slice(0, 7)}-01`;
+  const month = date.slice(0, 7);
+  const dayOpen = Boolean(openDays?.[date]);
+  const closed =
+    Boolean(lockedMonths?.[month]) || isPriorMonthClosed(date, openMonths, latest, lockRev);
+  const dayLocked = !dayOpen && (closed || Boolean(lockedDates?.[date]));
+  const first = `${month}-01`;
   const books = useDayBooks(first);
-  return { closed, first, books };
+  return { closed, dayOpen, dayLocked, first, books };
+}
+
+function LockedDay({ date }: { date: string }) {
+  const { gate } = useGate();
+  const unlockRegister = useLedger((s) => s.unlockRegister);
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{formatDay(date)} is locked</CardTitle>
+        <p className="text-sm text-muted">
+          This date stays locked in the register and in the report. Unlock opens only this date.
+          The rest of the month stays locked. Nothing is deleted.
+        </p>
+      </CardHeader>
+      <CardContent>
+        <Button
+          type="button"
+          onClick={() =>
+            gate(
+              () => {
+                unlockRegister(date);
+                toast.success(`Unlocked ${formatDay(date)}`);
+              },
+              {
+                title: `Unlock ${formatDay(date)}?`,
+                message: "Enter the security code. Only this date opens.",
+                confirmLabel: "Unlock",
+                requireCode: true,
+              },
+            )
+          }
+        >
+          <LockOpen className="size-4" />
+          Unlock {formatDay(date)}
+        </Button>
+      </CardContent>
+    </Card>
+  );
 }
 
 function LockedOpening({ first, books }: { first: string; books: DayBooks | undefined }) {
@@ -166,6 +212,7 @@ function DayFileButton() {
   const allExp = useLedger((s) => s.expenses);
   const allRecv = useLedger((s) => s.balReceived);
   const books = useDayBooks(date);
+  const lock = useMonthLock(date);
   const [busy, setBusy] = useState(false);
   const guests = allGuests.filter((g) => g.date === date);
   const food = allFood.filter((f) => f.date === date);
@@ -175,6 +222,7 @@ function DayFileButton() {
   const take = buildDayTake(guests, food, ws);
 
   async function download() {
+    if (lock.dayLocked) return;
     setBusy(true);
     toast.message("Preparing the day file…");
     try {
@@ -218,7 +266,7 @@ function DayFileButton() {
     <button
       type="button"
       onClick={() => void download()}
-      disabled={busy}
+      disabled={busy || lock.dayLocked}
       className="min-w-36 rounded-2xl border border-[#c4a36a] bg-[#16130f] px-4 py-3 text-left text-[#f6f0e6] disabled:opacity-60"
     >
       <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#e6c56a]">
@@ -228,7 +276,9 @@ function DayFileButton() {
         <Download className="size-4" />
         Day file
       </div>
-      <div className="text-xs text-[#e6d3a8]">Daily, detailed, balance</div>
+      <div className="text-xs text-[#e6d3a8]">
+        {lock.dayLocked ? "Locked" : "Daily, detailed, balance"}
+      </div>
     </button>
   );
 }
@@ -249,8 +299,10 @@ function MonthFileButton() {
   const complaints = useLedger((s) => s.complaints);
   const [busy, setBusy] = useState(false);
   const from = `${date.slice(0, 7)}-01`;
+  const lock = useMonthLock(date);
 
   async function download() {
+    if (lock.closed) return;
     setBusy(true);
     toast.message("Preparing the month file…");
     try {
@@ -285,7 +337,7 @@ function MonthFileButton() {
     <button
       type="button"
       onClick={() => void download()}
-      disabled={busy}
+      disabled={busy || lock.closed}
       className="min-w-36 rounded-2xl border border-[#c4a36a] bg-[#16130f] px-4 py-3 text-left text-[#f6f0e6] disabled:opacity-60"
     >
       <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#e6c56a]">
@@ -295,7 +347,7 @@ function MonthFileButton() {
         <Download className="size-4" />
         Month file
       </div>
-      <div className="text-xs text-[#e6d3a8]">Salary, balance, stock</div>
+      <div className="text-xs text-[#e6d3a8]">{lock.closed ? "Locked" : "Salary, balance, stock"}</div>
     </button>
   );
 }
@@ -609,9 +661,7 @@ function DetailDailyPanel() {
   const receipts = useLedger((s) => s.balReceived).filter((r) => r.date === date);
   const books = useDayBooks(date);
   const lock = useMonthLock(date);
-  if (lock.closed) {
-    return <LockedOpening first={lock.first} books={lock.books} />;
-  }
+  if (lock.dayLocked) return <LockedDay date={date} />;
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
@@ -667,16 +717,7 @@ function DailyReportPanel() {
   const lock = useMonthLock(date);
   const take = buildDayTake(guests, food, ws);
 
-  if (lock.closed) {
-    return (
-      <div className="flex flex-col gap-4">
-        <p className="text-sm text-muted">
-          {formatDay(lock.first)} · locked month · opening balance only
-        </p>
-        <LockedOpening first={lock.first} books={lock.books} />
-      </div>
-    );
-  }
+  if (lock.dayLocked) return <LockedDay date={date} />;
 
   return (
     <div className="flex flex-col gap-4">

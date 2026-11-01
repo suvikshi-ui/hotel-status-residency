@@ -9,14 +9,7 @@ export function HydrateLedger({ children }: { children: ReactNode }) {
     void (async () => {
       await setLedgerOwner(null);
       if (cancelled) return;
-      const state = useLedger.getState();
-      const date = state.selectedDate;
-      if (date && (state.openDays?.[date] || !state.lockedDates?.[date])) {
-        state.lockRegister(date);
-      }
-      for (const day of Object.keys(useLedger.getState().openDays ?? {})) {
-        useLedger.getState().lockRegister(day);
-      }
+      useLedger.getState().lockBooksOnRefresh();
       useLedger.getState().setAppRole("admin");
       setReady(true);
     })();

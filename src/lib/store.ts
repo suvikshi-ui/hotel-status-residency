@@ -223,6 +223,7 @@ export interface LedgerState {
   unlockRegister: (date: string) => void;
   lockMonth: (month: string) => void;
   unlockMonth: (month: string) => void;
+  lockBooksOnRefresh: () => void;
   sealEntries: (keys: string[]) => void;
   addGuest: (g: Omit<GuestEntry, "id" | "slNo" | "date"> & { date?: string }) => void;
   updateGuest: (id: string, patch: Partial<GuestEntry>, opts?: BypassGuard) => void;
@@ -281,6 +282,7 @@ function seedState(): Omit<
   | "unlockRegister"
   | "lockMonth"
   | "unlockMonth"
+  | "lockBooksOnRefresh"
   | "sealEntries"
   | "addGuest"
   | "updateGuest"
@@ -909,6 +911,53 @@ export const useLedger = create<LedgerState>()(
         const next = { ...get(), openMonths, lockedDates, lockRev, lockedMonths, openDays };
         afterLockChange();
         save(rebuildFrom(next, `${month}-01`));
+      },
+      lockBooksOnRefresh: () => {
+        const state = get();
+        const dated = [
+          state.openingDate,
+          state.selectedDate,
+          todayIso(),
+          ...state.guests.map((row) => row.date),
+          ...state.food.map((row) => row.date),
+          ...state.wholesale.map((row) => row.date),
+          ...state.expenses.map((row) => row.date),
+          ...state.balReceived.map((row) => row.date),
+        ].filter((date): date is string => typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date));
+        const latest = dated.reduce((max, date) => (date > max ? date : max), state.openingDate || todayIso());
+        const startMonth = monthStamp(state.openingDate || latest);
+        const endMonth = monthStamp(latest);
+        const months: string[] = [];
+        for (let month = startMonth; month && month <= endMonth; month = nextMonthStamp(month)) {
+          months.push(month);
+        }
+        let lockedDates = { ...(state.lockedDates ?? {}) };
+        let lockRev = { ...(state.lockRev ?? {}) };
+        const lockedMonths = { ...(state.lockedMonths ?? {}) };
+        let changed = (state.openMonths ?? []).length > 0 || Object.keys(state.openDays ?? {}).length > 0;
+        for (const month of months) {
+          if (!lockedMonths[month]) changed = true;
+          lockedMonths[month] = true;
+          for (const date of eachIsoDay(`${month}-01`, monthEnd(month))) {
+            if (!date.startsWith(month)) continue;
+            if (!lockedDates[date]) {
+              lockedDates = withLocked(lockedDates, date);
+              lockRev = bumpLockRev(lockRev, date);
+              changed = true;
+            }
+          }
+        }
+        if (!changed) return;
+        const next = {
+          ...state,
+          openMonths: [] as string[],
+          lockedMonths,
+          lockedDates,
+          lockRev,
+          openDays: {},
+        };
+        afterLockChange();
+        save(rebuildFrom(next, state.selectedDate || latest));
       },
       sealEntries: (keys) => {
         const sealedIds = withSealed(get().sealedIds, keys);
