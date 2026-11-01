@@ -54,15 +54,16 @@ function RegisterPage() {
   const lockRev = useLedger((s) => s.lockRev);
   const openingDate = useLedger((s) => s.openingDate);
   const openMonths = useLedger((s) => s.openMonths);
+  const lockedMonths = useLedger((s) => s.lockedMonths);
+  const openDays = useLedger((s) => s.openDays);
   const lockRegister = useLedger((s) => s.lockRegister);
   const unlockRegister = useLedger((s) => s.unlockRegister);
-  const lockMonth = useLedger((s) => s.lockMonth);
-  const unlockMonth = useLedger((s) => s.unlockMonth);
   const { busy: saving, saveToServer } = useAccountSave();
   const guestCards = useLedger((s) => s.guestCards);
   const saveGuestCard = useLedger((s) => s.saveGuestCard);
   const { gate } = useGate();
   const locked = isDayLocked(lockedDates, date);
+  const pageOpen = Boolean(openDays?.[date]);
   const [q, setQ] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [detailFor, setDetailFor] = useState<GuestEntry | null>(null);
@@ -100,10 +101,9 @@ function RegisterPage() {
   ]
     .filter(Boolean)
     .reduce((max, value) => (value > max ? value : max), openingDate || date);
-  const priorMonth = month < latestMark.slice(0, 7);
   const monthClosed = isPriorMonthClosed(date, openMonths, latestMark, lockRev);
-  const monthReopened = priorMonth && !monthClosed;
-  const sealed = locked || monthClosed;
+  const monthSheetLocked = Boolean(lockedMonths?.[month]) || monthClosed;
+  const sealed = pageOpen ? false : locked || monthSheetLocked;
 
   useEffect(() => {
     if (sealed) setEditingId(null);
@@ -125,59 +125,12 @@ function RegisterPage() {
         </p>
         <p className="mt-1 text-sm text-muted">
           {guests.length} postings · {money(take.roomsTotal)} room revenue ·
-          Lock / Unlock / Edit / Delete always need the security code. Then press Save.
+          The page lock covers only this date. The month lock covers the whole sheet.
         </p>
         </div>
         <div className="flex flex-wrap gap-2 print:hidden">
           <SaveCube busy={saving} onSave={() => void saveToServer()} />
-          {monthClosed ? (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() =>
-                gate(
-                  () => {
-                    unlockMonth(month);
-                    toast.success(`${monthName} unlocked`);
-                  },
-                  {
-                    title: `Unlock ${monthName}?`,
-                    message:
-                      "Enter the security code. The whole month opens for entry. Lock it again when you are done.",
-                    confirmLabel: "Unlock month",
-                    requireCode: true,
-                  },
-                )
-              }
-            >
-              <LockOpen className="size-4" />
-              Unlock {monthName}
-            </Button>
-          ) : priorMonth && monthReopened ? (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() =>
-                gate(
-                  () => {
-                    lockMonth(month);
-                    setEditingId(null);
-                    toast.success(`${monthName} locked`);
-                  },
-                  {
-                    title: `Lock ${monthName}?`,
-                    message:
-                      "Enter the security code. This month's register and report stay as they are.",
-                    confirmLabel: "Lock month",
-                    requireCode: true,
-                  },
-                )
-              }
-            >
-              <Lock className="size-4" />
-              Lock {monthName}
-            </Button>
-          ) : locked ? (
+          {locked && !pageOpen ? (
             <Button
               type="button"
               variant="outline"
@@ -188,10 +141,10 @@ function RegisterPage() {
                     toast.success(`Unlocked ${formatDay(date)}`);
                   },
                   {
-                    title: "Unlock this day's register?",
+                    title: "Unlock this page?",
                     message:
-                      "Enter the security code to unlock. Edit and Delete come back after unlock.",
-                    confirmLabel: "Unlock",
+                      "Enter the security code. Only this date opens. The rest of the month stays as it is.",
+                    confirmLabel: "Unlock page",
                     requireCode: true,
                   },
                 );
@@ -212,10 +165,10 @@ function RegisterPage() {
                     toast.success(`Locked ${formatDay(date)}`);
                   },
                   {
-                    title: "Lock this day's register?",
+                    title: "Lock this page?",
                     message:
-                      "Enter the security code to lock. Edit and Delete hide until you unlock with the same code.",
-                    confirmLabel: "Lock",
+                      "Enter the security code. Only this date locks. Edit and Delete hide until you unlock this page.",
+                    confirmLabel: "Lock page",
                     requireCode: true,
                   },
                 )
@@ -229,16 +182,16 @@ function RegisterPage() {
         </div>
         </div>
 
-      {monthClosed ? (
+      {monthSheetLocked && !pageOpen ? (
         <p className="rounded-lg bg-bg-warm px-4 py-3 text-sm">
-          {monthName} is locked. New posting is closed. Press Unlock {monthName}
-          and enter the security code if you need to add or edit. Nothing is deleted.
+          {monthName} is locked. This page is closed. Unlock opens only this
+          date. Unlock {monthName} at the top opens the whole sheet. Nothing is
+          deleted.
         </p>
-      ) : locked ? (
+      ) : locked && !pageOpen ? (
         <p className="rounded-lg bg-bg-warm px-4 py-3 text-sm">
-          This day's register is locked on every desk. Unlock with the digit
-          code to add or edit. You do not need to press Lock again on another
-          computer.
+          This page is locked. Unlock opens only this date. The other dates
+          stay as they are.
         </p>
       ) : null}
       <YesterdayRoll />
@@ -629,6 +582,9 @@ function MonthBooks() {
   const openings = useLedger((s) => s.monthOpenings);
   const archives = useLedger((s) => s.monthArchives);
   const openMonths = useLedger((s) => s.openMonths);
+  const lockedMonths = useLedger((s) => s.lockedMonths);
+  const lockMonth = useLedger((s) => s.lockMonth);
+  const unlockMonth = useLedger((s) => s.unlockMonth);
   const setMonthOpenings = useLedger((s) => s.setMonthOpenings);
   const role = useLedger((s) => s.appRole);
   const write = canWrite(role);
@@ -658,6 +614,9 @@ function MonthBooks() {
   function closedMonth(month: string) {
     return month < latestMonth && !(openMonths ?? []).includes(month);
   }
+  const sheetLocked =
+    Boolean(lockedMonths?.[selectedMonth]) || closedMonth(selectedMonth);
+  const selectedName = format(parseISO(`${selectedMonth}-01`), "MMMM");
   const saved = openingForMonth(openings, selectedMonth);
   const carriedDay = [...days].reverse().find((day) => day.date.slice(0, 7) < selectedMonth);
   const [cash, setCash] = useState(saved ? String(saved.cash) : "");
@@ -757,6 +716,7 @@ function MonthBooks() {
           </Button>
         ))}
       </div>
+      <div className="flex flex-wrap items-center justify-between gap-2">
       <div className="flex gap-2 overflow-x-auto pb-1">
         {yearMonths.map((month) => (
           <Button
@@ -767,9 +727,40 @@ function MonthBooks() {
             onClick={() => openMonth(month)}
           >
             {format(parseISO(`${month}-01`), "MMMM")}
-            {closedMonth(month) ? " · lock" : ""}
+            {closedMonth(month) || lockedMonths?.[month] ? " · lock" : ""}
           </Button>
         ))}
+      </div>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className="print:hidden"
+        onClick={() =>
+          gate(
+            () => {
+              if (sheetLocked) {
+                unlockMonth(selectedMonth);
+                toast.success(`${selectedName} unlocked`);
+                return;
+              }
+              lockMonth(selectedMonth);
+              toast.success(`${selectedName} locked`);
+            },
+            {
+              title: sheetLocked ? `Unlock ${selectedName}?` : `Lock ${selectedName}?`,
+              message: sheetLocked
+                ? "Enter the security code. The whole month sheet opens. One page can still be locked on its own."
+                : "Enter the security code. Every date in this month locks. The page button still opens or locks only that date.",
+              confirmLabel: sheetLocked ? "Unlock month" : "Lock month",
+              requireCode: true,
+            },
+          )
+        }
+      >
+        {sheetLocked ? <LockOpen className="size-4" /> : <Lock className="size-4" />}
+        {sheetLocked ? `Unlock ${selectedName}` : `Lock ${selectedName}`}
+      </Button>
       </div>
       {closedMonth(selectedMonth) ? (
         <Card>

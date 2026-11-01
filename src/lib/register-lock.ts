@@ -43,6 +43,24 @@ export function parseLockedDates(raw: unknown): Record<string, true> {
   return out;
 }
 
+export function parseMonthLocks(raw: unknown): Record<string, true> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const out: Record<string, true> = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (/^\d{4}-\d{2}$/.test(key) && value) out[key] = true;
+  }
+  return out;
+}
+
+export function parseMonthList(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return [
+    ...new Set(
+      raw.filter((month): month is string => typeof month === "string" && /^\d{4}-\d{2}$/.test(month)),
+    ),
+  ].sort();
+}
+
 export function parseLockRev(raw: unknown): Record<string, number> {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
   const out: Record<string, number> = {};

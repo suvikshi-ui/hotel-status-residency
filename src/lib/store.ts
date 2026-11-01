@@ -28,7 +28,7 @@ import { eachIsoDay, closeAsPrev, rebuildDayBooks } from "./ledger";
 import { fillAllSeedDates } from "./seed-fill";
 import { earlierDate, mergeRowsByDate } from "./cloud-save";
 import { parseAppRole, type AppRole } from "./roles";
-import { isDayLocked, withLocked, withoutLocked, pickLockedDates, parseLockedDates, parseLockRev, hotelFromCloud, bumpLockRev, readOpenMonths, openMonthsFromHotel, mergeOpenMonths, monthRevScore } from "./register-lock";
+import { isDayLocked, isPriorMonthClosed, withLocked, withoutLocked, pickLockedDates, parseLockedDates, parseLockRev, parseMonthLocks, parseMonthList, hotelFromCloud, bumpLockRev, readOpenMonths, openMonthsFromHotel, mergeOpenMonths, monthRevScore } from "./register-lock";
 import {
   freezeIfSealed,
   isSealed,
@@ -204,6 +204,12 @@ export interface LedgerState {
   lockedDates: Record<string, true>;
   lockRev: Record<string, number>;
   openMonths: string[];
+  /** Whole-month sheet lock. The day cube does not clear this. */
+  lockedMonths: Record<string, true>;
+  /** One page opened inside a locked month. */
+  openDays: Record<string, true>;
+  /** Prior months already sealed once, so a later page unlock is kept. */
+  autoSealedMonths: string[];
   sealedIds: SealedIds;
   deletedIds: SealedIds;
   /** After Reset, saved rows stay empty. Demo guests must not come back. */
@@ -357,6 +363,9 @@ function seedState(): Omit<
     lockedDates: {},
     lockRev: {},
     openMonths: [],
+    lockedMonths: {},
+    openDays: {},
+    autoSealedMonths: [],
     sealedIds: {},
     deletedIds: {},
     booksCleared: false,
@@ -512,6 +521,27 @@ function mergeSnapshot(
         current.lockRev,
         persisted.lockRev !== undefined ? parseLockRev(persisted.lockRev) : current.lockRev,
       );
+  const lockedMonths = parseMonthLocks(
+    persisted.lockedMonths !== undefined
+      ? persisted.lockedMonths
+      : opts?.replace
+        ? {}
+        : current.lockedMonths,
+  );
+  const openDays = parseLockedDates(
+    persisted.openDays !== undefined
+      ? persisted.openDays
+      : opts?.replace
+        ? {}
+        : current.openDays,
+  );
+  const autoSealedMonths = parseMonthList(
+    persisted.autoSealedMonths !== undefined
+      ? persisted.autoSealedMonths
+      : opts?.replace
+        ? []
+        : current.autoSealedMonths,
+  );
   const sealedIds = opts?.replace
     ? parseSealedIds(persisted.sealedIds)
     : mergeSealed(current.sealedIds, persisted.sealedIds);
@@ -591,14 +621,34 @@ function mergeSnapshot(
     lockedDates,
     lockRev,
     openMonths,
+    lockedMonths,
+    openDays,
+    autoSealedMonths,
     sealedIds,
     deletedIds,
     hotel: fromHotel.name ? fromHotel : current.hotel,
   };
 }
 
-function dayIsLocked(state: { lockedDates?: Record<string, true> }, date: string) {
-  return isDayLocked(state.lockedDates, date);
+function dayIsLocked(state: LedgerState, date: string) {
+  if (state.openDays?.[date]) return false;
+  if (isDayLocked(state.lockedDates, date)) return true;
+  const month = date.slice(0, 7);
+  if (state.lockedMonths?.[month]) return true;
+  const marks = [
+    state.openingDate,
+    state.selectedDate,
+    ...state.guests.map((row) => row.date),
+    ...state.food.map((row) => row.date),
+    ...state.wholesale.map((row) => row.date),
+    ...state.expenses.map((row) => row.date),
+    ...state.balReceived.map((row) => row.date),
+  ].filter(Boolean);
+  const latest = marks.reduce(
+    (max, value) => (value > max ? value : max),
+    state.openingDate || date,
+  );
+  return isPriorMonthClosed(date, state.openMonths, latest, state.lockRev);
 }
 
 type BypassGuard = { bypass?: boolean };
@@ -631,7 +681,12 @@ function nextMonthStamp(month: string) {
 }
 
 /** Once a later month is open, earlier months stay locked unless a security code reopened them. */
-function sealPriorMonths(state: LedgerState): Pick<LedgerState, "lockedDates" | "lockRev" | "openMonths"> {
+function sealPriorMonths(
+  state: LedgerState,
+): Pick<
+  LedgerState,
+  "lockedDates" | "lockRev" | "openMonths" | "openDays" | "autoSealedMonths" | "lockedMonths"
+> {
   const marks = [
     state.openingDate,
     state.selectedDate,
@@ -648,21 +703,36 @@ function sealPriorMonths(state: LedgerState): Pick<LedgerState, "lockedDates" | 
   );
   const locked = { ...(state.lockedDates ?? {}) };
   let rev = { ...(state.lockRev ?? {}) };
+  const openDays = { ...(state.openDays ?? {}) };
+  const seen = new Set(state.autoSealedMonths ?? []);
+  const lockedMonths = { ...(state.lockedMonths ?? {}) };
   const start = state.openingDate || BASE_OPENING_DATE;
   for (let month = monthStamp(start); month && month < latestMonth; month = nextMonthStamp(month)) {
     const from = month === monthStamp(start) ? start : `${month}-01`;
     const days = eachIsoDay(from, monthEnd(month)).filter((date) => monthStamp(date) === month);
-    if (opened.has(month)) {
-      for (const date of days) delete locked[date];
-      continue;
+    if (opened.has(month) && !lockedMonths[month]) continue;
+    if (!seen.has(month)) {
+      seen.add(month);
+      for (const date of days) delete openDays[date];
     }
     for (const date of days) {
+      if (openDays[date]) {
+        delete locked[date];
+        continue;
+      }
       if (locked[date]) continue;
       locked[date] = true;
       rev = bumpLockRev(rev, date);
     }
   }
-  return { lockedDates: locked, lockRev: rev, openMonths: [...opened] };
+  return {
+    lockedDates: locked,
+    lockRev: rev,
+    openMonths: [...opened],
+    openDays,
+    autoSealedMonths: [...seen].sort(),
+    lockedMonths,
+  };
 }
 
 function archiveClosedMonths(state: LedgerState, openMonths: string[]): MonthArchive[] {
@@ -714,7 +784,18 @@ function archiveClosedMonths(state: LedgerState, openMonths: string[]): MonthArc
 function rebuildFrom(
   state: LedgerState,
   fromDate: string,
-): Pick<LedgerState, "days" | "dirty" | "lockedDates" | "lockRev" | "openMonths" | "monthArchives"> {
+): Pick<
+  LedgerState,
+  | "days"
+  | "dirty"
+  | "lockedDates"
+  | "lockRev"
+  | "openMonths"
+  | "openDays"
+  | "autoSealedMonths"
+  | "lockedMonths"
+  | "monthArchives"
+> {
   const sealed = sealPriorMonths(state);
   const monthArchives = archiveClosedMonths(state, sealed.openMonths);
   const days = rebuildDayBooks({
@@ -782,33 +863,50 @@ export const useLedger = create<LedgerState>()(
       lockRegister: (date) => {
         const lockedDates = withLocked(get().lockedDates ?? {}, date);
         const lockRev = bumpLockRev(get().lockRev, date);
+        const openDays = { ...(get().openDays ?? {}) };
+        delete openDays[date];
         afterLockChange();
-        save({ lockedDates, lockRev });
+        save({ lockedDates, lockRev, openDays });
       },
       unlockRegister: (date) => {
         const lockedDates = withoutLocked(get().lockedDates ?? {}, date);
         const lockRev = bumpLockRev(get().lockRev, date);
+        const openDays = { ...(get().openDays ?? {}), [date]: true as const };
         const month = date.slice(0, 7);
-        const openMonths = readOpenMonths([...(get().openMonths ?? []), month]);
+        const autoSealedMonths = parseMonthList([...(get().autoSealedMonths ?? []), month]);
         afterLockChange();
-        const next = { ...get(), lockedDates, lockRev, openMonths };
+        const next = { ...get(), lockedDates, lockRev, openDays, autoSealedMonths };
         save(rebuildFrom(next, date));
       },
       lockMonth: (month) => {
         const openMonths = (get().openMonths ?? []).filter((item) => item !== month);
-        const next = { ...get(), openMonths };
+        const lockedMonths = { ...(get().lockedMonths ?? {}), [month]: true as const };
+        const openDays = { ...(get().openDays ?? {}) };
+        let lockedDates = { ...(get().lockedDates ?? {}) };
+        let lockRev = { ...(get().lockRev ?? {}) };
+        for (const date of eachIsoDay(`${month}-01`, monthEnd(month))) {
+          if (!date.startsWith(month)) continue;
+          lockedDates = withLocked(lockedDates, date);
+          lockRev = bumpLockRev(lockRev, date);
+          delete openDays[date];
+        }
+        const next = { ...get(), openMonths, lockedMonths, lockedDates, lockRev, openDays };
         afterLockChange();
         save(rebuildFrom(next, `${month}-01`));
       },
       unlockMonth: (month) => {
         const openMonths = readOpenMonths([...(get().openMonths ?? []), month]);
         const lockedDates = { ...(get().lockedDates ?? {}) };
+        const lockedMonths = { ...(get().lockedMonths ?? {}) };
+        const openDays = { ...(get().openDays ?? {}) };
+        delete lockedMonths[month];
         let lockRev = { ...(get().lockRev ?? {}) };
         for (const date of eachIsoDay(`${month}-01`, monthEnd(month))) {
           delete lockedDates[date];
+          delete openDays[date];
           lockRev = bumpLockRev(lockRev, date);
         }
-        const next = { ...get(), openMonths, lockedDates, lockRev };
+        const next = { ...get(), openMonths, lockedDates, lockRev, lockedMonths, openDays };
         afterLockChange();
         save(rebuildFrom(next, `${month}-01`));
       },
@@ -1264,6 +1362,9 @@ export const useLedger = create<LedgerState>()(
           lockedDates: {},
           lockRev: {},
           openMonths: [],
+          lockedMonths: {},
+          openDays: {},
+          autoSealedMonths: [],
           sealedIds: {},
           deletedIds: {},
           booksCleared: true,
@@ -1288,6 +1389,9 @@ export const useLedger = create<LedgerState>()(
         lockedDates: s.lockedDates,
         lockRev: s.lockRev,
         openMonths: s.openMonths,
+        lockedMonths: s.lockedMonths,
+        openDays: s.openDays,
+        autoSealedMonths: s.autoSealedMonths,
         sealedIds: s.sealedIds,
         deletedIds: s.deletedIds,
         guests: s.guests,

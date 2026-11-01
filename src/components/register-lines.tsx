@@ -392,6 +392,8 @@ export function RegisterLines() {
   const addExpense = useLedger((s) => s.addExpense);
   const removeExpense = useLedger((s) => s.removeExpense);
   const lockedDay = isDayLocked(useLedger((s) => s.lockedDates), date);
+  const openDays = useLedger((s) => s.openDays);
+  const lockedMonths = useLedger((s) => s.lockedMonths);
   const openMonths = useLedger((s) => s.openMonths);
   const lockRev = useLedger((s) => s.lockRev);
   const openingDate = useLedger((s) => s.openingDate);
@@ -406,7 +408,12 @@ export function RegisterLines() {
   ]
     .filter(Boolean)
     .reduce((max, value) => (value > max ? value : max), openingDate || date);
-  const locked = lockedDay || isPriorMonthClosed(date, openMonths, latestMark, lockRev);
+  const pageOpen = Boolean(openDays?.[date]);
+  const locked = pageOpen
+    ? false
+    : lockedDay ||
+      Boolean(lockedMonths?.[date.slice(0, 7)]) ||
+      isPriorMonthClosed(date, openMonths, latestMark, lockRev);
   const { gate } = useGate();
   const sources = useMemo(() => uniqueSources(guests), [guests]);
   const accounts = useMemo(
