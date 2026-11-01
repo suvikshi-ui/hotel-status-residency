@@ -13,6 +13,7 @@ import type {
   NamedAmount,
   OpeningBalances,
   OtaRow,
+  PayMode,
   RoomDef,
   SeedData,
   StaffRow,
@@ -236,6 +237,12 @@ export interface LedgerState {
   removeWholesale: (id: string, opts?: BypassGuard) => void;
   addExpense: (row: Omit<NamedAmount, "id" | "date"> & { date?: string }) => void;
   removeExpense: (id: string, opts?: BypassGuard) => void;
+  patchLine: (
+    kind: "food" | "wholesale" | "expense" | "receipt",
+    id: string,
+    patch: { mode?: PayMode; amount?: number; particular?: string; payRef?: string },
+    opts?: BypassGuard,
+  ) => void;
   addBalReceived: (row: Omit<NamedAmount, "id" | "date"> & { date?: string }) => boolean;
   removeBalReceived: (id: string, opts?: BypassGuard) => boolean;
   setLineRef: (
@@ -295,6 +302,7 @@ function seedState(): Omit<
   | "removeWholesale"
   | "addExpense"
   | "removeExpense"
+  | "patchLine"
   | "addBalReceived"
   | "removeBalReceived"
   | "setLineRef"
@@ -1086,6 +1094,42 @@ export const useLedger = create<LedgerState>()(
           sealedIds: omitSealed(get().sealedIds, [key]),
           deletedIds: withSealed(get().deletedIds, [key]),
           ...rebuildFrom(next, row?.date ?? get().selectedDate),
+        });
+      },
+      patchLine: (kind, id, patch, opts) => {
+        const bucket =
+          kind === "food"
+            ? "food"
+            : kind === "wholesale"
+              ? "wholesale"
+              : kind === "expense"
+                ? "expenses"
+                : "balReceived";
+        const rows = get()[bucket] as Array<ModeAmount | NamedAmount>;
+        const row = rows.find((item) => item.id === id);
+        if (!row) return;
+        const key =
+          kind === "food"
+            ? sealKey.food(id)
+            : kind === "wholesale"
+              ? sealKey.wholesale(id)
+              : kind === "expense"
+                ? sealKey.expense(id)
+                : sealKey.balance(id);
+        if (blockedRow(get(), row.date, key, opts)) return;
+        const nextRows = rows.map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                ...patch,
+                amount: patch.amount ?? item.amount,
+              }
+            : item,
+        );
+        const next = { ...get(), [bucket]: nextRows };
+        save({
+          [bucket]: nextRows,
+          ...rebuildFrom(next, row.date),
         });
       },
       addBalReceived: (row) => {

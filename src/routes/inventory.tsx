@@ -25,6 +25,7 @@ import {
   type InventoryItem,
 } from "@/lib/inventory";
 import { SaveCube, useAccountSave } from "@/components/save-cube";
+import { EntryPick, EntryTick, type PickMode } from "@/components/entry-pick";
 import { escapeHtml, printDocument } from "@/lib/print-sheet";
 import { useLedger } from "@/lib/store";
 import { useStaffSession } from "@/lib/supabase-auth";
@@ -261,6 +262,8 @@ function InventoryBookPanel({ kind }: { kind: InventoryBook }) {
   const [draft, setDraft] = useState<InventoryItem[]>(() => seedBook(kind));
   const [newName, setNewName] = useState("");
   const [editing, setEditing] = useState(false);
+  const [itemPick, setItemPick] = useState<PickMode>(null);
+  const [itemTicks, setItemTicks] = useState<string[]>([]);
   const kept = useRef<InventoryFile | null>(null);
 
   useEffect(() => {
@@ -489,6 +492,35 @@ function InventoryBookPanel({ kind }: { kind: InventoryBook }) {
       </div>
 
       <Card>
+        {canDelete && !locked ? (
+          <div className="flex justify-end px-5 pt-4 print:hidden">
+            <EntryPick
+              mode={itemPick}
+              onMode={(mode) => {
+                setItemPick(mode);
+                setItemTicks([]);
+              }}
+              count={itemTicks.length}
+              onDelete={() =>
+                gate(
+                  () => {
+                    setDraft((prev) => prev.filter((row) => !itemTicks.includes(row.id) || CATALOG_IDS.has(row.id)));
+                    toast.success(`Deleted ${itemTicks.length}`);
+                    setItemTicks([]);
+                    setItemPick(null);
+                  },
+                  {
+                    title: `Delete ${itemTicks.length} items?`,
+                    message: "Fixed housekeeping items stay. Enter the security code, then save the file.",
+                    confirmLabel: "Delete",
+                    danger: true,
+                    requireCode: true,
+                  },
+                )
+              }
+            />
+          </div>
+        ) : null}
         <CardContent className="overflow-x-auto p-0">
           <table className="w-full min-w-[48rem] text-left text-sm">
             <thead className="text-xs uppercase tracking-wide text-muted">
@@ -540,16 +572,16 @@ function InventoryBookPanel({ kind }: { kind: InventoryBook }) {
                       />
                     </td>
                     <td className="px-3 py-2.5 text-right">
-                      {!locked && canDelete && !CATALOG_IDS.has(row.id) ? (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-9 min-h-9 text-muted hover:text-danger"
-                          aria-label={`Remove ${row.name}`}
-                          onClick={() => removeItem(row.id)}
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
+                      {itemPick === "delete" && !locked && canDelete && !CATALOG_IDS.has(row.id) ? (
+                        <EntryTick
+                          checked={itemTicks.includes(row.id)}
+                          label={`Delete ${row.name}`}
+                          onChange={() =>
+                            setItemTicks((ids) =>
+                              ids.includes(row.id) ? ids.filter((id) => id !== row.id) : [...ids, row.id],
+                            )
+                          }
+                        />
                       ) : null}
                     </td>
                   </tr>

@@ -11,7 +11,7 @@ import {
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -36,6 +36,7 @@ import { printSourceGuests, printSourceSummary } from "@/lib/balance-print";
 import { DUE_PAY_MODES, formatDay, formatDayShort, MODE_LABEL, money, stayStamp } from "@/lib/format";
 import { useLedger, useDayBooks } from "@/lib/store";
 import { useGate } from "@/components/security-gate";
+import { EntryPick, EntryTick, type PickMode } from "@/components/entry-pick";
 import { SaveCube, useAccountSave } from "@/components/save-cube";
 import { canWrite } from "@/lib/roles";
 import { isDayLocked } from "@/lib/register-lock";
@@ -729,6 +730,33 @@ function OtherTab({
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [otherRef, setOtherRef] = useState("");
+  const { gate } = useGate();
+  const removeBal = useLedger((s) => s.removeBalReceived);
+  const [listPick, setListPick] = useState<PickMode>(null);
+  const [listTicks, setListTicks] = useState<string[]>([]);
+  const [otherPick, setOtherPick] = useState<PickMode>(null);
+  const [otherTicks, setOtherTicks] = useState<string[]>([]);
+  function drop(ids: string[], label: string, clear: () => void) {
+    const open = ids.filter((id) => {
+      const row = [...listRows, ...rows].find((item) => item.id === id);
+      return row && !isDayLocked(lockedDates, row.date);
+    });
+    if (!open.length) return;
+    gate(
+      () => {
+        for (const id of open) removeBal(id);
+        toast.success(`Deleted ${open.length} ${label}`);
+        clear();
+      },
+      {
+        title: `Delete ${open.length} ${label}?`,
+        message: "Locked dates stay as they are. Enter the security code, then press Save.",
+        confirmLabel: "Delete",
+        danger: true,
+        requireCode: true,
+      },
+    );
+  }
 
   return (
     <>
@@ -823,10 +851,30 @@ function OtherTab({
 
       {listRows.length > 0 ? (
         <Card>
+          <CardHeader className="flex-row items-center justify-between gap-3">
+            <CardTitle className="text-base">Balance list</CardTitle>
+            {write ? (
+              <EntryPick
+                mode={listPick}
+                onMode={(mode) => {
+                  setListPick(mode);
+                  setListTicks([]);
+                }}
+                count={listTicks.length}
+                onDelete={() =>
+                  drop(listTicks, "list entries", () => {
+                    setListTicks([]);
+                    setListPick(null);
+                  })
+                }
+              />
+            ) : null}
+          </CardHeader>
           <CardContent className="overflow-x-auto p-0">
             <table className="w-full min-w-[32rem] text-left text-sm">
               <thead className="text-xs uppercase tracking-wide text-muted">
                 <tr className="border-y border-border">
+                  {listPick === "delete" ? <th className="px-3 py-2 font-medium">Tick</th> : null}
                   <th className="px-5 py-2 font-medium">Date</th>
                   <th className="px-3 py-2 font-medium">Source</th>
                   <th className="px-3 py-2 text-right font-medium">List amount</th>
@@ -836,25 +884,27 @@ function OtherTab({
               <tbody>
                 {listRows.map((r) => (
                   <tr key={r.id} className="border-b border-border/70">
+                    {listPick === "delete" ? (
+                      <td className="px-3 py-2.5">
+                        {isDayLocked(lockedDates, r.date) ? null : (
+                          <EntryTick
+                            checked={listTicks.includes(r.id)}
+                            label={`Delete ${r.particular}`}
+                            onChange={() =>
+                              setListTicks((ids) =>
+                                ids.includes(r.id) ? ids.filter((id) => id !== r.id) : [...ids, r.id],
+                              )
+                            }
+                          />
+                        )}
+                      </td>
+                    ) : null}
                     <td className="px-5 py-2.5 tabular text-muted">
                       {formatDayShort(r.date)}
                     </td>
                     <td className="px-3 py-2.5">{r.particular}</td>
                     <td className="px-3 py-2.5 text-right tabular">
                       {money(r.amount)}
-                    </td>
-                    <td className="px-3 py-2.5 text-right">
-                      {write && !isDayLocked(lockedDates, r.date) ? (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-9 min-h-9 text-muted hover:text-danger"
-                        aria-label="Remove list entry"
-                        onClick={() => onRemove(r.id)}
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                      ) : null}
                     </td>
                   </tr>
                 ))}
@@ -1043,10 +1093,30 @@ function OtherTab({
       ) : null}
 
       <Card>
+        <CardHeader className="flex-row items-center justify-between gap-3">
+          <CardTitle className="text-base">Other entries</CardTitle>
+          {write ? (
+            <EntryPick
+              mode={otherPick}
+              onMode={(mode) => {
+                setOtherPick(mode);
+                setOtherTicks([]);
+              }}
+              count={otherTicks.length}
+              onDelete={() =>
+                drop(otherTicks, "other entries", () => {
+                  setOtherTicks([]);
+                  setOtherPick(null);
+                })
+              }
+            />
+          ) : null}
+        </CardHeader>
         <CardContent className="overflow-x-auto p-0">
           <table className="w-full min-w-[32rem] text-left text-sm">
             <thead className="text-xs uppercase tracking-wide text-muted">
               <tr className="border-y border-border">
+                {otherPick === "delete" ? <th className="px-3 py-2 font-medium">Tick</th> : null}
                 <th className="px-5 py-2 font-medium">Date</th>
                 <th className="px-3 py-2 font-medium">Note</th>
                 <th className="px-3 py-2 font-medium">Paid by</th>
@@ -1057,6 +1127,21 @@ function OtherTab({
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id} className="border-b border-border/70">
+                  {otherPick === "delete" ? (
+                    <td className="px-3 py-2.5">
+                      {isDayLocked(lockedDates, r.date) ? null : (
+                        <EntryTick
+                          checked={otherTicks.includes(r.id)}
+                          label={`Delete ${r.particular}`}
+                          onChange={() =>
+                            setOtherTicks((ids) =>
+                              ids.includes(r.id) ? ids.filter((id) => id !== r.id) : [...ids, r.id],
+                            )
+                          }
+                        />
+                      )}
+                    </td>
+                  ) : null}
                   <td className="px-5 py-2.5 tabular text-muted">
                     {formatDayShort(r.date)}
                   </td>
@@ -1066,19 +1151,6 @@ function OtherTab({
                   </td>
                   <td className="px-3 py-2.5 text-right tabular">
                     {money(r.amount)}
-                  </td>
-                  <td className="px-3 py-2.5 text-right">
-                    {write && !isDayLocked(lockedDates, r.date) ? (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-9 min-h-9 text-muted hover:text-danger"
-                      aria-label="Remove other entry"
-                      onClick={() => onRemove(r.id)}
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
-                    ) : null}
                   </td>
                 </tr>
               ))}
@@ -1121,6 +1193,10 @@ function SourceCard({
   const [mode, setMode] = useState<PayMode>("CASH");
   const [amount, setAmount] = useState("");
   const [payRef, setPayRef] = useState("");
+  const { gate } = useGate();
+  const removeBal = useLedger((s) => s.removeBalReceived);
+  const [pick, setPick] = useState<PickMode>(null);
+  const [ticks, setTicks] = useState<string[]>([]);
   const shown = open || pinned;
   const carried =
     !account.settled && Boolean(account.lastDate) && account.lastDate.slice(0, 7) < month;
@@ -1252,12 +1328,56 @@ function SourceCard({
           </div>
 
           {account.receipts.length > 0 ? (
-            <ul className="mt-3 divide-y divide-border rounded-lg border border-border">
+            <div className="mt-3 flex flex-col gap-2">
+              {write ? (
+                <EntryPick
+                  mode={pick}
+                  onMode={(mode) => {
+                    setPick(mode);
+                    setTicks([]);
+                  }}
+                  count={ticks.length}
+                  onDelete={() => {
+                    const openIds = ticks.filter((id) => {
+                      const row = account.receipts.find((item) => item.id === id);
+                      return row && !isDayLocked(lockedDates, row.date);
+                    });
+                    if (!openIds.length) return;
+                    gate(
+                      () => {
+                        for (const id of openIds) removeBal(id);
+                        toast.success(`Deleted ${openIds.length}`);
+                        setTicks([]);
+                        setPick(null);
+                      },
+                      {
+                        title: `Delete ${openIds.length} receipts?`,
+                        message: "The balance comes back if it is still due. Enter the security code, then press Save.",
+                        confirmLabel: "Delete",
+                        danger: true,
+                        requireCode: true,
+                      },
+                    );
+                  }}
+                />
+              ) : null}
+            <ul className="divide-y divide-border rounded-lg border border-border">
               {account.receipts.map((r) => (
                 <li
                   key={r.id}
                   className="flex items-center justify-between gap-3 px-3 py-2"
                 >
+                  {pick === "delete" && write && !isDayLocked(lockedDates, r.date) ? (
+                    <EntryTick
+                      checked={ticks.includes(r.id)}
+                      label={`Delete ${r.particular}`}
+                      onChange={() =>
+                        setTicks((ids) =>
+                          ids.includes(r.id) ? ids.filter((id) => id !== r.id) : [...ids, r.id],
+                        )
+                      }
+                    />
+                  ) : null}
                   <div className="min-w-0">
                     <div className="truncate text-sm">
                       {formatDayShort(r.date)} · {r.particular}
@@ -1273,21 +1393,11 @@ function SourceCard({
                     <span className="tabular text-sm font-medium text-ok">
                       {money(r.amount)}
                     </span>
-                    {write && !isDayLocked(lockedDates, r.date) ? (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-9 min-h-9 text-muted hover:text-danger"
-                      aria-label="Remove collection"
-                      onClick={() => onRemoveReceipt(r.id)}
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
-                    ) : null}
                   </div>
                 </li>
               ))}
             </ul>
+            </div>
           ) : null}
 
           {write && !account.settled ? (

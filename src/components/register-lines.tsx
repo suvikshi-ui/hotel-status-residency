@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { EntryPick, EntryTick, type PickMode } from "@/components/entry-pick";
 import { ModeBadge } from "@/components/mode-badge";
 import { GuardedPkRef } from "@/components/pk-ref";
 import { Button } from "@/components/ui/button";
@@ -44,16 +44,56 @@ function ModeLineCard({
   onRemove: (id: string) => void;
   addDisabled?: boolean;
 }) {
+  const { gate } = useGate();
+  const patchLine = useLedger((s) => s.patchLine);
   const [mode, setMode] = useState<PayMode>("CASH");
   const [amount, setAmount] = useState("");
   const [payRef, setPayRef] = useState("");
+  const [pick, setPick] = useState<PickMode>(null);
+  const [ticks, setTicks] = useState<string[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const total = rows.reduce((s, r) => s + r.amount, 0);
+  const kind = title === "Food" ? "food" : "wholesale";
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        <p className="text-sm text-muted">{money(total)} today</p>
+      <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <CardTitle>{title}</CardTitle>
+          <p className="text-sm text-muted">
+            {money(total)} today
+            {pick === "edit" ? " · Tick one line to edit." : ""}
+            {pick === "delete" ? " · Tick lines, then delete together." : ""}
+          </p>
+        </div>
+        {addDisabled ? null : (
+          <EntryPick
+            mode={pick}
+            onMode={(next) => {
+              setPick(next);
+              setTicks([]);
+            }}
+            count={ticks.length}
+            onDelete={() =>
+              gate(
+                () => {
+                  for (const id of ticks) onRemove(id);
+                  if (editingId && ticks.includes(editingId)) setEditingId(null);
+                  toast.success(`Deleted ${ticks.length}`);
+                  setTicks([]);
+                  setPick(null);
+                },
+                {
+                  title: `Delete ${ticks.length} ${title} lines?`,
+                  message: "Enter the security code, then press Save.",
+                  confirmLabel: "Delete",
+                  danger: true,
+                  requireCode: true,
+                },
+              )
+            }
+          />
+        )}
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <form
@@ -64,6 +104,29 @@ function ModeLineCard({
             const amt = Number(amount);
             if (!Number.isFinite(amt) || amt <= 0) {
               toast.error(`Enter a ${title} amount`);
+              return;
+            }
+            if (editingId) {
+              gate(
+                () => {
+                  patchLine(
+                    kind,
+                    editingId,
+                    { mode, amount: amt, payRef: mode === "QRPK" ? payRef.trim() : "" },
+                    { bypass: true },
+                  );
+                  setEditingId(null);
+                  setAmount("");
+                  setPayRef("");
+                  toast.success(`${title} updated`);
+                },
+                {
+                  title: "Save this edit?",
+                  message: "Enter the security code, then press Save.",
+                  confirmLabel: "Save",
+                  requireCode: true,
+                },
+              );
               return;
             }
             onAdd(mode, amt, mode === "QRPK" ? payRef.trim() : "");
@@ -110,13 +173,31 @@ function ModeLineCard({
           ) : null}
           <div className="flex items-end">
             <Button type="submit" className="w-full" disabled={addDisabled}>
-              Add
+              {editingId ? "Save edit" : "Add"}
             </Button>
           </div>
         </form>
         <ul className="divide-y divide-border">
           {rows.map((r) => (
             <li key={r.id} className="flex items-center justify-between gap-2 py-2">
+              {pick && !addDisabled ? (
+                <EntryTick
+                  checked={pick === "edit" ? editingId === r.id : ticks.includes(r.id)}
+                  label={`${pick === "edit" ? "Edit" : "Delete"} ${title} ${r.amount}`}
+                  onChange={() => {
+                    if (pick === "edit") {
+                      setEditingId(r.id);
+                      setMode(r.mode);
+                      setAmount(String(r.amount));
+                      setPayRef(r.payRef || "");
+                      return;
+                    }
+                    setTicks((ids) =>
+                      ids.includes(r.id) ? ids.filter((id) => id !== r.id) : [...ids, r.id],
+                    );
+                  }}
+                />
+              ) : null}
               <div className="min-w-0">
                 <ModeBadge mode={r.mode} />
                 {r.mode === "QRPK" ? (
@@ -136,18 +217,6 @@ function ModeLineCard({
               </div>
               <div className="flex items-center gap-1">
                 <span className="tabular text-sm font-medium">{money(r.amount)}</span>
-                {addDisabled ? null : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-danger hover:text-danger"
-                  aria-label={`Delete ${title} entry`}
-                  onClick={() => onRemove(r.id)}
-                >
-                  <Trash2 className="size-4" />
-                  Delete
-                </Button>
-                )}
               </div>
             </li>
           ))}
@@ -173,17 +242,56 @@ function ExpenseLineCard({
   onRemove: (id: string) => void;
   addDisabled?: boolean;
 }) {
+  const { gate } = useGate();
+  const patchLine = useLedger((s) => s.patchLine);
   const [particular, setParticular] = useState("");
   const [mode, setMode] = useState<PayMode>("CASH");
   const [amount, setAmount] = useState("");
   const [payRef, setPayRef] = useState("");
+  const [pick, setPick] = useState<PickMode>(null);
+  const [ticks, setTicks] = useState<string[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const total = rows.reduce((s, r) => s + r.amount, 0);
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Expenses</CardTitle>
-        <p className="text-sm text-muted">{money(total)} today</p>
+      <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <CardTitle>Expenses</CardTitle>
+          <p className="text-sm text-muted">
+            {money(total)} today
+            {pick === "edit" ? " · Tick one line to edit." : ""}
+            {pick === "delete" ? " · Tick lines, then delete together." : ""}
+          </p>
+        </div>
+        {addDisabled ? null : (
+          <EntryPick
+            mode={pick}
+            onMode={(next) => {
+              setPick(next);
+              setTicks([]);
+            }}
+            count={ticks.length}
+            onDelete={() =>
+              gate(
+                () => {
+                  for (const id of ticks) onRemove(id);
+                  if (editingId && ticks.includes(editingId)) setEditingId(null);
+                  toast.success(`Deleted ${ticks.length}`);
+                  setTicks([]);
+                  setPick(null);
+                },
+                {
+                  title: `Delete ${ticks.length} expenses?`,
+                  message: "Enter the security code, then press Save.",
+                  confirmLabel: "Delete",
+                  danger: true,
+                  requireCode: true,
+                },
+              )
+            }
+          />
+        )}
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <form
@@ -198,6 +306,35 @@ function ExpenseLineCard({
             }
             if (!Number.isFinite(amt) || amt <= 0) {
               toast.error("Enter an expense amount");
+              return;
+            }
+            if (editingId) {
+              gate(
+                () => {
+                  patchLine(
+                    "expense",
+                    editingId,
+                    {
+                      particular: particular.trim(),
+                      mode,
+                      amount: amt,
+                      payRef: mode === "QRPK" ? payRef.trim() : "",
+                    },
+                    { bypass: true },
+                  );
+                  setEditingId(null);
+                  setParticular("");
+                  setAmount("");
+                  setPayRef("");
+                  toast.success("Expense updated");
+                },
+                {
+                  title: "Save this edit?",
+                  message: "Enter the security code, then press Save.",
+                  confirmLabel: "Save",
+                  requireCode: true,
+                },
+              );
               return;
             }
             onAdd(particular.trim(), mode, amt, mode === "QRPK" ? payRef.trim() : "");
@@ -262,13 +399,32 @@ function ExpenseLineCard({
           ) : null}
           <div className="flex items-end">
             <Button type="submit" className="w-full" disabled={addDisabled}>
-              Add
+              {editingId ? "Save edit" : "Add"}
             </Button>
           </div>
         </form>
         <ul className="divide-y divide-border">
           {rows.map((r) => (
             <li key={r.id} className="flex items-center justify-between gap-2 py-2">
+              {pick && !addDisabled ? (
+                <EntryTick
+                  checked={pick === "edit" ? editingId === r.id : ticks.includes(r.id)}
+                  label={`${pick === "edit" ? "Edit" : "Delete"} ${r.particular}`}
+                  onChange={() => {
+                    if (pick === "edit") {
+                      setEditingId(r.id);
+                      setParticular(r.particular);
+                      setMode(r.mode);
+                      setAmount(String(r.amount));
+                      setPayRef(r.payRef || "");
+                      return;
+                    }
+                    setTicks((ids) =>
+                      ids.includes(r.id) ? ids.filter((id) => id !== r.id) : [...ids, r.id],
+                    );
+                  }}
+                />
+              ) : null}
               <div className="min-w-0">
                 <div className="truncate text-sm font-medium">{englishNarration(r.particular)}</div>
                 <ModeBadge mode={r.mode} />
@@ -289,18 +445,6 @@ function ExpenseLineCard({
               </div>
               <div className="flex items-center gap-1">
                 <span className="tabular text-sm font-medium">{money(r.amount)}</span>
-                {addDisabled ? null : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-danger hover:text-danger"
-                  aria-label="Delete expense"
-                  onClick={() => onRemove(r.id)}
-                >
-                  <Trash2 className="size-4" />
-                  Delete
-                </Button>
-                )}
               </div>
             </li>
           ))}
@@ -324,18 +468,108 @@ function ReceiptList({
   onRemove: (id: string) => void;
   locked?: boolean;
 }) {
-  if (rows.length === 0) {
+  const { gate } = useGate();
+  const patchLine = useLedger((s) => s.patchLine);
+  const [pick, setPick] = useState<PickMode>(null);
+  const [ticks, setTicks] = useState<string[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [amount, setAmount] = useState("");
+  if (rows.length === 0 && !pick) {
     return <p className="text-sm text-muted">No collections today.</p>;
   }
   return (
+    <div className="flex flex-col gap-2">
+      {locked ? null : (
+        <EntryPick
+          mode={pick}
+          onMode={(next) => {
+            setPick(next);
+            setTicks([]);
+          }}
+          count={ticks.length}
+          onDelete={() =>
+            gate(
+              () => {
+                for (const id of ticks) onRemove(id);
+                toast.success("Deleted. Any open balance is back on the list.");
+                setTicks([]);
+                setPick(null);
+              },
+              {
+                title: `Delete ${ticks.length} collections?`,
+                message: "Enter the security code. Then press Save.",
+                confirmLabel: "Delete",
+                danger: true,
+                requireCode: true,
+              },
+            )
+          }
+        />
+      )}
+      {rows.length === 0 ? (
+        <p className="text-sm text-muted">No collections today.</p>
+      ) : (
     <ul className="divide-y divide-border rounded-lg border border-border">
       {rows.map((r) => (
         <li key={r.id} className="flex items-center justify-between gap-3 px-3 py-2">
+          {pick && !locked ? (
+            <EntryTick
+              checked={pick === "edit" ? editingId === r.id : ticks.includes(r.id)}
+              label={`${pick === "edit" ? "Edit" : "Delete"} ${r.particular}`}
+              onChange={() => {
+                if (pick === "edit") {
+                  setEditingId(r.id);
+                  setAmount(String(r.amount));
+                  return;
+                }
+                setTicks((ids) =>
+                  ids.includes(r.id) ? ids.filter((id) => id !== r.id) : [...ids, r.id],
+                );
+              }}
+            />
+          ) : null}
           <div className="min-w-0">
             <div className="truncate text-sm font-medium">{r.particular}</div>
             <div className="text-xs text-muted">
               {r.kind === "ota" ? "Online · to P.K. QR" : MODE_LABEL[r.mode]}
             </div>
+            {editingId === r.id ? (
+              <div className="mt-2 flex items-center gap-2">
+                <Input
+                  className="h-9 w-28"
+                  inputMode="decimal"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  aria-label={`Amount for ${r.particular}`}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => {
+                    const amt = Number(amount);
+                    if (!Number.isFinite(amt) || amt <= 0) {
+                      toast.error("Enter an amount");
+                      return;
+                    }
+                    gate(
+                      () => {
+                        patchLine("receipt", r.id, { amount: amt }, { bypass: true });
+                        setEditingId(null);
+                        toast.success("Updated");
+                      },
+                      {
+                        title: "Save this edit?",
+                        message: "Enter the security code, then press Save.",
+                        confirmLabel: "Save",
+                        requireCode: true,
+                      },
+                    );
+                  }}
+                >
+                  Save edit
+                </Button>
+              </div>
+            ) : null}
             {r.mode === "QRPK" ? (
               <GuardedPkRef
                 locked={Boolean(locked)}
@@ -351,24 +585,12 @@ function ReceiptList({
               />
             ) : null}
           </div>
-          <div className="flex items-center gap-1">
-            <span className="tabular text-sm font-medium">{money(r.amount)}</span>
-            {locked ? null : (
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-danger hover:text-danger"
-              aria-label="Delete collection"
-              onClick={() => onRemove(r.id)}
-            >
-              <Trash2 className="size-4" />
-              Delete
-            </Button>
-            )}
-          </div>
+          <span className="tabular text-sm font-medium">{money(r.amount)}</span>
         </li>
       ))}
     </ul>
+      )}
+    </div>
   );
 }
 
@@ -449,15 +671,7 @@ export function RegisterLines() {
           empty="No food posted today."
           addDisabled={locked}
           onAdd={(mode, amount, payRef) => addFood({ mode, amount, payRef: payRef || null })}
-          onRemove={(id) =>
-            gate(() => removeFood(id, { bypass: true }), {
-              title: "Delete this food entry?",
-              message: "Enter the security code, then press Save.",
-              confirmLabel: "Delete",
-              danger: true,
-              requireCode: true,
-            })
-          }
+          onRemove={(id) => removeFood(id, { bypass: true })}
         />
         <ModeLineCard
           title="WS"
@@ -465,15 +679,7 @@ export function RegisterLines() {
           empty="No WS posted today."
           addDisabled={locked}
           onAdd={(mode, amount, payRef) => addWs({ mode, amount, payRef: payRef || null })}
-          onRemove={(id) =>
-            gate(() => removeWs(id, { bypass: true }), {
-              title: "Delete this WS entry?",
-              message: "Enter the security code, then press Save.",
-              confirmLabel: "Delete",
-              danger: true,
-              requireCode: true,
-            })
-          }
+          onRemove={(id) => removeWs(id, { bypass: true })}
         />
       </div>
 
@@ -484,15 +690,7 @@ export function RegisterLines() {
         onAdd={(particular, mode, amount, payRef) =>
           addExpense({ particular, mode, amount, payRef: payRef || null })
         }
-        onRemove={(id) =>
-          gate(() => removeExpense(id, { bypass: true }), {
-            title: "Delete this expense?",
-            message: "Enter the security code, then press Save.",
-            confirmLabel: "Delete",
-            danger: true,
-            requireCode: true,
-          })
-        }
+        onRemove={(id) => removeExpense(id, { bypass: true })}
       />
 
       <Card>
@@ -638,24 +836,10 @@ export function RegisterLines() {
             <ReceiptList
               rows={dueRows}
               locked={locked}
-              onRemove={(id) =>
-                gate(() => {
-                  const ok = removeBal(id, { bypass: true });
-                  if (!ok) {
-                    tellDateLocked(date);
-                    return;
-                  }
-                  toast.success(
-                    "Receipt deleted. The balance is back on the list if any amount is still due.",
-                  );
-                }, {
-                  title: "Delete this collection?",
-                  message: "Enter the security code. The open balance will show again if it is not fully received.",
-                  confirmLabel: "Delete",
-                  danger: true,
-                  requireCode: true,
-                })
-              }
+              onRemove={(id) => {
+                const ok = removeBal(id, { bypass: true });
+                if (!ok) tellDateLocked(date);
+              }}
             />
           </form>
 
@@ -745,15 +929,9 @@ export function RegisterLines() {
             <ReceiptList
               rows={otaRows}
               locked={locked}
-              onRemove={(id) =>
-                gate(() => removeBal(id, { bypass: true }), {
-                  title: "Delete this collection?",
-                  message: "Enter the security code, then press Save.",
-                  confirmLabel: "Delete",
-                  danger: true,
-                  requireCode: true,
-                })
-              }
+              onRemove={(id) => {
+                removeBal(id, { bypass: true });
+              }}
             />
           </form>
         </CardContent>

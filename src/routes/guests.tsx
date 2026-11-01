@@ -255,6 +255,7 @@ function PartyBook({
   const { gate } = useGate();
   const [open, setOpen] = useState(false);
   const [pick, setPick] = useState<null | "edit" | "delete">(null);
+  const [ticks, setTicks] = useState<string[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<PartyDraft>(blankParty);
   const set = (key: keyof PartyDraft) => (value: string) =>
@@ -382,10 +383,43 @@ function PartyBook({
             <Button
               type="button"
               variant={pick === "delete" ? "default" : "outline"}
-              onClick={() => setPick((mode) => (mode === "delete" ? null : "delete"))}
+              onClick={() => {
+                setTicks([]);
+                setPick((mode) => (mode === "delete" ? null : "delete"));
+              }}
             >
               Delete
             </Button>
+            {pick === "delete" && ticks.length > 0 ? (
+              <Button
+                type="button"
+                variant="danger"
+                onClick={() =>
+                  gate(
+                    () => {
+                      onSave(rows.filter((item) => !ticks.includes(item.id)));
+                      if (editingId && ticks.includes(editingId)) {
+                        setEditingId(null);
+                        setOpen(false);
+                        setDraft(blankParty());
+                      }
+                      toast.success(`Deleted ${ticks.length}`);
+                      setTicks([]);
+                      setPick(null);
+                    },
+                    {
+                      title: `Delete ${ticks.length} entries?`,
+                      message: "Enter the security code.",
+                      confirmLabel: "Delete",
+                      danger: true,
+                      requireCode: true,
+                    },
+                  )
+                }
+              >
+                Delete selected ({ticks.length})
+              </Button>
+            ) : null}
             <SaveCube busy={saving} onSave={() => void saveToServer()} />
           </div>
         ) : null}
@@ -429,7 +463,7 @@ function PartyBook({
           </CardTitle>
           {pick ? (
             <p className="text-sm text-muted">
-              {pick === "edit" ? "Tick the row you want to edit." : "Tick the row you want to delete."}
+              {pick === "edit" ? "Tick the row you want to edit." : "Tick the rows to delete, then delete together."}
             </p>
           ) : null}
         </CardHeader>
@@ -461,8 +495,16 @@ function PartyBook({
                           type="checkbox"
                           className="size-4"
                           aria-label={`${pick === "edit" ? "Edit" : "Delete"} ${row.name}`}
-                          checked={pick === "edit" && editingId === row.id}
-                          onChange={() => (pick === "edit" ? beginEdit(row) : beginDelete(row))}
+                          checked={pick === "edit" ? editingId === row.id : ticks.includes(row.id)}
+                          onChange={() => {
+                            if (pick === "edit") {
+                              beginEdit(row);
+                              return;
+                            }
+                            setTicks((ids) =>
+                              ids.includes(row.id) ? ids.filter((id) => id !== row.id) : [...ids, row.id],
+                            );
+                          }}
                         />
                       </td>
                     ) : null}

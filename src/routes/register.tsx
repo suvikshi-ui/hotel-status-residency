@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { createFileRoute } from "@tanstack/react-router";
-import { Pencil, Search, Trash2, Lock, LockOpen, Download } from "lucide-react";
+import { Search, Lock, LockOpen, Download } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,7 @@ import { openingForMonth } from "@/lib/month-opening";
 import { buildBackupFile, downloadBackupJson } from "@/lib/backup";
 import { canWrite } from "@/lib/roles";
 import type { GuestEntry } from "@/lib/types";
+import { EntryPick, EntryTick, type PickMode } from "@/components/entry-pick";
 import { SaveCube, useAccountSave } from "@/components/save-cube";
 
 export const Route = createFileRoute("/register")({ component: RegisterPage });
@@ -66,9 +67,13 @@ function RegisterPage() {
   const [q, setQ] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [detailFor, setDetailFor] = useState<GuestEntry | null>(null);
+  const [pick, setPick] = useState<PickMode>(null);
+  const [ticks, setTicks] = useState<string[]>([]);
 
   useEffect(() => {
     setEditingId(null);
+    setPick(null);
+    setTicks([]);
   }, [date]);
 
   const editing = allGuests.find((g) => g.id === editingId) ?? null;
@@ -224,8 +229,41 @@ function RegisterPage() {
         <CardHeader className="gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <CardTitle>Postings</CardTitle>
-            <p className="text-sm text-muted">{formatDay(date)}</p>
+            <p className="text-sm text-muted">
+              {formatDay(date)}
+              {pick === "edit" ? " · Tick one posting to edit." : ""}
+              {pick === "delete" ? " · Tick the postings to delete, then delete together." : ""}
+            </p>
           </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {sealed ? null : (
+              <EntryPick
+                mode={pick}
+                onMode={(mode) => {
+                  setPick(mode);
+                  setTicks([]);
+                }}
+                count={ticks.length}
+                onDelete={() =>
+                  gate(
+                    () => {
+                      for (const id of ticks) removeGuest(id, { bypass: true });
+                      if (editingId && ticks.includes(editingId)) setEditingId(null);
+                      toast.success(`Deleted ${ticks.length}`);
+                      setTicks([]);
+                      setPick(null);
+                    },
+                    {
+                      title: `Delete ${ticks.length} postings?`,
+                      message: "Enter the security code. Then press Save.",
+                      confirmLabel: "Delete",
+                      danger: true,
+                      requireCode: true,
+                    },
+                  )
+                }
+              />
+            )}
           <div className="relative w-full md:w-72">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
             <Input
@@ -235,11 +273,13 @@ function RegisterPage() {
               onChange={(e) => setQ(e.target.value)}
             />
           </div>
+          </div>
         </CardHeader>
         <CardContent className="overflow-x-auto p-0">
           <table className="w-full min-w-[52rem] text-left text-sm">
             <thead className="text-xs uppercase tracking-wide text-muted">
               <tr className="border-y border-border">
+                {pick && !sealed ? <th className="px-3 py-2 font-medium">Tick</th> : null}
                 <th className="px-5 py-2 font-medium">#</th>
                 <th className="px-3 py-2 font-medium">Name</th>
                 <th className="px-3 py-2 font-medium">Room</th>
@@ -252,7 +292,6 @@ function RegisterPage() {
                 <th className="px-3 py-2 font-medium">Check-out</th>
                 <th className="px-3 py-2 font-medium">Stay</th>
                 <th className="px-3 py-2 font-medium">Guest</th>
-                <th className="px-3 py-2" />
               </tr>
             </thead>
             <tbody>
@@ -263,6 +302,28 @@ function RegisterPage() {
                   key={g.id}
                   className="border-b border-border/70 hover:bg-bg-warm/50"
                 >
+                  {pick && !sealed ? (
+                    <td className="px-3 py-2.5">
+                      <EntryTick
+                        checked={pick === "edit" ? editingId === g.id : ticks.includes(g.id)}
+                        label={`${pick === "edit" ? "Edit" : "Delete"} ${g.name}`}
+                        onChange={() => {
+                          if (pick === "edit") {
+                            gate(() => setEditingId(g.id), {
+                              title: "Edit this entry?",
+                              message: `Edit ${g.name} · Room ${g.roomNo}. Enter the security code.`,
+                              confirmLabel: "Edit",
+                              requireCode: true,
+                            });
+                            return;
+                          }
+                          setTicks((ids) =>
+                            ids.includes(g.id) ? ids.filter((id) => id !== g.id) : [...ids, g.id],
+                          );
+                        }}
+                      />
+                    </td>
+                  ) : null}
                   <td className="px-5 py-2.5 tabular text-muted">{g.slNo}</td>
                   <td className="px-3 py-2.5 font-medium">
                     {g.name}
@@ -368,53 +429,6 @@ function RegisterPage() {
                       aria-label={`Guest detail for ${g.name}`}
                       onChange={() => setDetailFor(g)}
                     />
-                  </td>
-                  <td className="px-3 py-2.5 text-right">
-                    {sealed ? null : (
-                    <div className="flex justify-end gap-1 print:hidden">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        aria-label={`Edit ${g.name}`}
-                        onClick={() =>
-                          gate(() => setEditingId(g.id), {
-                            title: "Edit this entry?",
-                            message: `Edit ${g.name} · Room ${g.roomNo}. Enter the security code.`,
-                            confirmLabel: "Edit",
-                            requireCode: true,
-                          })
-                        }
-                      >
-                        <Pencil className="size-4" />
-                        Edit
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-danger hover:text-danger"
-                        aria-label={`Delete ${g.name}`}
-                        onClick={() =>
-                          gate(
-                            () => {
-                              if (editingId === g.id) setEditingId(null);
-                              removeGuest(g.id, { bypass: true });
-                              toast.success(`Removed ${g.name}`);
-                            },
-                            {
-                              title: "Delete this entry?",
-                              message: `Delete ${g.name} · Room ${g.roomNo}. Enter the security code. Then press Save.`,
-                              confirmLabel: "Delete",
-                              danger: true,
-                              requireCode: true,
-                            },
-                          )
-                        }
-                      >
-                        <Trash2 className="size-4" />
-                        Delete
-                      </Button>
-                    </div>
-                    )}
                   </td>
                 </tr>
                 );

@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Bell, Plus, Trash2 } from "lucide-react";
+import { Bell, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { EntryPick, EntryTick, type PickMode } from "@/components/entry-pick";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -41,6 +42,9 @@ function RemindersPage() {
   const [note, setNote] = useState("");
   const [date, setDate] = useState(todayIso());
   const [repeat, setRepeat] = useState<ReminderRepeat>("monthly");
+  const [pick, setPick] = useState<PickMode>(null);
+  const [ticks, setTicks] = useState<string[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const today = todayIso();
 
   function addRow() {
@@ -55,15 +59,25 @@ function RemindersPage() {
     }
     gate(
       () => {
-        const row: HotelReminder = {
-          id: uid("rm"),
-          note: text,
-          date,
-          repeat,
-        };
-        setReminders([...reminders, row]);
+        if (editingId) {
+          setReminders(
+            reminders.map((row) =>
+              row.id === editingId ? { ...row, note: text, date, repeat } : row,
+            ),
+          );
+          setEditingId(null);
+          toast.success("Reminder updated");
+        } else {
+          const row: HotelReminder = {
+            id: uid("rm"),
+            note: text,
+            date,
+            repeat,
+          };
+          setReminders([...reminders, row]);
+          toast.success("Reminder saved");
+        }
         setNote("");
-        toast.success("Reminder saved");
       },
       {
         title: "Save this reminder?",
@@ -104,7 +118,36 @@ function RemindersPage() {
             Monthly, quarterly, half year, yearly, or one manual date.
           </p>
         </div>
-        {write ? <SaveCube busy={saving} onSave={() => void saveToServer()} /> : null}
+        {write ? (
+          <div className="flex flex-wrap gap-2">
+            <EntryPick
+              mode={pick}
+              onMode={(mode) => {
+                setPick(mode);
+                setTicks([]);
+              }}
+              count={ticks.length}
+              onDelete={() =>
+                gate(
+                  () => {
+                    setReminders(reminders.filter((row) => !ticks.includes(row.id)));
+                    toast.success(`Deleted ${ticks.length}`);
+                    setTicks([]);
+                    setPick(null);
+                  },
+                  {
+                    title: `Delete ${ticks.length} reminders?`,
+                    message: "Enter the security code.",
+                    confirmLabel: "Delete",
+                    danger: true,
+                    requireCode: true,
+                  },
+                )
+              }
+            />
+            <SaveCube busy={saving} onSave={() => void saveToServer()} />
+          </div>
+        ) : null}
       </div>
 
       {write ? (
@@ -164,7 +207,7 @@ function RemindersPage() {
             <div className="flex items-end">
               <Button type="submit" className="w-full">
                 <Plus className="size-4" />
-                Add
+                {editingId ? "Save edit" : "Add"}
               </Button>
             </div>
           </form>
@@ -177,10 +220,10 @@ function RemindersPage() {
           <table className="w-full min-w-[36rem] text-left text-sm">
             <thead className="text-xs uppercase tracking-wide text-muted">
               <tr className="border-y border-border">
+                {pick && write ? <th className="px-3 py-2 font-medium">Tick</th> : null}
                 <th className="px-5 py-2 font-medium">Description</th>
                 <th className="px-3 py-2 font-medium">Date</th>
                 <th className="px-3 py-2 font-medium">Repeat</th>
-                <th className="px-3 py-2" />
               </tr>
             </thead>
             <tbody>
@@ -188,6 +231,26 @@ function RemindersPage() {
                 const due = reminderIsDue(r, today);
                 return (
                   <tr key={r.id} className="border-b border-border/70">
+                    {pick && write ? (
+                      <td className="px-3 py-2.5">
+                        <EntryTick
+                          checked={pick === "edit" ? editingId === r.id : ticks.includes(r.id)}
+                          label={`${pick === "edit" ? "Edit" : "Delete"} ${r.note}`}
+                          onChange={() => {
+                            if (pick === "edit") {
+                              setEditingId(r.id);
+                              setNote(r.note);
+                              setDate(r.date);
+                              setRepeat(r.repeat);
+                              return;
+                            }
+                            setTicks((ids) =>
+                              ids.includes(r.id) ? ids.filter((id) => id !== r.id) : [...ids, r.id],
+                            );
+                          }}
+                        />
+                      </td>
+                    ) : null}
                     <td className="px-5 py-2.5">
                       <div className="flex items-center gap-2">
                         {due ? (
@@ -200,19 +263,6 @@ function RemindersPage() {
                       {formatDay(r.date)}
                     </td>
                     <td className="px-3 py-2.5">{REPEAT_LABEL[r.repeat]}</td>
-                    <td className="px-3 py-2.5 text-right">
-                      {write ? (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-9 min-h-9 text-muted hover:text-danger"
-                        aria-label={`Delete ${r.note}`}
-                        onClick={() => removeRow(r.id)}
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                      ) : null}
-                    </td>
                   </tr>
                 );
               })}

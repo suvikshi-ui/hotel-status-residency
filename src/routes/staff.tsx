@@ -15,6 +15,7 @@ import { useLedger } from "@/lib/store";
 import { canWrite } from "@/lib/roles";
 import { HotelLogo } from "@/components/hotel-logo";
 import { SaveCube, useAccountSave } from "@/components/save-cube";
+import { EntryPick, EntryTick, type PickMode } from "@/components/entry-pick";
 import { useGate } from "@/components/security-gate";
 import {
   blankAdvanceMonth,
@@ -44,6 +45,8 @@ function StaffPage() {
   const write = canWrite(useLedger((s) => s.appRole));
   const { gate } = useGate();
   const [sheet, setSheet] = useState<Sheet>("register");
+  const [staffPick, setStaffPick] = useState<PickMode>(null);
+  const [staffTicks, setStaffTicks] = useState<string[]>([]);
   const [regDraft, setRegDraft] = useState<StaffProfile[]>(staffRegister);
   const [draft, setDraft] = useState<StaffRow[]>(staff);
   const [advDraft, setAdvDraft] = useState<AdvanceRow[]>(advances);
@@ -410,7 +413,36 @@ function StaffPage() {
         </TabsList>
 
         <TabsContent value="register" className="flex flex-col gap-5">
-          <div className="flex justify-end print:hidden">
+          <div className="flex flex-wrap justify-end gap-2 print:hidden">
+            {write ? (
+              <EntryPick
+                mode={staffPick}
+                onMode={(mode) => {
+                  setStaffPick(mode);
+                  setStaffTicks([]);
+                }}
+                count={staffTicks.length}
+                onDelete={() =>
+                  gate(
+                    () => {
+                      const next = regDraft.filter((row) => !staffTicks.includes(row.id));
+                      setRegDraft(next);
+                      setStaffRegister(next);
+                      toast.success(`Deleted ${staffTicks.length}`);
+                      setStaffTicks([]);
+                      setStaffPick(null);
+                    },
+                    {
+                      title: `Delete ${staffTicks.length} staff?`,
+                      message: "Enter the security code, then press Save.",
+                      confirmLabel: "Delete",
+                      danger: true,
+                      requireCode: true,
+                    },
+                  )
+                }
+              />
+            ) : null}
             <Button type="button" variant="outline" onClick={printRegister}>
               <Printer className="size-4" />
               Print
@@ -428,6 +460,7 @@ function StaffPage() {
               <table className="w-full min-w-[52rem] text-left text-sm">
                 <thead className="text-xs uppercase tracking-wide text-muted">
                   <tr className="border-y border-border">
+                    {staffPick === "delete" ? <th className="px-3 py-2 font-medium">Tick</th> : null}
                     <th className="px-5 py-2 font-medium">Name</th>
                     <th className="px-3 py-2 font-medium">Mobile</th>
                     <th className="px-3 py-2 font-medium">Mobile 2</th>
@@ -439,6 +472,19 @@ function StaffPage() {
                   {regDraft.length ? (
                     regDraft.map((row) => (
                       <tr key={row.id} className="border-b border-border/70">
+                        {staffPick === "delete" ? (
+                          <td className="px-3 py-2">
+                            <EntryTick
+                              checked={staffTicks.includes(row.id)}
+                              label={`Delete ${row.name || "staff"}`}
+                              onChange={() =>
+                                setStaffTicks((ids) =>
+                                  ids.includes(row.id) ? ids.filter((id) => id !== row.id) : [...ids, row.id],
+                                )
+                              }
+                            />
+                          </td>
+                        ) : null}
                         {(
                           [
                             ["name", "Name"],

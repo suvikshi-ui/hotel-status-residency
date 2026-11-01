@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus } from "lucide-react";
 import { toast } from "sonner";
+import { EntryPick, EntryTick, type PickMode } from "@/components/entry-pick";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -23,6 +24,9 @@ function ContactsPage() {
   const { busy: saving, saveToServer } = useAccountSave();
   const { gate } = useGate();
   const [open, setOpen] = useState(false);
+  const [pick, setPick] = useState<PickMode>(null);
+  const [ticks, setTicks] = useState<string[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [topic, setTopic] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -37,27 +41,40 @@ function ContactsPage() {
     }
     gate(
       () => {
-        setContacts([
-          ...contacts,
-          {
-            id: uid("ct"),
-            topic: point,
-            name: who,
-            phone: phone.trim(),
-            address: address.trim(),
-          },
-        ]);
+        if (editingId) {
+          setContacts(
+            contacts.map((row) =>
+              row.id === editingId
+                ? { ...row, topic: point, name: who, phone: phone.trim(), address: address.trim() }
+                : row,
+            ),
+          );
+          setEditingId(null);
+          toast.success("Contact updated");
+        } else {
+          setContacts([
+            ...contacts,
+            {
+              id: uid("ct"),
+              topic: point,
+              name: who,
+              phone: phone.trim(),
+              address: address.trim(),
+            },
+          ]);
+          toast.success("Contact added");
+        }
         setTopic("");
         setName("");
         setPhone("");
         setAddress("");
         setOpen(false);
-        toast.success("Contact added");
       },
       {
-        title: "Add this contact?",
+        title: editingId ? "Save this edit?" : "Add this contact?",
         message: `${point} · ${who}`,
-        confirmLabel: "Add",
+        confirmLabel: editingId ? "Save" : "Add",
+        requireCode: Boolean(editingId),
       },
     );
   }
@@ -92,10 +109,42 @@ function ContactsPage() {
         </div>
         {write ? (
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant={open ? "outline" : "default"} onClick={() => setOpen((v) => !v)}>
+            <Button type="button" variant={open && !editingId ? "outline" : "default"} onClick={() => {
+              setEditingId(null);
+              setTopic("");
+              setName("");
+              setPhone("");
+              setAddress("");
+              setOpen((v) => !v || Boolean(editingId));
+            }}>
               <Plus className="size-4" />
-              {open ? "Close" : "Add"}
+              {open && !editingId ? "Close" : "Add"}
             </Button>
+            <EntryPick
+              mode={pick}
+              onMode={(mode) => {
+                setPick(mode);
+                setTicks([]);
+              }}
+              count={ticks.length}
+              onDelete={() =>
+                gate(
+                  () => {
+                    setContacts(contacts.filter((row) => !ticks.includes(row.id)));
+                    toast.success(`Deleted ${ticks.length}`);
+                    setTicks([]);
+                    setPick(null);
+                  },
+                  {
+                    title: `Delete ${ticks.length} contacts?`,
+                    message: "Enter the security code.",
+                    confirmLabel: "Delete",
+                    danger: true,
+                    requireCode: true,
+                  },
+                )
+              }
+            />
             <SaveCube busy={saving} onSave={() => void saveToServer()} />
           </div>
         ) : null}
@@ -104,7 +153,7 @@ function ContactsPage() {
       {write && open ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">New contact</CardTitle>
+            <CardTitle className="text-base">{editingId ? "Edit contact" : "New contact"}</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
@@ -140,7 +189,7 @@ function ContactsPage() {
             <div className="sm:col-span-2">
               <Button type="button" onClick={add}>
                 <Plus className="size-4" />
-                Add
+                {editingId ? "Save" : "Add"}
               </Button>
             </div>
           </CardContent>
@@ -159,28 +208,42 @@ function ContactsPage() {
               <table className="w-full min-w-[36rem] text-left text-sm">
                 <thead className="text-[11px] uppercase tracking-wide text-muted">
                   <tr className="border-y border-border">
+                    {pick ? <th className="py-2 pr-3 font-medium">Tick</th> : null}
                     <th className="py-2 font-medium">For</th>
                     <th className="px-3 py-2 font-medium">Name</th>
                     <th className="px-3 py-2 font-medium">Contact</th>
                     <th className="px-3 py-2 font-medium">Address</th>
-                    {write ? <th className="py-2 font-medium" /> : null}
                   </tr>
                 </thead>
                 <tbody>
                   {contacts.map((row) => (
                     <tr key={row.id} className="border-b border-border/70">
+                      {pick ? (
+                        <td className="py-2.5 pr-3">
+                          <EntryTick
+                            checked={pick === "edit" ? editingId === row.id : ticks.includes(row.id)}
+                            label={`${pick === "edit" ? "Edit" : "Delete"} ${row.name}`}
+                            onChange={() => {
+                              if (pick === "edit") {
+                                setEditingId(row.id);
+                                setTopic(row.topic);
+                                setName(row.name);
+                                setPhone(row.phone);
+                                setAddress(row.address);
+                                setOpen(true);
+                                return;
+                              }
+                              setTicks((ids) =>
+                                ids.includes(row.id) ? ids.filter((id) => id !== row.id) : [...ids, row.id],
+                              );
+                            }}
+                          />
+                        </td>
+                      ) : null}
                       <td className="py-2.5 font-medium">{row.topic}</td>
                       <td className="px-3 py-2.5">{row.name}</td>
                       <td className="px-3 py-2.5 tabular">{row.phone || "—"}</td>
                       <td className="px-3 py-2.5">{row.address || "—"}</td>
-                      {write ? (
-                        <td className="py-2.5 text-right">
-                          <Button type="button" size="sm" variant="ghost" onClick={() => remove(row.id)}>
-                            <Trash2 className="size-4" />
-                            Delete
-                          </Button>
-                        </td>
-                      ) : null}
                     </tr>
                   ))}
                 </tbody>
