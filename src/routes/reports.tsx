@@ -219,7 +219,7 @@ function DayFileButton() {
       type="button"
       onClick={() => void download()}
       disabled={busy}
-      className="min-w-36 rounded-2xl border border-[#16130f] bg-[#16130f] px-4 py-3 text-left text-[#f6f0e6] disabled:opacity-60"
+      className="min-w-36 rounded-2xl border border-[#c4a36a] bg-[#16130f] px-4 py-3 text-left text-[#f6f0e6] disabled:opacity-60"
     >
       <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#e6c56a]">
         {formatDayShort(date)}
@@ -286,7 +286,7 @@ function MonthFileButton() {
       type="button"
       onClick={() => void download()}
       disabled={busy}
-      className="min-w-36 rounded-2xl border border-[#16130f] bg-[#16130f] px-4 py-3 text-left text-[#f6f0e6] disabled:opacity-60"
+      className="min-w-36 rounded-2xl border border-[#c4a36a] bg-[#16130f] px-4 py-3 text-left text-[#f6f0e6] disabled:opacity-60"
     >
       <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#e6c56a]">
         {formatDayShort(from)} – {formatDayShort(date)}

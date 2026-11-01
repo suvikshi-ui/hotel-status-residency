@@ -50,7 +50,10 @@
   }
 
   body {
-    background-color: #e7dcc8;
+    background-color: #d9c7a4;
+    background-image:
+      radial-gradient(900px 420px at 50% -120px, #f8efdc 0%, rgba(248, 239, 220, 0) 70%),
+      linear-gradient(180deg, #efe2c8 0%, #d7c29a 100%);
     color: #1c1612;
     --color-fg: #1c1612;
     --color-muted: #5c5148;
@@ -97,9 +100,9 @@
 .paper-card,
 .bg-card,
 .bg-bg-warm {
-  background: linear-gradient(180deg, #fffdf8 0%, #f7f1e6 100%);
-  border: 1px solid rgba(196, 163, 106, 0.45);
-  box-shadow: none;
+  background: linear-gradient(180deg, #fffdf8 0%, #f8f1e2 100%);
+  border: 1px solid rgba(180, 138, 62, 0.62);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 10px 24px rgba(28, 22, 14, 0.06);
   --color-fg: #1c1612;
   --color-muted: #5c5148;
   --color-primary: #1c1612;
@@ -119,11 +122,11 @@
 }
 
 .page-bar {
-  background: #16130f;
+  background: linear-gradient(180deg, #2a241c 0%, #100e0c 100%);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  border-color: #c4a36a;
-  box-shadow: inset 0 -1px 0 #c4a36a;
+  border-color: #e6c56a;
+  box-shadow: inset 0 1px 0 #e6c56a, inset 0 -2px 0 #c4a36a;
   color: #f8f1e4;
 }
 
@@ -172,7 +175,7 @@ select {
 }
 
 .daily-a4-head {
-  background: #16130f !important;
+  background: #1b332a !important;
   color: #f6f0e6 !important;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
@@ -226,6 +229,6 @@ select {
   }
 
   .daily-a4-head {
-    background: #16130f !important;
+    background: #1b332a !important;
   }
 }

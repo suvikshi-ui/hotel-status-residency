@@ -91,7 +91,7 @@ function TopLink({
       className={cn(
         "flex h-11 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-semibold",
         active
-          ? "bg-[#e8d5b0] text-[#1c1612]"
+          ? "bg-[#c4a36a] text-[#1c1612]"
           : onDark
             ? "text-[#f8f1e4] hover:bg-white/10"
             : "text-fg hover:bg-bg-warm",

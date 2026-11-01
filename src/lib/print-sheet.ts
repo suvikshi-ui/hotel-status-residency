@@ -116,7 +116,7 @@ html, body {
   min-height: 0 !important;
   border-radius: 16px;
 }
-.daily-a4-head { background: #16130f !important; color: #f8f1e4 !important; }
+.daily-a4-head { background: #1b332a !important; color: #f4efe4 !important; }
 .day-chart { background: #f7f1e6 !important; }`;
 
 export function a4PrintDocument(title: string, inner: string) {
@@ -255,7 +255,7 @@ export function printDailyRegister(input: {
       justify-content: space-between;
       gap: 10px;
       padding: 8px 10px;
-      background: #16130f;
+      background: #1b332a;
       color: #f6f0e6;
     }
     .head img {
@@ -268,7 +268,7 @@ export function printDailyRegister(input: {
       margin: 0;
       font-size: 18px;
       letter-spacing: .04em;
-      color: #e6c56a;
+      color: #f4c430;
       text-align: center;
     }
     .head p { margin: 2px 0 0; font-size: 10px; text-align: center; }

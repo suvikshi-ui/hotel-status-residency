@@ -71,7 +71,7 @@ const BODY = '"Source Serif 4", Georgia, "Times New Roman", serif';
 const DISPLAY = '"Fraunces", "Times New Roman", serif';
 
 const fill = {
-  ob: "#e6c56a",
+  ob: "#f4c430",
   ok: "#548235",
   bad: "#c00000",
   sub: "#efe8d8",
@@ -267,7 +267,7 @@ export function DailyA4({
         style={{
           padding: "8px 10px",
           borderBottom: B,
-          background: "#16130f",
+          background: "#1b332a",
           color: "#f6f0e6",
           WebkitPrintColorAdjust: "exact",
         }}
@@ -299,7 +299,7 @@ export function DailyA4({
                 fontSize: SIZE.title,
                 letterSpacing: "0.05em",
                 lineHeight: 1.05,
-                color: "#e6c56a",
+                color: "#f4c430",
                 fontOpticalSizing: "auto",
                 transform: "scaleX(0.94)",
                 transformOrigin: "center",
