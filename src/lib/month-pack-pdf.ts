@@ -18,10 +18,12 @@ import { paintPdfReportHead } from "./report-head";
 import { staffPay } from "./staff-pay";
 import type { AdvanceRow, GuestEntry, ModeAmount, NamedAmount, StaffRow } from "./types";
 
-const HEAD: [number, number, number] = [27, 51, 42];
-const GOLD: [number, number, number] = [244, 196, 48];
-const CREAM: [number, number, number] = [243, 234, 212];
-const SUB: [number, number, number] = [239, 232, 216];
+const HEAD: [number, number, number] = [14, 12, 10];
+const GOLD: [number, number, number] = [240, 215, 140];
+const CREAM: [number, number, number] = [255, 253, 248];
+const SUB: [number, number, number] = [243, 230, 200];
+const INK: [number, number, number] = [28, 22, 18];
+const RULE: [number, number, number] = [196, 163, 106];
 
 export type MonthPackInput = {
   hotel: string;
@@ -91,7 +93,7 @@ export async function downloadMonthPack(input: MonthPackInput, filename: string)
   async function sheet(landscape: boolean, right: string) {
     if (y > 0) pdf.addPage("a4", landscape ? "landscape" : "portrait");
     wide = landscape;
-    pdf.setFillColor(255, 255, 255);
+    pdf.setFillColor(255, 253, 248);
     const w = landscape ? 297 : 210;
     const h = landscape ? 210 : 297;
     pdf.rect(0, 0, w, h, "F");
@@ -103,11 +105,12 @@ export async function downloadMonthPack(input: MonthPackInput, filename: string)
       hotel: input.hotel.toUpperCase(),
       blessing: input.blessing.toUpperCase(),
       right,
+      tone: "luxury",
     });
     y += 3;
     pdf.setFont("times", "italic");
     pdf.setFontSize(8);
-    pdf.setTextColor(80, 80, 80);
+    pdf.setTextColor(...INK);
     pdf.text(range, 10, y);
     y += 4;
   }
@@ -150,12 +153,12 @@ export async function downloadMonthPack(input: MonthPackInput, filename: string)
         pdf.setFillColor(...(head ? CREAM : SUB));
         pdf.rect(10, y, contentW(), rh, "F");
       }
-      pdf.setDrawColor(26, 26, 26);
-      pdf.setLineWidth(0.12);
+      pdf.setDrawColor(...RULE);
+      pdf.setLineWidth(0.15);
       pdf.rect(10, y, contentW(), rh, "S");
       pdf.setFont("times", head || last ? "bold" : "normal");
       pdf.setFontSize(opts?.size ?? 8);
-      pdf.setTextColor(17, 17, 17);
+      pdf.setTextColor(...INK);
       let x = 10;
       cells.forEach((cell, i) => {
         const w = widths[i] ?? 20;

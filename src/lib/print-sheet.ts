@@ -117,7 +117,8 @@ html, body {
   border-radius: 16px;
 }
 .daily-a4-head { background: #1b332a !important; color: #f4efe4 !important; }
-.day-chart { background: #f7f1e6 !important; }`;
+.day-chart { background: #fffdf8 !important; color: #1c1612 !important; }
+.lux-report-head { background: #0e0c0a !important; color: #f6f0e6 !important; }`;
 
 export function a4PrintDocument(title: string, inner: string) {
   return `<!doctype html>

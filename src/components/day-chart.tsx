@@ -59,11 +59,11 @@ function byMode(rows: { mode: PayMode; amount: number }[], mode: PayMode) {
 }
 
 const PILL: Record<PayMode, { bg: string; fg: string; label: string }> = {
-  CASH: { bg: "#d8efe4", fg: "#1f6b4a", label: "CASH" },
-  QRS: { bg: "#d8efe4", fg: "#1f6b4a", label: "QRS" },
-  QRPK: { bg: "#dce8f5", fg: "#2c5282", label: "QRPK" },
-  ONLINE: { bg: "#ece8e0", fg: "#5c574e", label: "ONLINE" },
-  BALANCE: { bg: "#f3e4c8", fg: "#8a5a22", label: "BALANCE" },
+  CASH: { bg: "#f3e6c4", fg: "#3d2e12", label: "CASH" },
+  QRS: { bg: "#efe2c4", fg: "#5c4518", label: "QRS" },
+  QRPK: { bg: "#e7d3a4", fg: "#3d2e12", label: "QRPK" },
+  ONLINE: { bg: "#efe8dc", fg: "#4a4036", label: "ONLINE" },
+  BALANCE: { bg: "#f6ead0", fg: "#6b4e16", label: "BALANCE" },
 };
 
 function Pill({ mode }: { mode: PayMode }) {
@@ -101,7 +101,7 @@ function Section({
           fontWeight: 700,
           letterSpacing: "0.16em",
           textTransform: "uppercase",
-          color: "#6f675c",
+          color: "#8a6a32",
           marginBottom: 6,
         }}
       >
@@ -139,8 +139,8 @@ function EmptyLine() {
     <div
       style={{
         padding: "8px 2px",
-        borderBottom: "1px solid #eadfcd",
-        color: "#6f675c",
+        borderBottom: "1px solid #e8d7b0",
+        color: "#7a6854",
         fontSize: 12,
       }}
     >
@@ -164,7 +164,7 @@ function ItemRow({
         alignItems: "center",
         gap: 10,
         padding: "7px 2px",
-        borderBottom: "1px solid #eadfcd",
+        borderBottom: "1px solid #e8d7b0",
         fontSize: 12,
       }}
     >
@@ -184,13 +184,14 @@ const th: CSSProperties = {
   fontWeight: 700,
   letterSpacing: "0.08em",
   textTransform: "uppercase",
-  color: "#6f675c",
+  color: "#8a6a32",
   padding: "7px 8px",
-  borderBottom: "1px solid #eadfcd",
+  borderBottom: "1px solid #e8d7b0",
+  background: "#fffdf8",
 };
 const td: CSSProperties = {
   padding: "8px 8px",
-  borderBottom: "1px solid #eadfcd",
+  borderBottom: "1px solid #e8d7b0",
   verticalAlign: "top",
   fontSize: 12,
 };
@@ -329,23 +330,25 @@ export function DayChart({
       id="day-chart"
       className="day-chart"
       style={{
-        background: "#f7f1e6",
-        color: "#1a1a1a",
+        background: "#fffdf8",
+        color: "#1c1612",
         fontFamily: 'Georgia, "Times New Roman", Times, serif',
         padding: "18px 20px 28px",
-        border: "1px solid #e2d6c2",
+        border: "1px solid #c4a36a",
+        boxShadow: "0 0 0 1px #f0d78c inset",
       }}
     >
       <div
-        className="daily-a4-head"
+        className="lux-report-head"
         style={{
           display: "flex",
           alignItems: "center",
           gap: 10,
           margin: "-18px -20px 14px",
-          padding: "8px 12px",
-          background: "#1b332a",
+          padding: "10px 14px",
+          background: "#0e0c0a",
           color: "#f6f0e6",
+          boxShadow: "inset 0 1px 0 #f0d78c, inset 0 -2px 0 #a6853d",
         }}
       >
         <img src={publicUrl("logo.png?v=2")} alt="" className="logo-3d" style={{ height: 48, width: "auto" }} />
@@ -355,9 +358,9 @@ export function DayChart({
               fontFamily: '"Fraunces", "Times New Roman", serif',
               fontSize: 28,
               fontWeight: 700,
-              letterSpacing: "0.04em",
+              letterSpacing: "0.08em",
               lineHeight: 1.05,
-              color: "#f4c430",
+              color: "#f0d78c",
               transform: "scaleX(0.96)",
               transformOrigin: "center",
               whiteSpace: "nowrap",
@@ -365,11 +368,11 @@ export function DayChart({
           >
             {hotel}
           </div>
-          <div style={{ marginTop: 2, fontSize: 13, fontFamily: '"Fraunces", "Times New Roman", serif' }}>
+          <div style={{ marginTop: 2, fontSize: 13, fontFamily: '"Fraunces", "Times New Roman", serif', color: "#f6f0e6" }}>
             {blessing}
           </div>
         </div>
-        <div style={{ fontWeight: 700, fontSize: 14, textAlign: "right" }}>
+        <div style={{ fontWeight: 700, fontSize: 14, textAlign: "right", color: "#f0d78c" }}>
           Detailed daily
           <div>{longDay(date)}</div>
         </div>
@@ -377,7 +380,7 @@ export function DayChart({
       <div style={{ marginTop: 4, fontSize: 16, fontWeight: 600 }}>
         {sept(date)} 11:00 AM — {sept(next)} 11:00 AM
       </div>
-      <div style={{ marginTop: 3, marginBottom: 10, fontSize: 11, color: "#6f675c" }}>
+      <div style={{ marginTop: 3, marginBottom: 10, fontSize: 11, color: "#7a6854" }}>
         Same layout as Daily register · {guests.length} posting
         {guests.length === 1 ? "" : "s"}
       </div>
@@ -402,7 +405,7 @@ export function DayChart({
               const cout = dates.checkOut || next;
               return (
                 <tr key={g.id}>
-                  <td style={{ ...td, color: "#6f675c" }}>{g.slNo}</td>
+                  <td style={{ ...td, color: "#7a6854" }}>{g.slNo}</td>
                   <td style={{ ...td, fontWeight: 700 }}>
                     {g.name.toUpperCase()}
                     {g.otaChannel === "FAB"
@@ -420,15 +423,15 @@ export function DayChart({
                   <td style={{ ...td, fontVariantNumeric: "tabular-nums" }}>
                     {rupee(g.amount)}
                   </td>
-                  <td style={{ ...td, color: "#6f675c", whiteSpace: "nowrap" }}>
+                  <td style={{ ...td, color: "#7a6854", whiteSpace: "nowrap" }}>
                     {g.time || "—"}
                   </td>
-                  <td style={{ ...td, fontSize: 11, color: "#6f675c" }}>
+                  <td style={{ ...td, fontSize: 11, color: "#7a6854" }}>
                     {sept(cin)}
                     <br />
                     {g.inTime || "11:00 AM"}
                   </td>
-                  <td style={{ ...td, fontSize: 11, color: "#6f675c" }}>
+                  <td style={{ ...td, fontSize: 11, color: "#7a6854" }}>
                     {sept(cout)}
                     <br />
                     {g.outTime || "11:00 AM"}
@@ -591,7 +594,7 @@ export function DayChart({
             </tr>
           </tbody>
         </table>
-        <p style={{ fontSize: 11, color: "#6f675c", marginTop: 8 }}>
+        <p style={{ fontSize: 11, color: "#7a6854", marginTop: 8 }}>
           Cash in today {rupee(payTotal.cash)} · Santosh QR and P.K. QR are separate ·
           Fab and BraveStay are named on Balance received, and the amount sits in P.K. QR.
         </p>

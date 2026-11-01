@@ -117,11 +117,18 @@ export async function paintPdfReportHead(
     hotel: string;
     blessing?: string;
     right?: string;
+    tone?: "daily" | "luxury";
   },
 ) {
   const h = input.h ?? 18;
-  pdf.setFillColor(27, 51, 42);
+  const luxury = input.tone === "luxury";
+  pdf.setFillColor(luxury ? 14 : 27, luxury ? 12 : 51, luxury ? 10 : 42);
   pdf.rect(input.x, input.y, input.w, h, "F");
+  if (luxury) {
+    pdf.setFillColor(240, 215, 140);
+    pdf.rect(input.x, input.y, input.w, 0.45, "F");
+    pdf.rect(input.x, input.y + h - 0.45, input.w, 0.45, "F");
+  }
   const logo = await logoDataUrl();
   if (logo) {
     try {
@@ -133,7 +140,7 @@ export async function paintPdfReportHead(
   const cx = input.x + input.w / 2;
   pdf.setFont("times", "bold");
   pdf.setFontSize(15);
-  pdf.setTextColor(244, 196, 48);
+  pdf.setTextColor(luxury ? 240 : 244, luxury ? 215 : 196, luxury ? 140 : 48);
   pdf.text(input.hotel, cx, input.y + 7.8, { align: "center" });
   if (input.blessing) {
     pdf.setFontSize(8);
