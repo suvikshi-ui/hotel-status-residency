@@ -11,7 +11,6 @@ import { englishNarration } from "@/lib/english-narration";
 import { isDayLocked } from "@/lib/register-lock";
 import { useLedger } from "@/lib/store";
 import { canWrite } from "@/lib/roles";
-import { ReportsLink } from "@/components/reports-link";
 
 export const Route = createFileRoute("/expenses")({ component: ExpensesPage });
 
@@ -61,7 +60,6 @@ function ExpensesPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2 print:hidden">
-          <ReportsLink view="month" />
           <Button variant="outline" className="print:hidden" onClick={() => window.print()}>
           <Printer className="size-4" />
           Print

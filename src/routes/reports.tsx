@@ -652,8 +652,6 @@ function DetailDailyPanel() {
 
 function DailyReportPanel() {
   const date = useLedger((s) => s.selectedDate);
-  const setDate = useLedger((s) => s.setDate);
-  const days = useLedger((s) => s.days);
   const hotel = useLedger((s) => s.hotel);
   const allGuests = useLedger((s) => s.guests);
   const allFood = useLedger((s) => s.food);
@@ -668,11 +666,6 @@ function DailyReportPanel() {
   const books = useDayBooks(date);
   const lock = useMonthLock(date);
   const take = buildDayTake(guests, food, ws);
-  const month = date.slice(0, 7);
-  const monthDays = days
-    .map((day) => day.date)
-    .filter((iso) => iso.startsWith(month))
-    .sort();
 
   if (lock.closed) {
     return (
@@ -708,20 +701,6 @@ function DailyReportPanel() {
             Print
           </Button>
         </div>
-      </div>
-      <div className="flex gap-1.5 overflow-x-auto pb-1 print:hidden">
-        {monthDays.map((iso) => (
-          <Button
-            key={iso}
-            type="button"
-            size="sm"
-            variant={iso === date ? "default" : "outline"}
-            className="min-w-10 px-2"
-            onClick={() => setDate(iso)}
-          >
-            {Number(iso.slice(8))}
-          </Button>
-        ))}
       </div>
       <div className="mx-auto w-full max-w-[210mm]">
       <DailyA4

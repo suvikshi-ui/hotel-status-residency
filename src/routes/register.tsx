@@ -19,7 +19,6 @@ import { RegisterLines } from "@/components/register-lines";
 import { ModeBadge } from "@/components/mode-badge";
 import { PkRefField } from "@/components/pk-ref";
 import { YesterdayRoll } from "@/components/yesterday-roll";
-import { ReportsLink } from "@/components/reports-link";
 import { useGate } from "@/components/security-gate";
 import { buildDayTake } from "@/lib/day-report";
 import { formatDay, formatDayShort, money, uid } from "@/lib/format";
@@ -178,7 +177,6 @@ function RegisterPage() {
               Lock
             </Button>
           )}
-          <ReportsLink view="daily" label="Reports" />
         </div>
         </div>
 

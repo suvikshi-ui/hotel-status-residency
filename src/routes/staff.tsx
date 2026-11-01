@@ -488,7 +488,6 @@ function StaffPage() {
             openId={salaryOpen}
             saved={Boolean(salarySaved)}
             files={salaryFiles}
-            spanYear
             editing={salaryEditing}
             onOpen={(id) => {
               const file = salaryFiles.find((row) => row.id === id);

@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowUpRight, BedDouble, UtensilsCrossed, Wallet } from "lucide-react";
+import { createFileRoute } from "@tanstack/react-router";
+import { BedDouble, UtensilsCrossed, Wallet } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ModeBadge } from "@/components/mode-badge";
-import { Button } from "@/components/ui/button";
 import { formatDayShort, money, moneyCompact, normRoom } from "@/lib/format";
 import { useLedger, useDayBooks } from "@/lib/store";
 import { HotelLogo } from "@/components/hotel-logo";
@@ -75,9 +74,6 @@ function Overview() {
             Daily occupancy, sales and night audit — start posting from today.
           </p>
         </div>
-        <Button asChild>
-          <Link to="/register">Post a guest</Link>
-        </Button>
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -118,13 +114,6 @@ function Overview() {
               target {money(hotel.dailyTarget)}
             </p>
           </div>
-          <Link
-            to="/reports"
-            search={{ view: "month" }}
-            className="hidden items-center gap-1 text-sm text-primary md:inline-flex"
-          >
-            Full report <ArrowUpRight className="size-4" />
-          </Link>
         </CardHeader>
         <CardContent className="h-56 md:h-72">
           <SalesChart chart={chart} />
@@ -153,9 +142,6 @@ function Overview() {
       <Card>
         <CardHeader className="flex-row items-center justify-between">
           <CardTitle>Today's register</CardTitle>
-          <Link to="/register" className="text-sm text-primary">
-            Open register
-          </Link>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           <table className="w-full min-w-[32rem] text-left text-sm">

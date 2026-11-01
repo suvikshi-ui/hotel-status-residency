@@ -57,10 +57,13 @@ function CashCountPage() {
     found.add(String(new Date().getFullYear()));
     return [...found].filter((value) => /^\d{4}$/.test(value)).sort();
   }, [counts, year]);
-  const months = useMemo(
-    () => Array.from({ length: 12 }, (_, index) => `${year}-${String(index + 1).padStart(2, "0")}`),
-    [year],
-  );
+  const months = useMemo(() => {
+    const found = new Set(
+      counts.filter((row) => row.date.startsWith(`${year}-`)).map((row) => row.date.slice(0, 7)),
+    );
+    if (month.startsWith(`${year}-`)) found.add(month.slice(0, 7));
+    return [...found].sort();
+  }, [counts, year, month]);
   const dayList = useMemo(() => daysOf(month), [month]);
   const savedDates = useMemo(() => new Set(counts.map((row) => row.date)), [counts]);
 
